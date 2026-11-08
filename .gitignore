@@ -5,3 +5,5 @@ __pycache__/
 data/finn.db*
 data/pdfs/
 .pytest_cache/
+static/_dev/
+data/*.log

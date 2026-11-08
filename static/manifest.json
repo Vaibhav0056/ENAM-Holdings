@@ -1,0 +1,16 @@
+{
+  "name": "FINN — portfolio inbox",
+  "short_name": "FINN",
+  "description": "What changed in your Indian stock portfolio, and why you should care.",
+  "start_url": "/#today",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0d10",
+  "theme_color": "#0b0d10",
+  "icons": [
+    {"src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "/static/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

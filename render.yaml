@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: finn
+    runtime: docker
+    plan: starter            # persistent disks need a paid plan; on free, drop the disk and FINN_DB (seed.db is used on every boot)
+    healthCheckPath: /api/health
+    disk:
+      name: finn-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: FINN_DB
+        value: /var/data/finn.db
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CHEAP_MODEL
+        value: gemini-3.5-flash
+      - key: STRONG_MODEL
+        value: gemini-3.8-flash
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:admin@example.com
+      - key: TAVILY_API_KEY
+        sync: false

@@ -120,6 +120,26 @@ def _row_numbers(toks: list[str]) -> list[float]:
     return [n for _, n in nums]
 
 
+_SUBITEM = re.compile(r"^\s*(?:[-–•]|\(?[a-h]\)|\(?[ivx]{1,3}\))\s*\S")
+
+
+def _sum_sublines(lines: list[str], idx: int, raw: str):
+    """A label with no figures of its own ('Revenue from operations' then '- Sale of products 20,337 ...',
+    '- Other operating revenues 277 ...') is the column-wise SUM of its sub-items. Python adds them."""
+    rows, quote = [], [raw.strip()]
+    for ln in lines[idx + 1: idx + 6]:
+        if not _SUBITEM.match(ln):
+            break
+        nums = _row_numbers(ln.split())
+        if len(nums) < 3:
+            break
+        rows.append(nums[:3])
+        quote.append(ln.strip())
+    if len(rows) < 2:
+        return [], raw
+    return [round(sum(r[i] for r in rows), 4) for i in range(3)], " / ".join(quote)
+
+
 def parse_page(text: str) -> dict:
     """Deterministic: for each metric, take the first line starting with its label and read 3 numbers."""
     lines = text.splitlines()
@@ -146,6 +166,8 @@ def parse_page(text: str) -> dict:
                         break  # only pure-number continuation lines belong to this row
                     nums += _row_numbers(nxt)
                     j += 1
+                if len(nums) < 3 and metric == "revenue":
+                    nums, raw = _sum_sublines(lines, idx, raw)
                 if len(nums) >= 3:
                     found[metric] = {"current_quarter": nums[0], "previous_quarter": nums[1],
                                      "same_quarter_last_year": nums[2], "quote": raw.strip()}

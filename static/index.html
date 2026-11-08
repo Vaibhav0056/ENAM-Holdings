@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FINN</title>
+  <meta name="description" content="Your portfolio's daily inbox: what changed and why you should care.">
+  <meta name="theme-color" content="#0b0d10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FINN">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/static/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script>
+    tailwind.config = { darkMode: "class", theme: { extend: {
+      colors: { bg: "#0b0d10", surface: "#14171c", raised: "#1b1f26", line: "#262b33", ink: "#e6e8eb",
+                mute: "#8b93a1", faint: "#5d6470", accent: "#8ab4ff", up: "#3ecf8e", down: "#ff6b6b" },
+      fontFamily: { sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"] } } } };
+  </script>
+  <style>
+    :root { color-scheme: dark; }
+    body { background: #0b0d10; color: #e6e8eb; -webkit-tap-highlight-color: transparent; }
+    .num { font-variant-numeric: tabular-nums; }
+    .clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .clamp1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    [x-cloak] { display: none !important; }
+    .safe-b { padding-bottom: max(env(safe-area-inset-bottom), 8px); }
+    .card-swipe { transition: transform .18s ease, opacity .18s ease; touch-action: pan-y; }
+    .spin { animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
+    .flash { animation: flash 1.6s ease; } @keyframes flash { 0% { box-shadow: 0 0 0 2px #8ab4ff; } 100% { box-shadow: 0 0 0 0 transparent; } }
+    input[type=number]::-webkit-inner-spin-button { opacity: .4; }
+  </style>
+  <script defer src="/static/app.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+</head>
+<body class="min-h-screen font-sans text-[15px] leading-snug">
+<div x-data="finn()" x-init="init()" x-cloak class="max-w-md mx-auto min-h-screen flex flex-col">
+
+  <!-- ===================== TODAY ===================== -->
+  <main x-show="tab==='today'" class="flex-1 pb-24">
+    <header class="sticky top-0 z-10 bg-bg/95 backdrop-blur px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2 border-b border-line">
+      <div class="flex items-center justify-between">
+        <h1 class="text-lg font-semibold tracking-tight">Today</h1>
+        <div class="flex bg-surface border border-line rounded-lg p-0.5 text-xs">
+          <template x-for="w in ['24h','3d','7d','30d']" :key="w">
+            <button @click="setWindow(w)" class="px-2.5 py-1 rounded-md num"
+                    :class="feedWindow===w ? 'bg-raised text-ink' : 'text-mute'" x-text="w"></button>
+          </template>
+        </div>
+      </div>
+      <p class="text-xs text-mute mt-1 num" x-text="feedHeader()"></p>
+      <p x-show="feed && feed.note" class="text-[11px] text-faint mt-0.5" x-text="feed && feed.note"></p>
+    </header>
+
+    <div class="px-3 pt-3 space-y-3">
+      <template x-if="loading.feed && !feed"><p class="text-mute text-sm px-1">Loading filings…</p></template>
+      <template x-if="feed && feed.cards.length===0">
+        <div class="text-center text-mute text-sm py-10">Nothing needs you right now.</div>
+      </template>
+
+      <template x-for="c in (feed ? feed.cards : [])" :key="c.id">
+        <article :id="'card-'+c.id" class="card-swipe bg-surface border border-line rounded-xl p-3"
+                 :class="{'flash': focusId===c.id}"
+                 @touchstart.passive="swipeStart($event, c)" @touchmove.passive="swipeMove($event, c)" @touchend="swipeEnd($event, c)">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span x-show="c.bucket==='attention'" class="w-1.5 h-1.5 rounded-full bg-accent shrink-0"></span>
+                <span class="font-semibold" x-text="c.symbol"></span>
+                <span class="text-[11px] px-1.5 py-0.5 rounded bg-raised text-mute border border-line" x-text="c.type_label"></span>
+              </div>
+              <p class="text-xs text-mute clamp1 mt-0.5" x-text="c.name"></p>
+            </div>
+            <span class="text-[11px] text-faint num shrink-0" x-text="score(c)"></span>
+          </div>
+
+          <!-- results card -->
+          <template x-if="c.type==='results' && c.enrichment && c.enrichment.ok">
+            <div class="mt-2">
+              <table class="w-full text-sm num">
+                <thead><tr class="text-[11px] text-faint">
+                  <th class="text-left font-normal pb-1">₹ cr</th><th class="text-right font-normal">This qtr</th>
+                  <th class="text-right font-normal">QoQ</th><th class="text-right font-normal">YoY</th></tr></thead>
+                <tbody>
+                  <template x-for="r in c.enrichment.table" :key="r.metric">
+                    <tr class="border-t border-line/60">
+                      <td class="py-1 text-mute" x-text="metricLabel(r.metric)"></td>
+                      <td class="py-1 text-right" x-text="r.found ? crore(r.current) : '—'"></td>
+                      <td class="py-1 text-right" :class="deltaCls(r.qoq)" x-text="pct(r.qoq)"></td>
+                      <td class="py-1 text-right" :class="deltaCls(r.yoy)" x-text="pct(r.yoy)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+              <div class="flex items-center gap-1.5 mt-1.5 text-[11px]">
+                <span class="px-1.5 py-0.5 rounded bg-raised text-mute capitalize" x-text="c.enrichment.basis"></span>
+                <span class="px-1.5 py-0.5 rounded border"
+                      :class="c.enrichment.confidence==='high' ? 'border-line text-mute' : 'border-accent/50 text-accent'"
+                      x-text="c.enrichment.confidence + ' confidence'"></span>
+                <span class="text-faint" x-show="c.enrichment.table.find(t=>t.metric==='ebitda' && t.derived)">EBITDA derived</span>
+              </div>
+            </div>
+          </template>
+          <template x-if="c.type==='results' && c.enrichment && !c.enrichment.ok">
+            <p class="text-xs text-mute mt-2" x-text="'Figures not extracted: ' + c.enrichment.reason"></p>
+          </template>
+
+          <!-- mgmt change card -->
+          <template x-if="c.type==='mgmt_change' && c.enrichment && c.enrichment.people && c.enrichment.people.length">
+            <div class="mt-2 space-y-2">
+              <template x-for="p in c.enrichment.people.slice(0,3)" :key="p.name">
+                <div class="text-sm">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs px-1.5 rounded" :class="p.direction==='appointed' ? 'bg-accent/15 text-accent' : 'bg-raised text-mute'"
+                          x-text="p.direction==='appointed' ? 'IN' : 'OUT'"></span>
+                    <span class="font-medium" x-text="p.name"></span>
+                  </div>
+                  <p class="text-xs text-mute clamp1" x-text="p.role + (p.effective_date ? ' · from ' + p.effective_date : '')"></p>
+                  <p x-show="p.bio" class="text-xs text-ink/80 clamp2 mt-0.5" x-text="p.bio"></p>
+                  <a x-show="p.bio_url" :href="p.bio_url" target="_blank" rel="noopener" class="text-[11px] text-accent">Bio source ↗</a>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- generic one-liner -->
+          <template x-if="c.one_liner && !(c.type==='results' && c.enrichment && c.enrichment.ok) && !(c.type==='mgmt_change' && c.enrichment && c.enrichment.people && c.enrichment.people.length)">
+            <p class="text-sm mt-2 clamp2" x-text="c.one_liner.text"></p>
+          </template>
+          <template x-if="!c.one_liner && !c.enrichment">
+            <p class="text-sm mt-2 clamp2 text-ink/90" x-text="c.subject"></p>
+          </template>
+          <p x-show="c.status==='error'" class="text-xs text-down mt-1">Couldn't process this filing. Open it directly.</p>
+
+          <div class="flex items-center gap-1.5 mt-2 text-[11px] text-faint whitespace-nowrap">
+            <span class="px-1.5 py-0.5 rounded bg-raised text-mute">BSE</span>
+            <span class="num" x-text="ago(c.filed_at)"></span>
+            <span>·</span>
+            <a x-show="c.pdf_url" :href="c.pdf_url" target="_blank" rel="noopener" class="text-mute underline underline-offset-2 decoration-line">Open filing</a>
+          </div>
+          <div class="flex items-center gap-2 mt-2 text-xs whitespace-nowrap">
+            <button @click="review(c)" class="flex-1 text-mute py-2 rounded-lg border border-line">Mark reviewed</button>
+            <button @click="openResearch(c.symbol)" class="flex-1 text-accent font-medium py-2 rounded-lg bg-accent/10">Dig deeper →</button>
+          </div>
+        </article>
+      </template>
+
+      <!-- routine, collapsed -->
+      <template x-if="feed && feed.routine.length">
+        <div class="bg-surface/60 border border-line rounded-xl">
+          <button @click="routineOpen=!routineOpen" class="w-full flex items-center justify-between px-3 py-3 text-sm text-mute">
+            <span class="num" x-text="feed.routine.length + ' routine filings'"></span>
+            <span x-text="routineOpen ? 'Hide' : 'Show'"></span>
+          </button>
+          <div x-show="routineOpen" class="border-t border-line divide-y divide-line">
+            <template x-for="r in feed.routine" :key="r.id">
+              <div class="px-3 py-2 text-xs">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-medium text-ink" x-text="r.symbol"></span>
+                  <span class="text-faint" x-text="r.type_label"></span>
+                  <span class="flex-1"></span>
+                  <span class="text-faint num" x-text="ago(r.filed_at)"></span>
+                </div>
+                <div class="flex gap-2">
+                  <p class="text-mute clamp1 flex-1" x-text="r.subject"></p>
+                  <a x-show="r.pdf_url" :href="r.pdf_url" target="_blank" rel="noopener" class="text-accent shrink-0">PDF</a>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+      <template x-if="feed && feed.reviewed.length">
+        <button @click="unreviewAll()" class="w-full text-xs text-faint py-2 num" x-text="feed.reviewed.length + ' reviewed · restore'"></button>
+      </template>
+    </div>
+  </main>
+
+  <!-- ===================== ALERTS ===================== -->
+  <main x-show="tab==='alerts'" class="flex-1 pb-24">
+    <header class="sticky top-0 z-10 bg-bg/95 backdrop-blur px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2 border-b border-line flex items-center justify-between">
+      <h1 class="text-lg font-semibold">Alerts</h1>
+      <button x-show="unread" @click="readAll()" class="text-xs text-mute">Mark all read</button>
+    </header>
+    <div class="divide-y divide-line">
+      <template x-if="alerts.length===0"><p class="text-mute text-sm p-4">No alerts yet. Thresholds live in Settings.</p></template>
+      <template x-for="a in alerts" :key="a.id">
+        <button @click="openAlert(a)" class="w-full text-left px-4 py-3 flex gap-3 active:bg-surface">
+          <span class="mt-1.5 w-2 h-2 rounded-full shrink-0" :class="a.read ? 'bg-transparent' : 'bg-accent'"></span>
+          <span class="min-w-0 flex-1">
+            <span class="flex justify-between gap-2">
+              <span class="font-medium clamp1" :class="a.read ? 'text-mute' : 'text-ink'" x-text="a.title"></span>
+              <span class="text-[11px] text-faint num shrink-0" x-text="shortDate(a.date)"></span>
+            </span>
+            <span class="block text-xs text-mute clamp2 mt-0.5" x-text="a.body"></span>
+          </span>
+        </button>
+      </template>
+    </div>
+  </main>
+
+  <!-- ===================== RESEARCH ===================== -->
+  <main x-show="tab==='research'" class="flex-1 pb-24">
+    <header class="sticky top-0 z-10 bg-bg/95 backdrop-blur px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 border-b border-line">
+      <h1 class="text-lg font-semibold mb-2">Research</h1>
+      <form @submit.prevent="startResearch(rq.query)" class="flex gap-2">
+        <input x-model="rq.query" placeholder="Any NSE symbol, e.g. TRENT" autocapitalize="characters" autocomplete="off" spellcheck="false"
+               class="flex-1 bg-surface border border-line rounded-lg px-3 py-2 uppercase placeholder:normal-case placeholder:text-faint focus:outline-none focus:border-accent">
+        <button class="bg-accent text-bg font-semibold rounded-lg px-4">Go</button>
+      </form>
+      <div class="flex gap-1.5 mt-2 overflow-x-auto text-xs" x-show="recent.length">
+        <template x-for="r in recent" :key="r.symbol">
+          <button @click="startResearch(r.symbol)" class="px-2 py-1 rounded-md bg-surface border border-line text-mute shrink-0" x-text="r.symbol"></button>
+        </template>
+      </div>
+    </header>
+
+    <div class="px-3 pt-3 space-y-3">
+      <!-- progress -->
+      <template x-if="rq.job && rq.job.status==='running'">
+        <div class="bg-surface border border-line rounded-xl p-4">
+          <div class="flex justify-between text-sm mb-2"><span class="font-medium" x-text="rq.job.symbol"></span>
+            <span class="text-mute num" x-text="Math.round((rq.job.progress||0)*100)+'%'"></span></div>
+          <div class="h-1 bg-raised rounded"><div class="h-1 bg-accent rounded transition-all" :style="'width:'+Math.round((rq.job.progress||0)*100)+'%'"></div></div>
+          <ol class="mt-3 space-y-1.5 text-sm">
+            <template x-for="(s,i) in rq.job.stages" :key="s">
+              <li class="flex items-center gap-2" :class="stageState(i)==='todo' ? 'text-faint' : 'text-ink'">
+                <span class="w-4 text-center" x-show="stageState(i)==='done'">✓</span>
+                <span class="w-4 h-4 border-2 border-accent border-t-transparent rounded-full spin" x-show="stageState(i)==='now'"></span>
+                <span class="w-4 text-center" x-show="stageState(i)==='todo'">·</span>
+                <span x-text="s"></span>
+              </li>
+            </template>
+          </ol>
+          <p class="text-xs text-faint mt-3">First run reads every document, so it can take a few minutes. Reports are cached for 24h.</p>
+        </div>
+      </template>
+      <template x-if="rq.job && rq.job.status==='error'">
+        <div class="bg-surface border border-line rounded-xl p-4 text-sm">
+          <p class="text-down">Research failed for <span x-text="rq.job.symbol"></span>.</p>
+          <p class="text-mute text-xs mt-1" x-text="rq.job.error"></p>
+        </div>
+      </template>
+
+      <!-- result -->
+      <template x-if="rq.result">
+        <div class="space-y-3">
+          <div class="px-1">
+            <div class="flex items-baseline justify-between">
+              <h2 class="text-base font-semibold" x-text="rq.result.symbol"></h2>
+              <span class="text-[11px] text-faint" x-text="'Generated ' + ago(rq.result.generated_at)"></span>
+            </div>
+            <p class="text-xs text-mute" x-text="rq.result.name"></p>
+            <div class="flex flex-wrap gap-1.5 mt-2 text-[11px]">
+              <template x-for="s in rq.result.sources" :key="s.id">
+                <a :href="s.url" target="_blank" rel="noopener" class="px-1.5 py-0.5 rounded border"
+                   :class="s.ok ? 'border-line text-mute' : 'border-line text-faint line-through'"
+                   x-text="s.id + ' · ' + (s.kind==='transcript' ? 'Concall ' + (s.quarter || s.label) : 'Annual report')"></a>
+              </template>
+            </div>
+            <template x-for="n in rq.result.notes" :key="n"><p class="text-xs text-accent mt-1" x-text="n"></p></template>
+          </div>
+
+          <section class="bg-surface border border-line rounded-xl">
+            <div class="px-3 pt-3 pb-2 flex items-center justify-between">
+              <h3 class="font-semibold text-sm">Promised vs Delivered</h3>
+              <span class="text-[11px] text-faint num" x-text="verdictSummary()"></span>
+            </div>
+            <template x-if="!rq.result.rows.length"><p class="px-3 pb-3 text-sm text-mute">Not found in sources: no verifiable guidance in the transcripts.</p></template>
+            <div class="divide-y divide-line">
+              <template x-for="(r,i) in rq.result.rows" :key="r.guidance.id">
+                <div>
+                  <button @click="rq.open = rq.open===i ? null : i" class="w-full text-left px-3 py-2.5">
+                    <div class="flex items-start gap-2">
+                      <div class="min-w-0 flex-1">
+                        <p class="text-sm clamp1" x-text="r.guidance.metric"></p>
+                        <p class="text-xs text-mute clamp2 num"><span x-text="r.guidance.target_text"></span>
+                          <span class="text-faint" x-text="' · ' + r.guidance.horizon"></span></p>
+                        <p class="text-xs num mt-0.5" :class="r.actual ? 'text-ink' : 'text-faint'" x-text="actualText(r)"></p>
+                      </div>
+                      <span class="text-[11px] px-1.5 py-0.5 rounded shrink-0 capitalize" :class="verdictCls(r.verdict)" x-text="r.verdict"></span>
+                    </div>
+                  </button>
+                  <div x-show="rq.open===i" class="px-3 pb-3 space-y-2">
+                    <blockquote class="text-xs text-ink/90 border-l-2 border-accent pl-2">
+                      <span x-text="'“' + r.guidance.quote + '”'"></span>
+                      <span class="block text-faint mt-0.5" x-text="r.guidance.speaker + ' · ' + docLabel(r.guidance.doc) + ' · p.' + r.guidance.page"></span>
+                    </blockquote>
+                    <template x-if="r.actual || r.progress">
+                      <blockquote class="text-xs text-ink/90 border-l-2 border-line pl-2">
+                        <span x-text="'“' + (r.actual||r.progress).quote + '”'"></span>
+                        <span class="block text-faint mt-0.5" x-text="docLabel((r.actual||r.progress).doc) + ' · p.' + (r.actual||r.progress).page"></span>
+                      </blockquote>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <section class="bg-surface border border-line rounded-xl p-3">
+            <h3 class="font-semibold text-sm mb-2">Business snapshot</h3>
+            <template x-if="!rq.result.snapshot.what_it_does && !rq.result.snapshot.segments.length">
+              <p class="text-sm text-mute">Not found in sources.</p></template>
+            <p x-show="rq.result.snapshot.what_it_does" class="text-sm" x-text="rq.result.snapshot.what_it_does && rq.result.snapshot.what_it_does.text"></p>
+            <ul class="mt-2 space-y-1.5">
+              <template x-for="s in rq.result.snapshot.segments" :key="s.name">
+                <li class="text-sm"><span class="font-medium" x-text="s.name"></span>
+                  <span class="text-mute num" x-show="s.share_pct!=null" x-text="' · ' + s.share_pct + '%'"></span>
+                  <p class="text-xs text-mute clamp2" x-text="s.description"></p>
+                  <p class="text-[11px] text-faint" x-text="docLabel(s.doc) + ' · p.' + s.page"></p></li>
+              </template>
+            </ul>
+            <ul class="mt-2 space-y-1" x-show="rq.result.snapshot.revenue_mix.length">
+              <template x-for="m in rq.result.snapshot.revenue_mix" :key="m.quote">
+                <li class="text-xs text-mute num"><span x-text="m.text"></span> <span class="text-faint" x-text="'p.' + m.page"></span></li>
+              </template>
+            </ul>
+          </section>
+
+          <section class="bg-surface border border-line rounded-xl p-3">
+            <h3 class="font-semibold text-sm mb-2">Credibility read</h3>
+            <template x-if="!rq.result.synthesis.credibility.length"><p class="text-sm text-mute">Not enough verified evidence.</p></template>
+            <ul class="space-y-2">
+              <template x-for="b in rq.result.synthesis.credibility" :key="b.text">
+                <li class="text-sm"><span x-text="b.text"></span> <span class="text-[11px] text-accent" x-text="b.evidence.join(' ')"></span></li>
+              </template>
+            </ul>
+          </section>
+
+          <div class="grid grid-cols-1 gap-3">
+            <template x-for="side in ['bull','bear']" :key="side">
+              <section class="bg-surface border border-line rounded-xl p-3">
+                <h3 class="font-semibold text-sm mb-2" x-text="side==='bull' ? 'Bull case' : 'Bear case'"></h3>
+                <template x-if="!rq.result.synthesis[side].length"><p class="text-sm text-mute">Not enough verified evidence.</p></template>
+                <ul class="space-y-2">
+                  <template x-for="b in rq.result.synthesis[side]" :key="b.text">
+                    <li class="text-sm"><span x-text="b.text"></span> <span class="text-[11px] text-accent" x-text="b.evidence.join(' ')"></span></li>
+                  </template>
+                </ul>
+              </section>
+            </template>
+          </div>
+          <p class="text-[11px] text-faint px-1 pb-2">Built only from the linked concall transcripts and annual report. Every quote was matched to its page. Decision support only, not investment advice.</p>
+        </div>
+      </template>
+
+      <template x-if="!rq.job && !rq.result">
+        <p class="text-sm text-mute px-1">Search any NSE symbol to see what management promised on earnings calls and what they actually delivered, with the exact quote and page.</p>
+      </template>
+    </div>
+  </main>
+
+  <!-- ===================== SETTINGS ===================== -->
+  <main x-show="tab==='settings'" class="flex-1 pb-24">
+    <header class="sticky top-0 z-10 bg-bg/95 backdrop-blur px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2 border-b border-line">
+      <h1 class="text-lg font-semibold">Settings</h1>
+    </header>
+    <div class="px-3 pt-3 space-y-3">
+      <div x-show="iosHint" class="bg-accent/10 border border-accent/40 rounded-xl p-3 text-sm flex gap-2">
+        <p class="flex-1">Add FINN to your Home Screen to get notifications.</p>
+        <button @click="dismissIosHint()" class="text-mute text-xs">Got it</button>
+      </div>
+
+      <section class="bg-surface border border-line rounded-xl p-3 space-y-3">
+        <h3 class="font-semibold text-sm">Notifications</h3>
+        <div class="flex gap-2">
+          <button @click="enablePush()" class="flex-1 bg-accent text-bg font-semibold rounded-lg py-2 text-sm" x-text="pushState==='on' ? 'Notifications on' : 'Enable notifications'"></button>
+          <button @click="testPush()" class="flex-1 bg-raised border border-line rounded-lg py-2 text-sm">Send test</button>
+        </div>
+        <p class="text-xs text-mute" x-text="pushMsg"></p>
+      </section>
+
+      <section class="bg-surface border border-line rounded-xl p-3 space-y-3">
+        <h3 class="font-semibold text-sm">Alert rules</h3>
+        <template x-for="r in rules" :key="r.kind">
+          <div>
+            <label class="flex items-center justify-between gap-2 text-sm">
+              <span x-text="ruleLabel(r)"></span>
+              <input type="checkbox" x-model="r.enabled" class="accent-[#8ab4ff] w-4 h-4">
+            </label>
+            <template x-if="r.kind!=='announcement_type'">
+              <div class="flex items-center gap-2 mt-1">
+                <input type="number" step="0.5" min="0" x-model.number="r.threshold"
+                       class="w-24 bg-raised border border-line rounded-md px-2 py-1 text-sm num">
+                <span class="text-xs text-mute" x-text="r.kind==='volume_spike' ? '× 20-day average volume' : '% daily move (either way)'"></span>
+              </div>
+            </template>
+            <template x-if="r.kind==='announcement_type'">
+              <div class="flex flex-wrap gap-1.5 mt-1.5">
+                <template x-for="t in ruleTypes" :key="t">
+                  <button @click="toggleType(r,t)" class="text-[11px] px-2 py-1 rounded-md border"
+                          :class="hasType(r,t) ? 'border-accent text-accent bg-accent/10' : 'border-line text-mute'" x-text="typeLabels[t]"></button>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+        <button @click="saveRules()" class="w-full bg-raised border border-line rounded-lg py-2 text-sm">Save rules</button>
+      </section>
+
+      <section class="bg-surface border border-line rounded-xl p-3">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold text-sm">Data</h3>
+          <button @click="refreshData()" class="text-sm bg-raised border border-line rounded-lg px-3 py-1.5" :disabled="refreshing"
+                  x-text="refreshing ? 'Refreshing…' : 'Refresh data'"></button>
+        </div>
+        <p class="text-xs text-mute" x-text="refreshMsg"></p>
+      </section>
+
+      <section class="bg-surface border border-line rounded-xl">
+        <h3 class="font-semibold text-sm px-3 pt-3 pb-2">Portfolio <span class="text-faint font-normal num" x-text="'(' + holdings.length + ')'"></span></h3>
+        <div class="divide-y divide-line">
+          <template x-for="p in holdings" :key="p.nse_symbol">
+            <button @click="openResearch(p.nse_symbol)" class="w-full flex items-center justify-between px-3 py-2 text-left">
+              <span class="min-w-0"><span class="text-sm font-medium" x-text="p.nse_symbol"></span>
+                <span class="block text-[11px] text-faint clamp1" x-text="p.sector + ' · BSE ' + p.bse_code"></span></span>
+              <span class="text-right num text-sm"><span x-text="p.close ? '₹' + fmt(p.close) : '—'"></span>
+                <span class="block text-[11px]" :class="deltaCls(p.change_pct)" x-text="pct(p.change_pct)"></span></span>
+            </button>
+          </template>
+        </div>
+      </section>
+      <p class="text-[11px] text-faint px-1 pb-4">FINN is decision support only. It never gives buy or sell calls.</p>
+    </div>
+  </main>
+
+  <!-- toast -->
+  <div x-show="toast" x-transition class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-raised border border-line text-sm px-3 py-2 rounded-lg shadow-lg" x-text="toast"></div>
+
+  <!-- bottom tabs -->
+  <nav class="fixed bottom-0 inset-x-0 bg-bg/95 backdrop-blur border-t border-line safe-b">
+    <div class="max-w-md mx-auto grid grid-cols-4 text-[11px]">
+      <template x-for="t in tabs" :key="t.id">
+        <button @click="go(t.id)" class="relative flex flex-col items-center gap-0.5 pt-2 pb-1" :class="tab===t.id ? 'text-accent' : 'text-mute'">
+          <span class="relative">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" x-html="t.icon"></svg>
+            <span x-show="t.id==='alerts' && unread" class="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-accent text-bg text-[10px] font-bold leading-4 text-center num" x-text="unread > 99 ? '99+' : unread"></span>
+          </span>
+          <span x-text="t.label"></span>
+        </button>
+      </template>
+    </div>
+  </nav>
+</div>
+</body>
+</html>
