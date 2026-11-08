@@ -203,6 +203,9 @@ def test_parse_period():
     assert pull.parse_period("H1 FY2027") == (27, 2)
     assert pull.parse_period("FY26-FY28") == (28, 4)
     assert pull.parse_period("medium term") is None
+    assert pull.parse_period("FY2025-26") == (26, 4)
+    assert pull.parse_period("2025-26") == (26, 4)
+    assert pull.parse_period("Q1 FY2026-27") == (27, 1)
 
 
 def _g(**kw):

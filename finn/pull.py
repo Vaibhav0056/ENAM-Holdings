@@ -207,6 +207,7 @@ def parse_period(s: str) -> Optional[tuple[int, int]]:
     if not s:
         return None
     t = s.upper().replace("'", " ").replace("FISCAL", "FY")
+    t = re.sub(r"(?:FY\s*)?20(\d{2})\s*[-–/]\s*(\d{2})\b", r"FY\2", t)  # FY2025-26 / 2025-26 -> FY26
     fys = re.findall(r"FY\s*(\d{2,4})", t)
     if not fys:
         m = re.search(r"\b(20\d{2})\b", t)
@@ -224,7 +225,8 @@ def parse_period(s: str) -> Optional[tuple[int, int]]:
 
 
 _GENERIC = {"growth", "rate", "increase", "level", "share", "contribution", "guidance", "target", "ratio",
-            "percentage", "cycle", "day", "steady", "state", "long", "term", "medium", "annual", "run", "net", "gross", "from"}
+            "percentage", "cycle", "day", "steady", "state", "long", "term", "medium", "annual", "run", "net", "gross", "from",
+            "investment", "amount", "value", "total", "budget", "spend", "expenditure", "plan", "program", "programme"}
 
 
 def _metric_tokens(m: str) -> list[str]:
