@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+yfinance
+bse
+requests
+beautifulsoup4
+pymupdf
+pdfplumber
+rapidfuzz
+pywebpush
+py-vapid
+python-dotenv
+google-genai
+pydantic
+pytest

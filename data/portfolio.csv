@@ -1,0 +1,17 @@
+nse_symbol,bse_code,yahoo_symbol,name,sector
+RELIANCE,500325,RELIANCE.NS,Reliance Industries Limited,Energy
+HDFCBANK,500180,HDFCBANK.NS,HDFC Bank Limited,Financial Services
+TCS,532540,TCS.NS,Tata Consultancy Services Limited,Technology
+INFY,500209,INFY.NS,Infosys Limited,Technology
+ITC,500875,ITC.NS,ITC Limited,Consumer Defensive
+LT,500510,LT.NS,Larsen & Toubro Limited,Industrials
+SUNPHARMA,524715,SUNPHARMA.NS,Sun Pharmaceutical Industries Limited,Healthcare
+MARUTI,532500,MARUTI.NS,Maruti Suzuki India Limited,Consumer Cyclical
+TITAN,500114,TITAN.NS,Titan Company Limited,Consumer Cyclical
+ASIANPAINT,500820,ASIANPAINT.NS,Asian Paints Limited,Basic Materials
+BAJFINANCE,500034,BAJFINANCE.NS,Bajaj Finance Limited,Financial Services
+TATAPOWER,500400,TATAPOWER.NS,The Tata Power Company Limited,Utilities
+HAL,541154,HAL.NS,Hindustan Aeronautics Limited,Industrials
+POLYCAB,542652,POLYCAB.NS,Polycab India Limited,Industrials
+DIXON,540699,DIXON.NS,Dixon Technologies (India) Limited,Technology
+PERSISTENT,533179,PERSISTENT.NS,Persistent Systems Limited,Technology
