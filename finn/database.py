@@ -29,12 +29,50 @@ def engine():
     return _engine
 
 
+_read_engine = None
+_ReadSession = None
+
+
+def read_engine():
+    """Hot read paths (the feed). AUTOCOMMIT and no pre-ping: one network round trip per query instead of four
+    (BEGIN, ping, SELECT, COMMIT); from India to Neon Singapore that is ~85 ms vs ~300 ms. A connection Neon
+    dropped while suspended is retried once in read_session()."""
+    global _read_engine, _ReadSession
+    if _read_engine is None:
+        url = database_url()
+        if is_postgres(url):
+            _read_engine = create_engine(url, isolation_level="AUTOCOMMIT", pool_size=5, max_overflow=5,
+                                         pool_recycle=240)
+        else:
+            _read_engine = engine()
+        _ReadSession = sessionmaker(_read_engine, expire_on_commit=False)
+    return _read_engine
+
+
+def read_session_run(fn):
+    """Run fn(session) on the read engine; retry once if the pooled connection had gone stale."""
+    from sqlalchemy.exc import DBAPIError, OperationalError
+    read_engine()
+    for attempt in (1, 2):
+        s = _ReadSession()
+        try:
+            return fn(s)
+        except (OperationalError, DBAPIError) as e:
+            if attempt == 2 or not getattr(e, "connection_invalidated", True):
+                raise
+            _read_engine.dispose()
+        finally:
+            s.close()
+
+
 def reset_engine():
     """For tests that switch DATABASE_URL."""
-    global _engine, _Session
+    global _engine, _Session, _read_engine, _ReadSession
+    if _read_engine is not None and _read_engine is not _engine:
+        _read_engine.dispose()
     if _engine is not None:
         _engine.dispose()
-    _engine, _Session = None, None
+    _engine, _Session, _read_engine, _ReadSession = None, None, None, None
 
 
 @contextmanager

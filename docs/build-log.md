@@ -100,3 +100,24 @@ The challenge spec supersedes Steps 1-8. Those built a working SQLite MVP; v2 re
 **Problems.** One BSE metadata timeout during validation (now retried). PyMuPDF warns that the `fitz` alias is deprecated, so the code imports `pymupdf`. Failed documents are retried on each run; a permanent 403 costs one request per run, acceptable at this scale.
 
 **Checkpoint.** Second full run: 0 price rows, 0 filings, 0 calendar events and 0 documents added; SQL checks find 0 duplicate filings and 0 duplicate price bars. Tests: 139 passed (19 new for the adapters, including idempotent inserts and revision linking). ✅
+
+## Phase 2: Push core
+
+**Plan.** What: rules-first classification with a cheap-model fallback, a stored score breakdown, buckets, one-liners for "worth a look", `/digest?from&to` with presets and "since I last checked". Why: the feed is the product's front door and has to be right before enrichment makes it rich. Risks: rules overfitting to a few subjects; one event filed several times; a slow feed because Neon is ~85 ms away.
+
+**Built.** `finn/feed/`: `classify.py` (15 types, ~120 ordered patterns, batched enum-constrained fallback), `score.py` (type_weight × magnitude × novelty × thesis_multiplier, every factor and its reason stored), `pipeline.py` (classify → score → one-liners; re-scores the last 5 days each run; `--all`, `--reclassify-llm`), `digest.py` (one query, zero LLM calls, 60 s in-process cache invalidated by writes), `finn/web.py` (`/digest`, `/api/state/checked`, review, `/metrics/latency`), `finn/marketmath.py` (shared price maths, market leg = NIFTY 50). Versioned prompts `classify.v1/v2`, `one_liner.v1`.
+
+**Numbers.** 855 filings: 676 typed by rules, 179 by the model in 5 batched calls; 0 failures. Buckets over 90 days: 102 attention, 177 worth a look, 576 routine. LLM spend for the whole phase: 19 calls, ~52k input / ~20k output tokens, ≈ $0.023 at list price (classification $0.0085, one-liners $0.0145). One-liners only for worth-a-look and un-enriched attention cards; routine gets none.
+
+**Decisions and rejected alternatives.**
+- Kept the Step 8 scoring ideas that were each justified by a real row (same-event windows, text cues, market-reaction boost) and added the spec's factors. Rejected: starting the scorer from scratch.
+- Results twins drop to 0.25 (fold under the primary card) while the spec's 0.5 applies to follow-ups. A duplicate results filing at 0.5 would sit in "worth a look" as a second copy of the same news.
+- Follow-up demotion needs an earlier filing of the same type within 45 days. Without that, "Update on the takeover offer" is the first the investor hears of it. Inside one event, the filing with the strongest wording leads, not the earliest.
+- Order size: L&T's own bands (significant/large/major/mega) scale magnitude; a press-release deal with no stated value is 0.8. Order value ÷ trailing revenue arrives with results extraction (Phase 3).
+- On a company's results day, a bare "Outcome of Board Meeting" or "Press Release" is part of the results event. Typed `results`, it folds under the results card instead of floating as "other".
+- Headlines: BSE subjects are often boilerplate ("Announcement under Regulation 30 (LODR)-Credit Rating"); the headline falls back to the first real sentence of BSE's summary, skipping "This is to inform you that…" and not splitting on "Mr." or initials.
+- Feed reads use an AUTOCOMMIT engine without pre-ping: one round trip (~85 ms) instead of four (~300 ms). Rejected: Neon's HTTP driver (not available from Python) and a local read replica (premature).
+
+**Problems found by the eval, and fixes.** First run: 85 % classification, 100 % material recall, only 50 % of attention material. Misses were rule gaps, each fixed generally: promoter reclassification → routine; results-day bare filings → results; prompt v2 (bond calls are not fundraises; client-deal press releases are order wins). A real bug surfaced while labelling: Persistent's takeover of Nagarro never reached attention, because every filing begins "Update on the offer" and the follow-up penalty halved them all, including "Persistent Secures Strong Majority Stake". Now the first update and the majority-stake release are in attention, later updates in worth a look.
+
+**Checkpoint.** `evals/filings_labeled.csv` (40 rows, stratified by type, labels provisional for the user to correct; labelled before any tuning): classification 95 %, material recall in attention 100 % (4/4), attention 80 % material. Blind holdout `evals/filings_holdout.csv` (20 unseen rows, labelled before seeing predictions, never tuned on): classification 100 %, material recall 100 % (2/2). Feed: 85-180 ms for 24h/3d/7d, 0.37-0.86 s for 30d (optimised in Phase 7). Tests: 165 passed. ✅

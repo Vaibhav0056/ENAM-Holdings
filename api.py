@@ -12,6 +12,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s
 log = logging.getLogger("finn.api")
 IST = ZoneInfo("Asia/Kolkata")
 app = FastAPI(title="FINN")
+from finn import web as web_v2  # noqa: E402  (v2 Postgres routes)
+app.include_router(web_v2.router)
+app.middleware("http")(web_v2.timing_middleware)
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 WINDOWS = {"24h": timedelta(hours=24), "3d": timedelta(days=3), "7d": timedelta(days=7), "30d": timedelta(days=30)}
 TYPE_LABEL = {
