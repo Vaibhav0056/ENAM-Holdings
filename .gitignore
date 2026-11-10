@@ -7,3 +7,5 @@ data/pdfs/
 .pytest_cache/
 static/_dev/
 data/*.log
+.neon
+node_modules/

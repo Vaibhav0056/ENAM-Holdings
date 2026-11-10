@@ -164,6 +164,86 @@ def test_price_hits_thresholds():
     assert not any(d == "2026-10-22" for _, d in kinds)
 
 
+def _px(closes, vols=None):
+    return [{"date": f"2026-{9 + i // 28:02d}-{1 + i % 28:02d}", "close": c, "volume": (vols or [100.0] * len(closes))[i]}
+            for i, c in enumerate(closes)]
+
+
+def test_volume_baseline_ignores_an_earlier_spike():
+    # a 10x results day inside the window lifts a mean baseline to 145 and hides the next 2.5x day
+    vols = [100.0] * 19 + [1000.0] + [250.0]
+    assert alerts.volume_ratio(vols) == 2.5
+
+
+def test_volume_burst_alerts_once_unless_it_escalates():
+    vols = [100.0] * 21 + [300.0, 250.0, 400.0]
+    hits = [d for _, d, *_ in alerts.price_hits(_px([100.0] * 24, vols), 2.0, None, "2026-09-01")]
+    assert hits == ["2026-09-22", "2026-09-24"]  # 3.0x fires, 2.5x the next day doesn't, 4.0x does
+
+
+def test_move_unusual_for_the_stock_fires_below_fixed_threshold():
+    def walk(scale):  # 30 closes whose daily moves cycle through +-0.1..0.4% x scale
+        out = [100.0]
+        for i in range(29):
+            out.append(out[-1] * (1 + scale * (0.4, -0.2, 0.1, -0.4, 0.2, -0.1)[i % 6] / 100))
+        return out
+    quiet = walk(1)
+    rows = _px(quiet + [quiet[-1] * 1.03])                                  # then +3%
+    hits = list(alerts.price_hits(rows, None, 5.0, rows[-1]["date"]))
+    assert len(hits) == 1 and hits[0][0] == "price_move" and "σ" in hits[0][2]
+    # the same +3% is the market's move, not the stock's: no alert
+    assert not list(alerts.price_hits(rows, None, 5.0, rows[-1]["date"], {rows[-1]["date"]: 2.9}))
+    # and a volatile stock moving 3% is just a normal day
+    wild = walk(8)
+    rows = _px(wild + [wild[-1] * 1.03])
+    assert not list(alerts.price_hits(rows, None, 5.0, rows[-1]["date"]))
+
+
+def test_magnitude_cues_demote_non_events():
+    a = lambda subject, more="": {"subject": subject, "more": more, "headline": ""}
+    assert push.magnitude_for(a("Credit Rating", "Intimation of re-affirmation of rating by S&P"), "credit_rating", None) == 0.5
+    assert push.magnitude_for(a("Credit Rating", "Rating downgraded by ICRA"), "credit_rating", None) == 1.0
+    assert push.magnitude_for(a("Acquisition", "Incorporation of Wholly Owned Subsidiary"), "m_and_a", None) == 0.4
+    assert push.magnitude_for(a("Acquisition", "Acquisition of 100% stake in XYZ Ltd"), "m_and_a", None) == 1.0
+    assert push.magnitude_for(a("Change in Management", "approved the re-appointment of Mr A"), "mgmt_change", None) == 0.6
+    assert push.magnitude_for(a("Change in Management", "resignation of CFO and re-appointment of Mr A"), "mgmt_change", None) == 0.85
+    assert push.score_for("results", 1.5, 1.0) == 1.0  # a reaction boost never pushes a score past 1
+
+
+def _ann(symbol, ann_type, filed_at, category="Company Update"):
+    from finn import db
+    i = db.x("INSERT INTO announcements(content_hash,symbol,category,subject,filed_at,ann_type) VALUES(?,?,?,?,?,?)",
+             (f"{symbol}{ann_type}{filed_at}{category}", symbol, category, "s", filed_at, ann_type))
+    return db.q("SELECT * FROM announcements WHERE id=?", (i,), one=True)
+
+
+def test_novelty_same_event_window():
+    # two order wins two days apart are two events; two filings minutes apart are one
+    a = _ann("NOV", "order_win", "2026-10-19T10:13:00+05:30")
+    b = _ann("NOV", "order_win", "2026-10-21T09:45:00+05:30")
+    c = _ann("NOV", "order_win", "2026-10-21T09:55:00+05:30")
+    assert [push.novelty_for(x, "order_win") for x in (a, b, c)] == [1.0, 1.0, 0.5]
+    # results: the 'Result' filing is primary even when the board-meeting outcome came first
+    r1 = _ann("NOV", "results", "2026-10-29T14:03:00+05:30", "Board Meeting")
+    r2 = _ann("NOV", "results", "2026-10-29T14:09:00+05:30", "Result")
+    assert [push.novelty_for(x, "results") for x in (r1, r2)] == [0.25, 1.0]
+
+
+def test_market_reaction_uses_the_first_session_that_could_trade_on_the_filing():
+    from finn import db
+    closes = [100.0 * (1.004 if i % 2 else 0.996) for i in range(30)] + [108.0]
+    for r in _px(closes):
+        db.x("INSERT INTO prices(symbol,date,close,volume) VALUES('RX',?,?,?)", (r["date"], r["close"], r["volume"]))
+    jump, before = _px(closes)[-1]["date"], _px(closes)[-2]["date"]
+    assert push.market_reaction(_ann("RX", "order_win", f"{before}T18:00:00+05:30"), "order_win")      # after close -> next session
+    assert not push.market_reaction(_ann("RX", "order_win", f"{before}T10:00:00+05:30"), "order_win")  # traded that day: flat
+    assert push.market_reaction(_ann("RX", "order_win", f"{jump}T10:00:00+05:30"), "order_win")
+    assert not push.market_reaction(_ann("RX", "routine_compliance", f"{jump}T10:00:00+05:30"), "routine_compliance")
+    # on a results day the move belongs to the results filing
+    _ann("RX", "results", f"{jump}T12:00:00+05:30", "Result")
+    assert not push.market_reaction(_ann("RX", "order_win", f"{jump}T11:00:00+05:30"), "order_win")
+
+
 def test_alert_dedupe_per_rule_ticker_date():
     assert alerts._insert("price_move", "TEST", "2026-10-23", "t", "b", "/#x") is True
     assert alerts._insert("price_move", "TEST", "2026-10-23", "t2", "b2", "/#x") is False
@@ -184,6 +264,18 @@ def test_quote_ok_exact_and_fuzzy():
 
 def test_quote_rejects_fabrication():
     assert not grounding.quote_ok("we expect revenue to double by FY28 with margins of 20%", PAGE)
+
+
+def test_quote_numbers_must_match_exactly():
+    # one digit off is ~98% similar text, and a different fact
+    assert not grounding.quote_ok("we expect the working capital cycle to trend towards our long-term operating range of 45 to 60 days", PAGE)
+
+
+def test_value_must_be_printed_in_its_quote():
+    assert grounding.value_in_quote(1600.0, "R&D spend of INR1,600 plus crores")
+    assert grounding.value_in_quote(-5.0, "margins fell by 5%")
+    assert not grounding.value_in_quote(7.5, "our estimate of the growth is anywhere between 7% to 8%")  # model's midpoint
+    assert grounding.value_in_quote(None, "healthy growth")
 
 
 def test_verify_drops_bad_items_and_fixes_page():
@@ -231,6 +323,47 @@ def test_match_links_guidance_to_actual_for_its_horizon():
     rows = pull.match(guidance, actuals)
     assert rows[0]["verdict"] == "delivered" and rows[0]["actual"]["value"] == 14.4
     assert rows[1]["verdict"] == "pending" and rows[1]["progress"]["value"] == 47.0
+
+
+def test_match_needs_the_same_period_length():
+    # a Q4 figure is not the full-year figure: FY27 stays open, Q4 shows as progress
+    rows = pull.match([_g(horizon="FY27")], [{"period": "Q4 FY27", "metric": "EBITDA margin", "value": 9.0, "unit": "%"}])
+    assert rows[0]["actual"] is None and rows[0]["progress"]["value"] == 9.0 and rows[0]["verdict"] != "missed"
+    rows = pull.match([_g(horizon="H1 FY27")], [{"period": "Q2 FY27", "metric": "EBITDA margin", "value": 9.0, "unit": "%"}])
+    assert rows[0]["actual"] is None
+
+
+def test_match_prefers_the_actual_in_the_targets_unit():
+    g = _g(metric="revenue growth", target_text="13% to 14%", target_low=13, target_high=14, horizon="FY26")
+    actuals = [{"period": "FY26", "metric": "revenue", "value": 87584.0, "unit": "crore"},
+               {"period": "FY26", "metric": "revenue growth", "value": 13.5, "unit": "%"}]
+    for order in (actuals, actuals[::-1]):
+        row = pull.match([g], order)[0]
+        assert row["actual"]["value"] == 13.5 and row["verdict"] == "delivered"
+
+
+def test_more_is_better_for_savings_and_reductions():
+    act = lambda m, v: {"period": "FY26", "metric": m, "value": v, "unit": "crore"}
+    g = lambda m: _g(metric=m, target_low=500, target_high=500, unit="crore")
+    assert pull.verdict_for(g("cost savings"), act("cost savings", 600), (26, 4)) == "delivered"
+    assert pull.verdict_for(g("debt reduction"), act("debt reduction", 300), (26, 4)) == "missed"
+    assert pull.verdict_for(g("net debt"), act("net debt", 300), (26, 4)) == "delivered"
+
+
+def test_repeated_promise_counts_once_and_keeps_latest():
+    said = [_g(quarter_said="Q3 FY26", horizon="FY27", target_low=28, target_high=28),
+            _g(quarter_said="Q1 FY27", horizon="FY27", target_low=28, target_high=None, metric="EBITDA margins"),
+            _g(quarter_said="Q4 FY26", horizon="FY27", target_low=21, target_high=23),   # different target: kept
+            _g(quarter_said="Q4 FY26", horizon="FY28", target_low=28, target_high=28)]   # different horizon: kept
+    kept = pull.dedupe_guidance(said)
+    assert len(kept) == 3
+    assert [g["quarter_said"] for g in kept if g["horizon"] == "FY27" and g["target_low"] == 28] == ["Q1 FY27"]
+
+
+def test_scorecard_hit_rate_needs_a_sample():
+    rows = lambda *v: [{"verdict": x} for x in v]
+    assert pull.scorecard(rows("delivered", "delivered", "partially", "missed", "pending")) == {"checked": 4, "hit_rate": 62}
+    assert pull.scorecard(rows("delivered", "delivered", "pending")) == {"checked": 2, "hit_rate": None}
 
 
 def test_scrub_numbers_removes_unsupported_sentences():

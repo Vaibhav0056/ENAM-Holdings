@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Literal, Optional
 import requests
 from pydantic import BaseModel
-from . import db, grounding, llm as llm_mod, pdfs, results
+from . import alerts, db, grounding, llm as llm_mod, pdfs, results
 
 log = logging.getLogger("finn.push")
 
@@ -19,6 +19,26 @@ TYPE_WEIGHTS = {
 SENIOR_WEIGHT = 1.0  # mgmt_change involving CEO / CFO / MD
 BUCKETS = [("attention", 0.7), ("worth_a_look", 0.3)]
 TYPES = list(TYPE_WEIGHTS)
+
+# Within-type materiality read from the filing's own words; first match wins. A rating re-affirmed, a
+# shell subsidiary incorporated or a director re-appointed is the same filing type as a downgrade, an
+# acquisition or a resignation, but not the same news.
+MAGNITUDE_CUES = {
+    "credit_rating": [(r"re-?affirm", 0.5)],
+    "m_and_a": [(r"incorporat(ed|ion)\b.{0,80}subsidiary", 0.4)],
+    "mgmt_change": [(r"^(?!.*(resign|cessation|retire)).*re-?appoint", 0.6)],
+}
+# Filings of ONE event land together: several results filings over a few days, anything else within hours.
+# Same-type filings further apart (two order wins, two rating agencies) are separate events.
+SAME_EVENT = {"results": timedelta(days=3)}
+SAME_EVENT_DEFAULT = timedelta(hours=12)
+# The market's own verdict: the first session able to trade on a filing was abnormal for the stock.
+MARKET_CLOSE = "15:30"                      # IST; later filings are traded on the next session
+REACTION_MOVE = 5.0                         # same definition of an abnormal move as the default alert rule
+REACTION_BOOST = 1.5
+REACTION_MIN_WEIGHT = 0.3                   # procedural filings never earn a reaction: they didn't cause it
+REACTION_MAX_GAP_DAYS = 4                   # a session further out is not a reaction to this filing
+RESCORE_DAYS = 5                            # recent filings are re-scored each run as prices/twins arrive
 SENIOR_RE = re.compile(r"\b(ceo|cfo|chief executive officer|chief financial officer|managing director|md)\b", re.I)
 
 # Ordered rules: first match wins. Matched against "category | subcategory | subject" (lower-case).
@@ -66,7 +86,7 @@ def bucket_for(score: float) -> str:
 
 def score_for(ann_type: str, magnitude: float, novelty: float, senior: bool = False) -> float:
     w = SENIOR_WEIGHT if (ann_type == "mgmt_change" and senior) else TYPE_WEIGHTS.get(ann_type, 0.3)
-    return round(w * magnitude * novelty, 3)
+    return min(1.0, round(w * magnitude * novelty, 3))
 
 
 # ---------- LLM schemas ----------
@@ -261,11 +281,24 @@ def results_magnitude(enr: dict) -> float:
     return round(0.8 + 0.2 * min(1.0, yoy / 30.0), 3)
 
 
+def magnitude_for(a, ann_type: str, enr: Optional[dict]) -> float:
+    if ann_type == "results" and enr:
+        return results_magnitude(enr)
+    text = f"{a['subject']} {a['more'] or a['headline'] or ''}"
+    for pat, m in MAGNITUDE_CUES.get(ann_type, []):
+        if re.search(pat, text, re.I | re.S):
+            return m
+    if ann_type == "mgmt_change":
+        return 1.0 if (enr or {}).get("senior") else 0.85
+    return 1.0
+
+
 def novelty_for(a, ann_type) -> float:
     """One event often arrives as several filings (e.g. 'Result' + 'Outcome of board meeting'). Only the primary
     filing keeps novelty 1.0: for results the one in the 'Result' category, otherwise the earliest."""
     t = datetime.fromisoformat(a["filed_at"])
-    lo, hi = (t - timedelta(days=3)).isoformat(), (t + timedelta(days=3)).isoformat()
+    w = SAME_EVENT.get(ann_type, SAME_EVENT_DEFAULT)
+    lo, hi = (t - w).isoformat(), (t + w).isoformat()
     group = db.q("SELECT id, category, filed_at FROM announcements WHERE symbol=? AND ann_type=? AND filed_at BETWEEN ? AND ?",
                  (a["symbol"], ann_type, lo, hi))
     if len(group) <= 1:
@@ -277,23 +310,65 @@ def novelty_for(a, ann_type) -> float:
     return 0.25 if ann_type == "results" else 0.5
 
 
-def process(a, ann_type, src) -> bool:
-    """Enrich + score one item. Returns True when it needs a one-liner."""
+def market_reaction(a, ann_type: str, market: Optional[dict] = None) -> bool:
+    """True when the first session that could trade on this filing was abnormal for the stock (an alert-grade
+    price move; volume alone is too common to attribute). On a results day the reaction is credited to the results filing only."""
+    day, hhmm = a["filed_at"][:10], a["filed_at"][11:16]
+    if TYPE_WEIGHTS.get(ann_type, 0) < REACTION_MIN_WEIGHT:
+        return False
+    if ann_type != "results" and db.q("SELECT 1 FROM announcements WHERE symbol=? AND ann_type='results' AND "
+                                      "substr(filed_at,1,10)=? LIMIT 1", (a["symbol"], day)):
+        return False
+    op = ">=" if hhmm < MARKET_CLOSE else ">"
+    s = db.q(f"SELECT date FROM prices WHERE symbol=? AND date{op}? ORDER BY date LIMIT 1", (a["symbol"], day), one=True)
+    if not s or (datetime.fromisoformat(s["date"]) - datetime.fromisoformat(day)).days > REACTION_MAX_GAP_DAYS:
+        return False
+    rows = db.q("SELECT date, close, volume FROM prices WHERE symbol=? AND date<=? ORDER BY date", (a["symbol"], s["date"]))
+    return any(alerts.price_hits(rows, None, REACTION_MOVE, s["date"], market))
+
+
+def _market() -> dict:
+    return alerts.market_moves({p["nse_symbol"]: db.q("SELECT date, close FROM prices WHERE symbol=? ORDER BY date",
+                                                      (p["nse_symbol"],)) for p in db.portfolio()})
+
+
+def score(a, ann_type: str, enr: Optional[dict], market: Optional[dict] = None) -> bool:
+    """Score one enriched item (pure Python, repeatable). Returns True when it needs a one-liner."""
     novelty = novelty_for(a, ann_type)
-    enr, magnitude, senior = None, 1.0, False
-    if ann_type == "results" and novelty == 1.0:
+    magnitude = magnitude_for(a, ann_type, enr)
+    if novelty == 1.0 and market_reaction(a, ann_type, market):
+        magnitude = round(magnitude * REACTION_BOOST, 3)
+    s = score_for(ann_type, magnitude, novelty, bool(enr and enr.get("senior")))
+    bucket = bucket_for(s)
+    db.x("UPDATE announcements SET processed=1, magnitude=?, novelty=?, score=?, bucket=?, status='ok', error=NULL "
+         "WHERE id=?", (magnitude, novelty, s, bucket, a["id"]))
+    return bucket == "worth_a_look" or (bucket == "attention" and not (enr and enr.get("ok")))
+
+
+def process(a, ann_type, market=None) -> bool:
+    """Enrich + score one item. Returns True when it needs a one-liner."""
+    enr = None
+    if ann_type == "results" and novelty_for(a, ann_type) == 1.0:
         enr = enrich_results(a)
-        magnitude = results_magnitude(enr)
     elif ann_type == "mgmt_change":
         enr = enrich_mgmt(a)
-        senior = enr["senior"]
-        magnitude = 1.0 if senior else 0.85
-    score = score_for(ann_type, magnitude, novelty, senior)
-    bucket = bucket_for(score)
-    db.x("UPDATE announcements SET processed=1, magnitude=?, novelty=?, score=?, bucket=?, enrichment_json=?, "
-         "status='ok', error=NULL WHERE id=?",
-         (magnitude, novelty, score, bucket, json.dumps(enr) if enr else None, a["id"]))
-    return bucket == "worth_a_look" or (bucket == "attention" and not (enr and enr.get("ok")))
+    db.x("UPDATE announcements SET enrichment_json=? WHERE id=?", (json.dumps(enr) if enr else None, a["id"]))
+    return score(a, ann_type, enr, market)
+
+
+def rescore(days: int = RESCORE_DAYS, skip: frozenset = frozenset(), market: Optional[dict] = None) -> list[dict]:
+    """Re-score recent filings without re-reading them: the reaction session of an after-close filing only
+    exists after the next ingest, and a later twin can change which filing is primary. Returns the items
+    that now need a one-liner and don't have one."""
+    since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    need = []
+    for a in db.q("SELECT * FROM announcements WHERE processed=1 AND status='ok' AND ann_type IS NOT NULL AND filed_at>=?", (since,)):
+        if a["id"] in skip:
+            continue
+        enr = json.loads(a["enrichment_json"]) if a["enrichment_json"] else None
+        if score(a, a["ann_type"], enr, market) and not a["one_liner"]:
+            need.append(a)
+    return need
 
 
 def run(limit: Optional[int] = None) -> dict:
@@ -302,12 +377,12 @@ def run(limit: Optional[int] = None) -> dict:
     for a in todo:  # store every type first so novelty can see the whole group of related filings
         t, src = types.get(a["id"], ("other", "fallback"))
         db.x("UPDATE announcements SET ann_type=?, type_source=? WHERE id=?", (t, src, a["id"]))
+    market = _market()
     ok = failed = 0
     need_line = []
     for a in todo:
         try:
-            t, src = types.get(a["id"], ("other", "fallback"))
-            if process(a, t, src):
+            if process(a, types.get(a["id"], ("other", "fallback"))[0], market):
                 need_line.append(a)
             ok += 1
         except Exception as e:
@@ -315,6 +390,10 @@ def run(limit: Optional[int] = None) -> dict:
             db.x("UPDATE announcements SET processed=1, status='error', error=?, score=COALESCE(score,0.3), "
                  "bucket=COALESCE(bucket,'worth_a_look') WHERE id=?", (f"couldn't process: {e}"[:500], a["id"]))
             failed += 1
+    try:
+        need_line += rescore(skip=frozenset(a["id"] for a in todo), market=market)
+    except Exception as e:
+        log.warning("rescore failed: %s", e)
     try:
         for aid, line in one_liners(need_line).items():
             db.x("UPDATE announcements SET one_liner=? WHERE id=?", (json.dumps(line), aid))

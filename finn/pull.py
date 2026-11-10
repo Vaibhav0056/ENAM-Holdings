@@ -202,8 +202,9 @@ SYNTH_PROMPT = (
 
 # ---------------- periods & matching (pure python, tested) ----------------
 
-def parse_period(s: str) -> Optional[tuple[int, int]]:
-    """'Q2 FY27' -> (27, 2); 'FY27' -> (27, 4); 'H1 FY27' -> (27, 2); 'FY26-FY28'/'FY28' end -> (28, 4)."""
+def _period(s: str) -> Optional[tuple[int, int, int]]:
+    """(fiscal year, last quarter, quarters covered): 'Q2 FY27' -> (27, 2, 1); 'H1 FY27' -> (27, 2, 2);
+    'FY27' and 'FY26-FY28' (its end) -> (.., 4, 4)."""
     if not s:
         return None
     t = s.upper().replace("'", " ").replace("FISCAL", "FY")
@@ -217,11 +218,17 @@ def parse_period(s: str) -> Optional[tuple[int, int]]:
     fy = int(fys[-1]) % 100
     q = re.search(r"\bQ([1-4])\b", t)
     if q and len(fys) == 1:
-        return (fy, int(q.group(1)))
+        return (fy, int(q.group(1)), 1)
     h = re.search(r"\bH([12])\b", t)
     if h and len(fys) == 1:
-        return (fy, 2 if h.group(1) == "1" else 4)
-    return (fy, 4)
+        return (fy, 2 if h.group(1) == "1" else 4, 2)
+    return (fy, 4, 4)
+
+
+def parse_period(s: str) -> Optional[tuple[int, int]]:
+    """When the period ENDS: 'Q2 FY27' -> (27, 2); 'FY27' -> (27, 4); 'H1 FY27' -> (27, 2); 'FY26-FY28' -> (28, 4)."""
+    p = _period(s)
+    return p[:2] if p else None
 
 
 _GENERIC = {"growth", "rate", "increase", "level", "share", "contribution", "guidance", "target", "ratio",
@@ -277,7 +284,8 @@ def verdict_for(g: dict, actual: Optional[dict], latest: Optional[tuple]) -> str
     v = actual["value"]
     lo = lo if lo is not None else hi
     hi = hi if hi is not None else lo
-    lower_is_better = bool(re.search(r"debt|cost|working capital|days|leverage|attrition", g["metric"], re.I))
+    lower_is_better = bool(re.search(r"debt|cost|working capital|days|leverage|attrition", g["metric"], re.I)
+                           and not re.search(r"reduc|saving|repay", g["metric"], re.I))  # 'cost savings': more is better
     if lower_is_better:
         if v <= hi:
             return "delivered"
@@ -294,13 +302,15 @@ def match(guidance: list[dict], actuals: list[dict]) -> list[dict]:
     for g in guidance:
         hz = parse_period(g.get("horizon", ""))
         cands = [a for a in actuals if metric_match(g["metric"], a["metric"])]
-        exact = [a for a in cands if hz and parse_period(a["period"]) == hz]
-        actual = exact[0] if exact else None
+        same_unit = lambda a: _unit_key(a["unit"]) == _unit_key(g.get("unit", ""))  # 'revenue growth %' is not 'revenue, crore'
+        # the actual must cover the promised period itself: Q4 FY27 is not FY27, Q2 is not H1
+        exact = [a for a in cands if hz and _period(a["period"]) == _period(g["horizon"])]
+        actual = max(exact, key=same_unit) if exact else None
         progress = None
         if not actual:
-            # latest reported figure for the same metric, before the horizon ends (or any, for open horizons)
-            dated = [a for a in cands if parse_period(a["period"]) and (hz is None or parse_period(a["period"]) < hz)]
-            progress = max(dated, key=lambda a: parse_period(a["period"])) if dated else None
+            # latest reported figure for the same metric, up to the horizon's end (or any, for open horizons)
+            dated = [a for a in cands if parse_period(a["period"]) and (hz is None or parse_period(a["period"]) <= hz)]
+            progress = max(dated, key=lambda a: (same_unit(a), parse_period(a["period"]))) if dated else None
         verdict = verdict_for(g, actual, latest)
         tracking = None
         ratio_like = _unit_key(g.get("unit", "")) in {"%", "bps", "x"} or "day" in (g.get("unit") or "").lower()
@@ -309,6 +319,35 @@ def match(guidance: list[dict], actuals: list[dict]) -> list[dict]:
             tracking = {"delivered": "on track", "partially": "slightly behind", "missed": "behind"}.get(t)
         rows.append({"guidance": g, "actual": actual, "progress": progress, "verdict": verdict, "tracking": tracking})
     return rows
+
+
+def dedupe_guidance(guidance: list[dict]) -> list[dict]:
+    """A promise repeated on several calls is one promise, counted once: keep its latest statement."""
+    def bounds(g):  # a one-sided target is judged as its single number, so '28%' and '28%+' are one promise
+        lo, hi = g.get("target_low"), g.get("target_high")
+        return (hi if lo is None else lo, lo if hi is None else hi)
+
+    def same(a, b):
+        return (bounds(a) == bounds(b)
+                and _unit_key(a.get("unit", "")) == _unit_key(b.get("unit", ""))
+                and (_period(a["horizon"]) or a["horizon"].strip().lower()) == (_period(b["horizon"]) or b["horizon"].strip().lower())
+                and metric_match(a["metric"], b["metric"]))
+    kept = []
+    for g in sorted(guidance, key=lambda g: parse_period(g["quarter_said"]) or (0, 0), reverse=True):
+        if not any(same(g, k) for k in kept):
+            kept.append(g)
+    return kept
+
+
+MIN_CHECKED = 3  # below this a hit rate is an anecdote, not a track record
+
+
+def scorecard(rows: list[dict]) -> dict:
+    """Management's hit rate over promises that could be checked; a partial delivery counts half."""
+    n = {v: sum(r["verdict"] == v for r in rows) for v in ("delivered", "partially", "missed")}
+    checked = sum(n.values())
+    rate = round(100 * (n["delivered"] + 0.5 * n["partially"]) / checked) if checked >= MIN_CHECKED else None
+    return {"checked": checked, "hit_rate": rate}
 
 
 # ---------------- verification of prose ----------------
@@ -423,8 +462,12 @@ def run_research(symbol: str, job_id: str):
             continue
         g = grounding.verify([dict(i.model_dump(), doc=src_id) for i in ex.guidance], t["pages"])
         a = grounding.verify([dict(i.model_dump(), doc=src_id) for i in ex.actuals], t["pages"])
+        a = [i for i in a if grounding.value_in_quote(i["value"], i["quote"])]
         for i in g:
             i["quarter_said"] = i.get("quarter_said") or ex.quarter
+            for k in ("target_low", "target_high"):  # a bound the quote doesn't state can't be judged against
+                if not grounding.value_in_quote(i[k], i["quote"]):
+                    i[k] = None
         sources[-1].update(quarter=ex.quarter, dropped=len(ex.guidance) + len(ex.actuals) - len(g) - len(a))
         guidance += g
         actuals += a
@@ -441,10 +484,11 @@ def run_research(symbol: str, job_id: str):
             snapshot["what_it_does"] = (grounding.verify([dict(sn.what_it_does.model_dump(), doc=src_id)], pages) or [None])[0] if sn.what_it_does else None
             snapshot["segments"] = grounding.verify([dict(s.model_dump(), doc=src_id) for s in sn.segments], pages)
             snapshot["revenue_mix"] = grounding.verify([dict(s.model_dump(), doc=src_id) for s in sn.revenue_mix], pages)
-            actuals += grounding.verify([dict(s.model_dump(), doc=src_id) for s in sn.actuals], pages)
+            actuals += [i for i in grounding.verify([dict(s.model_dump(), doc=src_id) for s in sn.actuals], pages)
+                        if grounding.value_in_quote(i["value"], i["quote"])]
         except Exception as e:
             notes.append(f"Annual report extraction failed: {e}")
-    # de-duplicate guidance (same metric + horizon + same target said in several calls -> keep latest saying)
+    guidance = dedupe_guidance(guidance)
     for i, g in enumerate(guidance, 1):
         g["id"] = f"G{i}"
     for i, a in enumerate(actuals, 1):
@@ -456,7 +500,9 @@ def run_research(symbol: str, job_id: str):
     rows.sort(key=lambda r: (order[r["verdict"]], -(parse_period(r["guidance"]["quarter_said"]) or (0, 0))[0]))
 
     _stage(job_id, 4)
+    card = scorecard(rows)
     evidence = {
+        "scorecard": card,
         "promises": [{"id": r["guidance"]["id"], "metric": r["guidance"]["metric"], "target": r["guidance"]["target_text"],
                       "horizon": r["guidance"]["horizon"], "said_in": r["guidance"]["quarter_said"], "verdict": r["verdict"],
                       "actual": (r["actual"] or {}).get("value"), "actual_id": (r["actual"] or {}).get("id"),
@@ -491,7 +537,7 @@ def run_research(symbol: str, job_id: str):
     result = {
         "symbol": symbol, "name": docs["name"], "generated_at": datetime.now().isoformat(timespec="seconds"),
         "sources": sources, "notes": notes, "rows": rows, "actuals": actuals, "snapshot": snapshot,
-        "synthesis": synthesis, "removed_bullets": removed,
+        "synthesis": synthesis, "removed_bullets": removed, "scorecard": card,
         "counts": {k: sum(r["verdict"] == k for r in rows) for k in order},
     }
     db.x("INSERT OR REPLACE INTO research_reports(symbol,result_json,created_at) VALUES(?,?,CURRENT_TIMESTAMP)",

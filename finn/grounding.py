@@ -10,13 +10,33 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
+_NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+
+def numbers(s: str) -> set[str]:
+    """Every figure in the text, normalised ('INR1,600' -> '1600')."""
+    out = set()
+    for n in _NUM_RE.findall(s or ""):
+        try:
+            out.add("%g" % float(n.replace(",", "")))
+        except ValueError:
+            continue
+    return out
+
+
+def value_in_quote(value, quote: str) -> bool:
+    """An extracted figure must be printed in its own quote, not computed by the model (a midpoint, a sum)."""
+    return value is None or "%g" % abs(value) in numbers(quote)
+
+
 def quote_ok(quote: str, page_text: str, threshold: int = THRESHOLD) -> bool:
     q, p = _norm(quote), _norm(page_text)
     if len(q) < 4 or not p:
         return False
     if q in p:
         return True
-    return fuzz.partial_ratio(q, p) >= threshold
+    # Words may be fuzzy (OCR, hyphenation); figures may not: '14.4%' is 90% similar to '12.4%'.
+    return fuzz.partial_ratio(q, p) >= threshold and numbers(q) <= numbers(p)
 
 
 def verify(items, pages: list[str], quote_attr="quote", page_attr="page"):

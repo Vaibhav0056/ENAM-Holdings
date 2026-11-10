@@ -323,6 +323,11 @@
 
           <section class="bg-surface border border-line rounded-xl p-3">
             <h3 class="font-semibold text-sm mb-2">Credibility read</h3>
+            <template x-if="rq.result.scorecard">
+              <p class="text-sm text-mute num mb-2" x-text="rq.result.scorecard.hit_rate != null
+                ? `Hit rate ${rq.result.scorecard.hit_rate}% on ${rq.result.scorecard.checked} promises that could be checked (partial counts half).`
+                : `${rq.result.scorecard.checked} promise${rq.result.scorecard.checked === 1 ? '' : 's'} could be checked so far: too few for a hit rate.`"></p>
+            </template>
             <template x-if="!rq.result.synthesis.credibility.length"><p class="text-sm text-mute">Not enough verified evidence.</p></template>
             <ul class="space-y-2">
               <template x-for="b in rq.result.synthesis.credibility" :key="b.text">
