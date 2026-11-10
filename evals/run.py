@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from evals import push_eval, results_eval  # noqa: E402
+from evals import guidance_eval, push_eval, results_eval  # noqa: E402
 
 
 def main() -> int:
@@ -29,6 +29,14 @@ def main() -> int:
     rows.append(("results (10 hand-read statements)", "unit errors", str(r["unit_errors"]), "0", r["unit_errors"] == 0))
     rows.append(("results (10 hand-read statements)", "scanned PDFs shown as not extracted", r["scanned_pdfs_abstained"],
                  "all", r["scanned_pdfs_abstained"].split("/")[0] == r["scanned_pdfs_abstained"].split("/")[1]))
+    g = guidance_eval.run(verbose=False)
+    if "error" in g:
+        rows.append(("guidance (POLYCAB, 4 calls)", "report available", "no", "yes", False))
+    else:
+        rows.append(("guidance (POLYCAB, 4 calls)", f"promise recall (n={g['gold_promises']})", f"{g['recall']:.0%}", "≥ 80%", g["recall"] >= 0.8))
+        rows.append(("guidance (POLYCAB, 4 calls)", "verdict agreement", f"{g['verdict_agreement']:.0%}", "≥ 80%",
+                     (g["verdict_agreement"] or 0) >= 0.8))
+        rows.append(("guidance (POLYCAB, 4 calls)", "unverified citations shown", str(g["unverified_shown"]), "0", g["unverified_shown"] == 0))
     w = max(len(r[0]) + len(r[1]) for r in rows) + 3
     for suite, metric, value, target, passed in rows:
         print(f"{(suite + ' · ' + metric):<{w}} {value:>6}   target {target:<7} {'PASS' if passed else 'FAIL'}")

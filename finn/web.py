@@ -58,3 +58,64 @@ def review(filing_id: int, undo: bool = False):
     if not dg.mark_reviewed(filing_id, undo):
         raise HTTPException(404, "no such card")
     return {"ok": True, "reviewed": not undo}
+
+
+# ---------- research (Pull) ----------
+
+@router.post("/api/v2/research/{ticker}")
+def research_start(ticker: str, force: bool = False):
+    import re as _re
+    from .research import engine
+    t = ticker.upper().strip()
+    if not _re.fullmatch(r"[A-Z0-9&\-]{1,20}", t):
+        raise HTTPException(400, "not a valid NSE symbol")
+    out = engine.start(t, force=force)
+    if out.get("cached"):
+        return {"cached": True, "report": out["report"]}
+    return {"cached": False, "job_id": out["job_id"]}
+
+
+@router.get("/api/v2/research/job/{job_id}")
+def research_job(job_id: str):
+    from .research import engine
+    j = engine.job(job_id)
+    if not j:
+        raise HTTPException(404, "no such job")
+    return j
+
+
+@router.get("/api/v2/research/job/{job_id}/events")
+async def research_events(job_id: str):
+    """Server-sent events: one `stage` event whenever the stage or progress changes, then `done` or `failed`."""
+    import asyncio
+    import json as _json
+    from fastapi.responses import StreamingResponse
+    from .research import engine
+
+    async def gen():
+        last = None
+        for _ in range(1800):  # at most ~15 minutes
+            j = await asyncio.to_thread(engine.job, job_id)
+            if not j:
+                yield "event: failed\ndata: {\"error\": \"no such job\"}\n\n"
+                return
+            cur = (j["stage"], j["progress"], j["status"])
+            if cur != last:
+                last = cur
+                payload = {k: j[k] for k in ("stage", "progress", "status", "error", "stages", "report_id")}
+                yield f"event: stage\ndata: {_json.dumps(payload)}\n\n"
+            if j["status"] in ("done", "failed"):
+                yield f"event: {j['status']}\ndata: {_json.dumps({'report_id': j['report_id'], 'error': j['error']})}\n\n"
+                return
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+@router.get("/api/v2/research/{ticker}")
+def research_report(ticker: str):
+    from .research import engine
+    hit = engine.cached_report(ticker)
+    if not hit:
+        raise HTTPException(404, "no report in the last 24 hours; POST to start one")
+    return hit

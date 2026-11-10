@@ -1,0 +1,343 @@
+{
+ "company": "POLYCAB",
+ "calls": [
+  "Q2 FY27",
+  "Q1 FY27",
+  "Q4 FY26",
+  "Q3 FY26"
+ ],
+ "about": "Hand-labelled from management's forward-looking remarks in Polycab's four latest earnings-call transcripts (documents 151-154), before comparing with the extractor. Market or industry forecasts, past results and capacity-allocation splits are not promises. label_source: claude-provisional; please correct.",
+ "label_source": "claude-provisional",
+ "promises": [
+  {
+   "said_in": "Q2 FY27",
+   "metric": "working capital cycle",
+   "target_low": 45,
+   "target_high": 50,
+   "unit": "days",
+   "horizon": "long term",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q2 FY27",
+   "metric": "Wires & Cables EBITDA margin",
+   "target_low": 11,
+   "target_high": 13,
+   "unit": "%",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q2 FY27",
+   "metric": "FMEG EBITDA margin",
+   "target_low": 8,
+   "target_high": 10,
+   "unit": "%",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 8,
+   "note": ""
+  },
+  {
+   "said_in": "Q2 FY27",
+   "metric": "Wires & Cables volume growth vs market",
+   "target_low": 1.5,
+   "target_high": 1.5,
+   "unit": "x",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 13,
+   "note": ""
+  },
+  {
+   "said_in": "Q2 FY27",
+   "metric": "EHV plant commissioning",
+   "target_low": null,
+   "target_high": null,
+   "unit": "date",
+   "horizon": "FY28",
+   "expected_verdict": "unverifiable",
+   "page": 18,
+   "note": "a date, not a number"
+  },
+  {
+   "said_in": "Q1 FY27",
+   "metric": "working capital cycle",
+   "target_low": 45,
+   "target_high": 50,
+   "unit": "days",
+   "horizon": "long term",
+   "expected_verdict": "pending",
+   "page": 4,
+   "note": ""
+  },
+  {
+   "said_in": "Q1 FY27",
+   "metric": "Wires & Cables EBITDA margin",
+   "target_low": 11,
+   "target_high": 13,
+   "unit": "%",
+   "horizon": "medium to long term",
+   "expected_verdict": "pending",
+   "page": 4,
+   "note": ""
+  },
+  {
+   "said_in": "Q1 FY27",
+   "metric": "FMEG EBITDA margin",
+   "target_low": 8,
+   "target_high": 10,
+   "unit": "%",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 4,
+   "note": ""
+  },
+  {
+   "said_in": "Q1 FY27",
+   "metric": "EPC EBIT margin",
+   "target_low": null,
+   "target_high": null,
+   "unit": "%",
+   "horizon": "long term",
+   "expected_verdict": "unverifiable",
+   "page": 8,
+   "note": "'high single digit'"
+  },
+  {
+   "said_in": "Q1 FY27",
+   "metric": "Wires & Cables growth vs market",
+   "target_low": 1.5,
+   "target_high": 1.5,
+   "unit": "x",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 9,
+   "note": ""
+  },
+  {
+   "said_in": "Q1 FY27",
+   "metric": "export share of revenue",
+   "target_low": 10,
+   "target_high": null,
+   "unit": "%",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 18,
+   "note": ""
+  },
+  {
+   "said_in": "Q1 FY27",
+   "metric": "FMEG growth vs market",
+   "target_low": 1.5,
+   "target_high": 2,
+   "unit": "x",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 19,
+   "note": ""
+  },
+  {
+   "said_in": "Q1 FY27",
+   "metric": "BharatNet revenue",
+   "target_low": 800,
+   "target_high": 1000,
+   "unit": "crore",
+   "horizon": "FY27",
+   "expected_verdict": "pending",
+   "page": 14,
+   "note": ""
+  },
+  {
+   "said_in": "Q1 FY27",
+   "metric": "RDSS revenue",
+   "target_low": 800,
+   "target_high": 800,
+   "unit": "crore",
+   "horizon": "FY27",
+   "expected_verdict": "pending",
+   "page": 14,
+   "note": ""
+  },
+  {
+   "said_in": "Q4 FY26",
+   "metric": "working capital cycle",
+   "target_low": 45,
+   "target_high": 50,
+   "unit": "days",
+   "horizon": "steady state",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q4 FY26",
+   "metric": "capex over five years",
+   "target_low": 60,
+   "target_high": 80,
+   "unit": "billion",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q4 FY26",
+   "metric": "dividend payout ratio",
+   "target_low": 30,
+   "target_high": null,
+   "unit": "%",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q4 FY26",
+   "metric": "FMEG EBITDA margin",
+   "target_low": 8,
+   "target_high": 10,
+   "unit": "%",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q4 FY26",
+   "metric": "FMEG growth vs industry",
+   "target_low": 1.5,
+   "target_high": 2,
+   "unit": "x",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q4 FY26",
+   "metric": "export share of revenue",
+   "target_low": 10,
+   "target_high": null,
+   "unit": "%",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q4 FY26",
+   "metric": "annual capex",
+   "target_low": 12,
+   "target_high": 16,
+   "unit": "billion",
+   "horizon": "per annum to FY30",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q4 FY26",
+   "metric": "EBITDA margin",
+   "target_low": 11,
+   "target_high": 13,
+   "unit": "%",
+   "horizon": "long term",
+   "expected_verdict": "pending",
+   "page": 13,
+   "note": ""
+  },
+  {
+   "said_in": "Q4 FY26",
+   "metric": "EBITDA margin",
+   "target_low": 12,
+   "target_high": 14,
+   "unit": "%",
+   "horizon": "near to mid term",
+   "expected_verdict": "pending",
+   "page": 13,
+   "note": ""
+  },
+  {
+   "said_in": "Q4 FY26",
+   "metric": "Wires & Cables growth vs market",
+   "target_low": 1.5,
+   "target_high": 1.5,
+   "unit": "x",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 11,
+   "note": ""
+  },
+  {
+   "said_in": "Q3 FY26",
+   "metric": "working capital cycle",
+   "target_low": 50,
+   "target_high": 55,
+   "unit": "days",
+   "horizon": "long term",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": "range later restated as 45-50 days"
+  },
+  {
+   "said_in": "Q3 FY26",
+   "metric": "annual capex",
+   "target_low": 12,
+   "target_high": 16,
+   "unit": "billion",
+   "horizon": "per annum to FY30",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q3 FY26",
+   "metric": "FMEG growth vs industry",
+   "target_low": 1.5,
+   "target_high": 2,
+   "unit": "x",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q3 FY26",
+   "metric": "FMEG EBITDA margin",
+   "target_low": 8,
+   "target_high": 10,
+   "unit": "%",
+   "horizon": "FY30",
+   "expected_verdict": "pending",
+   "page": 5,
+   "note": ""
+  },
+  {
+   "said_in": "Q3 FY26",
+   "metric": "A&P spend share of B2C revenue",
+   "target_low": 3,
+   "target_high": 5,
+   "unit": "%",
+   "horizon": "every year",
+   "expected_verdict": "pending",
+   "page": 14,
+   "note": ""
+  },
+  {
+   "said_in": "Q3 FY26",
+   "metric": "EBITDA margin",
+   "target_low": 11,
+   "target_high": 13,
+   "unit": "%",
+   "horizon": "long term",
+   "expected_verdict": "pending",
+   "page": 15,
+   "note": ""
+  }
+ ]
+}

@@ -139,7 +139,17 @@ def pool(tier: str) -> list[str]:
     with session() as s:
         dead = set(s.scalars(select(LLMQuota.model).where(LLMQuota.day == date.today())))
     alive = [m for m in models if m not in dead]
+    if tier == "strong":
+        # Disclosed downgrade, never an escalation: when every strong model is out of quota, synthesis may run on the
+        # cheap tier, and Result.meta["downgraded"] makes the report's receipt say so.
+        alive += [m for m in pool("cheap") if m not in alive]
     return alive
+
+
+def _strong_list() -> list[str]:
+    import os
+    env = os.getenv("STRONG_FALLBACKS")
+    return [m.strip() for m in env.split(",")] if env else DEFAULT_POOLS["strong"]
 
 
 def _mark_exhausted(model: str):
@@ -285,7 +295,8 @@ def call(task: str, prompt_id: str, inputs: dict, schema: Type[BaseModel] | None
                 with session() as s:
                     s.merge(LLMCache(key_sha=key, task=task, model=model, response=stored))
                 return Result(data, model, False, tin, tout, c, int((time.monotonic() - t0) * 1000), versioned,
-                              {"fallback": model != primary})
+                              {"fallback": model != primary,
+                               "downgraded": tier == "strong" and model not in [primary_model("strong")] + _strong_list()})
             except (BudgetExceeded, LLMUnavailable):
                 raise
             except Exception as e:  # noqa: BLE001 - classify and decide
