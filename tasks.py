@@ -61,7 +61,7 @@ def probes():
 
 
 def ingest():
-    run(PY, "-m", "finn.ingest_v2")
+    run(PY, "-m", "finn.sources.run", *sys.argv[2:])
 
 
 def pipeline():

@@ -1,0 +1,32 @@
+2026-11-11 03:21:09,166 finn.sources.pdfstore document 1 failed: 403 Client Error: Forbidden for url: https://www.apollohospitals.com/sites/default/files/2026-08/transcript-of-apollo-hospitals---q1-fy27-earnings-call.pdf
+2026-11-11 03:21:09,916 finn.sources.pdfstore document 2 failed: 403 Client Error: Forbidden for url: https://www.apollohospitals.com/sites/default/files/2026-05/transcript-of-apollo-hospitals---q4-fy26-earnings-call.pdf
+symbol       price+ filings filing+ transcr  ARs  latest transcript
+APOLLOHOSP        0      18       0       8    2         parsed 18p 
+ASIANPAINT        0      44       0       8    2         parsed 34p 
+BAJFINANCE        0      41       0       8    2         parsed 20p 
+CAMS              0      35       0       8    2         parsed 20p 
+CHOLAFIN          0      25       0       8    2         parsed 24p 
+DEEPAKNTR         0      13       0       8    2         parsed 21p 
+DIVISLAB          0       9       0       8    2         parsed 18p 
+DIXON             0      50       0       8    2         parsed 24p 
+DMART             0      41       0       8    2         parsed 38p 
+HAL               0      17       0       8    2         parsed 19p 
+HAVELLS           0      26       0       8    2         parsed 17p 
+HDFCBANK          0      42       0       8    2         parsed 17p 
+KAYNES            0      12       0       8    2         parsed 20p 
+KPITTECH          0      29       0       8    2         parsed 21p 
+LT                0      41       0       8    2         parsed 26p 
+MARUTI            0      40       0       8    2         parsed 12p 
+NAUKRI            0      63       0       8    2         parsed 19p 
+PERSISTENT        0      75       0       8    2         parsed 26p 
+PIDILITIND        0      27       0       8    2         parsed 20p 
+POLYCAB           0      39       0       8    2         parsed 20p 
+SUNPHARMA         0      40       0       8    2         parsed 19p 
+TATAPOWER         0      30       0       8    2         parsed 21p 
+TCS               0      43       0       8    2         parsed 29p 
+TITAN             0      36       0       8    2         parsed 18p 
+TRENT             0      19       0       0    2        none listed 
+^NSEI             0       -       -       -    -                  - 
+TOTAL price rows added 0, filings seen 855, filings added 0
+calendar: {"seen": 30, "added": 0, "next_7_days": 4, "errors": []}
+seconds: 125.7

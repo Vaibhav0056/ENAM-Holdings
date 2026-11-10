@@ -64,7 +64,8 @@ class Company(Base):
 
 class Price(Base):
     __tablename__ = "prices"
-    __table_args__ = (UniqueConstraint("company_id", "date"),)
+    # Unique on (symbol, date), not (company_id, date): index rows (^NSEI) have no company and NULLs never collide.
+    __table_args__ = (UniqueConstraint("symbol", "date", name="uq_prices_symbol_date"),)
     id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"))  # NULL = market index row
     symbol: Mapped[str] = mapped_column(String(40), index=True)               # yahoo symbol, incl. ^NSEI

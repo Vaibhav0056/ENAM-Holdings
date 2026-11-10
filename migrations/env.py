@@ -15,6 +15,19 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 target_metadata = Base.metadata
 
+# Created by hand in the initial migration and deliberately not mapped (queried with SQL): tsvector columns and
+# the GIN/HNSW search indexes. Without this, autogenerate proposes dropping them.
+UNMAPPED_COLUMNS = {"tsv"}
+UNMAPPED_INDEXES = {"ix_pages_tsv", "ix_chunks_tsv", "ix_filings_tsv", "ix_chunks_embedding"}
+
+
+def include_object(obj, name, type_, reflected, compare_to):
+    if type_ == "column" and name in UNMAPPED_COLUMNS and reflected:
+        return False
+    if type_ == "index" and name in UNMAPPED_INDEXES:
+        return False
+    return True
+
 
 def run_migrations_offline():
     context.configure(url=migration_url() or database_url(), target_metadata=target_metadata,
@@ -26,7 +39,8 @@ def run_migrations_offline():
 def run_migrations_online():
     connectable = create_engine(migration_url() or database_url(), poolclass=pool.NullPool)
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True,
+                          include_object=include_object)
         with context.begin_transaction():
             context.run_migrations()
 

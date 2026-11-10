@@ -78,3 +78,25 @@ The challenge spec supersedes Steps 1-8. Those built a working SQLite MVP; v2 re
 **Problems.** gemini-3.8-flash latency is the biggest risk for the < 90 s cold-research target; the router's 30 s timeout plus fallback contains it. A Neon round trip of ~0.3 s means the feed must be one query (or cached in-process) to hit p95 < 300 ms. The bash heredoc in this environment mangles long Python files, so code is written with the editor tool.
 
 **Checkpoint.** 25/25 tickers resolve (1 swap, logged). Every probe is recorded above with its real response shape. Tests: 120 passed (46 fiscal, 11 router, 1 health, 62 carried over). ✅
+
+## Phase 1: Ingest
+
+**Plan.** What: 90 days of prices (25 companies + NIFTY 50), 90 days of BSE filings, a catalysts calendar, screener.in document links, and polite PDF fetching cached by sha256. Why: the app must read only the database, so every later phase depends on clean, deduplicated source rows. Risks: BSE timeouts, screener.in rate limits, company-hosted PDFs that block bots, NULL-keyed index rows defeating uniqueness.
+
+**Built.** `finn/sources/`, one adapter per source: `prices.py`, `bse_filings.py`, `calendar.py`, `screener.py`, `pdfstore.py`, plus `common.py` (generic User-Agent, ≥ 1 s per host, retry on 429/5xx, `INSERT … ON CONFLICT` helper that counts true inserts) and `run.py` (`python tasks.py ingest [prices bse calendar docs pdfs]`).
+- Filings: content hash over scrip|NEWSID|subject|attachment; IST `DissemDT` stored as UTC; BSE's own summary kept as `body`; revised/corrigendum filings linked to the filing they supersede (same sub-category, ≤ 7 days earlier).
+- Calendar: BSE result calendar + corporate actions (dividend titles normalised to "Interim Dividend ₹7/share", record dates kept separately) + meeting dates parsed out of board-meeting intimations.
+- Documents: 8 transcripts + 2 annual reports listed per company (period inferred: an Aug 2026 call covers Q1 FY27). PDFs cached at `data/pdfs/<sha256>.pdf`; a PDF averaging < 200 characters per page is `unparseable`, never OCR-guessed. `data/doc_overrides.csv` can add documents screener.in doesn't list.
+- Migration `6e5b1dbba28d`: prices are unique on (symbol, date), not (company_id, date). The ^NSEI rows have no company, and NULLs never collide, so re-runs would have duplicated every index bar. Alembic now ignores the hand-made tsvector/HNSW objects so autogenerate can't propose dropping them.
+
+**Counts (first run).** 2,340 price rows (25 × 90 + 90 NIFTY), 855 filings, 30 calendar events (4 in the next 7 days), 242 documents listed, 24 latest transcripts parsed (12-38 pages each, 521 pages stored). Per company, filings over 90 days ranged from 9 (DIVISLAB) to 75 (PERSISTENT). Full table: `docs/probes/ingest_rerun.txt`.
+
+**Decisions and rejected alternatives.**
+- Only the newest transcript per company is fetched at ingest; older transcripts and annual reports are fetched on demand by research. Rejected: fetching all ~240 PDFs up front, which means ~1 GB of annual reports and several hundred polite requests for documents most users never open.
+- APOLLOHOSP hosts its two newest transcripts on apollohospitals.com, which returns 403 to automated requests. The block is respected: those rows stay `failed` with the reason, and the fetcher falls back to the next listed transcript (Q3 FY26, parsed, 18 pages). Rejected: spoofing a browser to get past it.
+- TRENT lists no earnings-call transcripts (it doesn't hold calls). Per §10 its research runs on annual reports only and the UI will say so.
+- The NSE holiday list in `finn/fiscal.py` is checked against the data: the weekdays missing from ^NSEI bars in the window are exactly 14 Sep, 2 Oct and 20 Oct 2026, all in the list.
+
+**Problems.** One BSE metadata timeout during validation (now retried). PyMuPDF warns that the `fitz` alias is deprecated, so the code imports `pymupdf`. Failed documents are retried on each run; a permanent 403 costs one request per run, acceptable at this scale.
+
+**Checkpoint.** Second full run: 0 price rows, 0 filings, 0 calendar events and 0 documents added; SQL checks find 0 duplicate filings and 0 duplicate price bars. Tests: 139 passed (19 new for the adapters, including idempotent inserts and revision linking). ✅
