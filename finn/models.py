@@ -60,6 +60,10 @@ class Company(Base):
     peer_of: Mapped[int | None] = mapped_column(ForeignKey("companies.id"))
     validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     note: Mapped[str | None] = mapped_column(Text)  # e.g. swap reason
+    # BSE's own structured results snapshot (latest two quarters + last FY, revenue and net profit, ₹ crore):
+    # an independent cross-check on PDF extraction and the trailing revenue used to size orders.
+    bse_snapshot: Mapped[dict | None] = mapped_column(JSONType)
+    snapshot_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Price(Base):

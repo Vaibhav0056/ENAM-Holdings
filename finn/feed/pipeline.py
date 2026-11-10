@@ -178,7 +178,79 @@ def to_ist_date(dt: datetime):
     return to_ist(dt).date()
 
 
-def run(rescore_all: bool = False, use_llm: bool = True, reclassify_llm: bool = False) -> dict:
+def _order_factor(payload: dict) -> tuple[float, str] | None:
+    if payload.get("kind") != "order":
+        return None
+    return sc.order_magnitude(payload.get("value_cr"), payload.get("ttm_revenue_cr"))
+
+
+def score_pass(stats: dict, rescore_all: bool, since: datetime, new_ids: list[int]) -> None:
+    """Score every filing in scope (pure Python, repeatable). Enriched headlines are kept; others are rebuilt."""
+    with session() as s:
+        by_company, market = _prices(s)
+        feedback = _feedback_prefs(s)
+        q = select(Filing, Enrichment).join(Enrichment, Enrichment.filing_id == Filing.id)
+        if not rescore_all:
+            q = q.where((Filing.filed_at >= since) | (Filing.id.in_(new_ids or [-1])))
+        todo = s.execute(q).all()
+        siblings: dict[tuple[int, str], list[dict]] = defaultdict(list)
+        results_days = set()
+        for f, e in s.execute(select(Filing, Enrichment).join(Enrichment, Enrichment.filing_id == Filing.id)).all():
+            siblings[(f.company_id, e.type)].append({"id": f.id, "filed_at": f.filed_at, "category_raw": f.category_raw,
+                                                     "subject": f.subject, "body": f.body})
+            if e.type == "results":
+                results_days.add((f.company_id, to_ist_date(f.filed_at)))
+        for f, e in todo:
+            try:
+                payload = e.payload or {}
+                b = sc.compute(
+                    e.type, filed_at=f.filed_at, filing_id=f.id, category=f.category_raw, subject=f.subject, body=f.body,
+                    siblings=siblings[(f.company_id, e.type)], people=payload.get("people") or None,
+                    pat_yoy=payload.get("pat_yoy"), results_extracted=bool(payload.get("ok") and payload.get("table")),
+                    order=_order_factor(payload),
+                    reacted=reaction(f.filed_at, by_company.get(f.company_id, []), market),
+                    results_same_day=(f.company_id, to_ist_date(f.filed_at)) in results_days and e.type != "results",
+                    thesis=None, feedback=feedback)
+                e.score, e.bucket, e.score_breakdown = b.score, b.bucket, b.as_dict()
+                if not payload.get("ok") or e.type not in ("results", "mgmt_change"):
+                    e.headline = headline(f.subject, f.body, f.subcategory_raw)
+                f.status, f.error = "processed", None
+                stats["scored"] += 1
+                stats["buckets"][b.bucket] += 1
+            except Exception as ex:  # noqa: BLE001 - one bad filing never stops the run
+                log.exception("scoring failed for filing %s", f.id)
+                f.status, f.error = "failed", f"couldn't process: {ex}"[:500]
+                e.score, e.bucket = max(e.score or 0, 0.3), "worth_a_look"
+                e.score_breakdown = {"error": str(ex)[:200], "reasons": ["couldn't process; shown so it isn't missed"]}
+                stats["failed"] += 1
+
+
+def share_event_payloads() -> int:
+    """One event, several filings: the extractor may find the people in a twin rather than in the filing that leads
+    the event. The leading card (novelty 1.0) borrows the richest twin's payload and headline, so the card the
+    investor sees is the informative one. Returns how many cards borrowed."""
+    n = 0
+    with session() as s:
+        rows = s.execute(select(Filing, Enrichment).join(Enrichment, Enrichment.filing_id == Filing.id)
+                         .where(Enrichment.type == "mgmt_change")).all()
+        by_co: dict[int, list] = defaultdict(list)
+        for f, e in rows:
+            by_co[f.company_id].append((f, e))
+        for items in by_co.values():
+            for f, e in items:
+                if (e.score_breakdown or {}).get("novelty") != 1.0 or (e.payload or {}).get("people"):
+                    continue
+                twins = [(tf, te) for tf, te in items if tf.id != f.id
+                         and abs(tf.filed_at - f.filed_at) <= sc.SAME_EVENT_DEFAULT and (te.payload or {}).get("people")]
+                if twins:
+                    tf, te = max(twins, key=lambda t: len(t[1].payload["people"]))
+                    e.payload = {**te.payload, "borrowed_from_filing": tf.id}
+                    e.headline = te.headline
+                    n += 1
+    return n
+
+
+def run(rescore_all: bool = False, use_llm: bool = True, reclassify_llm: bool = False, enrich: bool = True) -> dict:
     stats = {"new": 0, "classified_by": defaultdict(int), "scored": 0, "failed": 0, "one_liners": defaultdict(int),
              "buckets": defaultdict(int)}
     with session() as s:
@@ -213,46 +285,20 @@ def run(rescore_all: bool = False, use_llm: bool = True, reclassify_llm: bool = 
     stats["classified_by"]["results_day"] = results_day_pass()
 
     since = datetime.now(timezone.utc) - timedelta(days=RESCORE_DAYS)
-    need_line: list[dict] = []
+    new_ids = [f["id"] for f in new]
+    score_pass(stats, rescore_all, since, new_ids)
+    if enrich:  # enrichment needs pass-1 novelty (which results filing leads its event); pass 2 uses the payloads
+        from ..enrich import run as enrich_run
+        stats["enriched"] = enrich_run.run(use_llm=use_llm)
+        stats["buckets"] = defaultdict(int)
+        stats["scored"] = 0
+        score_pass(stats, rescore_all, since, new_ids)
+    stats["event_payloads_shared"] = share_event_payloads()
     with session() as s:
-        by_company, market = _prices(s)
-        feedback = _feedback_prefs(s)
-        q = select(Filing, Enrichment).join(Enrichment, Enrichment.filing_id == Filing.id)
-        if not rescore_all:
-            new_ids = [f["id"] for f in new]
-            q = q.where((Filing.filed_at >= since) | (Filing.id.in_(new_ids or [-1])))
-        todo = s.execute(q).all()
-        siblings: dict[tuple[int, str], list[dict]] = defaultdict(list)
-        for f, e in s.execute(select(Filing, Enrichment).join(Enrichment, Enrichment.filing_id == Filing.id)).all():
-            siblings[(f.company_id, e.type)].append({"id": f.id, "filed_at": f.filed_at, "category_raw": f.category_raw,
-                                                     "subject": f.subject, "body": f.body})
-        results_days = {(f.company_id, f.filed_at.date()) for f, e in
-                        s.execute(select(Filing, Enrichment).join(Enrichment).where(Enrichment.type == "results")).all()}
-        for f, e in todo:
-            try:
-                payload = e.payload or {}
-                b = sc.compute(
-                    e.type, filed_at=f.filed_at, filing_id=f.id, category=f.category_raw, subject=f.subject, body=f.body,
-                    siblings=siblings[(f.company_id, e.type)], people=payload.get("people"),
-                    pat_yoy=payload.get("pat_yoy"), results_extracted=bool(payload.get("table")),
-                    reacted=reaction(f.filed_at, by_company.get(f.company_id, []), market),
-                    results_same_day=(f.company_id, f.filed_at.date()) in results_days and e.type != "results",
-                    thesis=None, feedback=feedback)
-                e.score, e.bucket, e.score_breakdown = b.score, b.bucket, b.as_dict()
-                e.headline = headline(f.subject, f.body, f.subcategory_raw)
-                f.status, f.error = "processed", None
-                stats["scored"] += 1
-                stats["buckets"][b.bucket] += 1
-                if b.bucket == "worth_a_look" and not e.one_liner:
-                    need_line.append(_filing_dict(f))
-                elif b.bucket == "attention" and not e.one_liner and not payload:
-                    need_line.append(_filing_dict(f))  # until Phase 3 enrichment, attention cards need a line too
-            except Exception as ex:  # noqa: BLE001 - one bad filing never stops the run
-                log.exception("scoring failed for filing %s", f.id)
-                f.status, f.error = "failed", f"couldn't process: {ex}"[:500]
-                e.score, e.bucket = max(e.score or 0, 0.3), "worth_a_look"
-                e.score_breakdown = {"error": str(ex)[:200], "reasons": ["couldn't process; shown so it isn't missed"]}
-                stats["failed"] += 1
+        need_line = [_filing_dict(f) for f, e in s.execute(
+            select(Filing, Enrichment).join(Enrichment, Enrichment.filing_id == Filing.id)
+            .where(Enrichment.one_liner.is_(None), Enrichment.bucket.in_(["worth_a_look", "attention"]))).all()
+            if e.bucket == "worth_a_look" or not (e.payload or {}).get("ok")]
     if need_line:
         lines = one_liners(need_line, use_llm=use_llm)
         with session() as s:
@@ -267,4 +313,4 @@ def run(rescore_all: bool = False, use_llm: bool = True, reclassify_llm: bool = 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(name)s %(message)s")
     print(run(rescore_all="--all" in sys.argv, use_llm="--no-llm" not in sys.argv,
-              reclassify_llm="--reclassify-llm" in sys.argv))
+              reclassify_llm="--reclassify-llm" in sys.argv, enrich="--no-enrich" not in sys.argv))

@@ -95,7 +95,9 @@ def candidate_pages(pages: list[str]) -> list[int]:
     out = []
     for i, t in enumerate(pages, 1):
         low = t.lower()
-        has_rev = any(l in low for l in METRIC_LABELS["revenue"]) or "total income" in low
+        # OCR mangles labels ("Revenue from operalions"), so match the stem and the usual totals too.
+        has_rev = (any(l in low for l in METRIC_LABELS["revenue"]) or "total income" in low or "total revenue" in low
+                   or re.search(r"revenue\s+from\s+oper\w*", low) is not None)
         if has_rev and "profit before tax" in low.replace("(loss)", "").replace("/ ", "").replace("/", ""):
             out.append(i)
     def rank(i):

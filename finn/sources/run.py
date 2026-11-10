@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from ..database import session
 from ..models import Company, Document
-from . import bse_filings, calendar, prices, screener
+from . import bse_filings, bse_snapshot, calendar, prices, screener
 from .common import PoliteHTTP, insert_ignore, log_run
 from .pdfstore import fetch_document
 
@@ -75,7 +75,7 @@ def fetch_latest_transcripts(cos, http: PoliteHTTP) -> dict[str, dict]:
 
 
 def main(which: list[str]) -> dict:
-    which = which or ["prices", "bse", "calendar", "docs", "pdfs"]
+    which = which or ["prices", "bse", "snapshot", "calendar", "docs", "pdfs"]
     cos = companies()
     http = PoliteHTTP(1.0)
     report, t0 = {}, time.time()
@@ -83,6 +83,8 @@ def main(which: list[str]) -> dict:
         report["prices"] = prices.ingest(cos, 90)
     if "bse" in which:
         report["bse"] = bse_filings.ingest(cos, 90)
+    if "snapshot" in which:
+        report["snapshot"] = bse_snapshot.ingest(cos)
     if "calendar" in which:
         report["calendar"] = calendar.ingest(cos)
     if "docs" in which:

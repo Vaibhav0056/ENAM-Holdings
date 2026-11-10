@@ -1,0 +1,272 @@
+{
+ "about": "Hand-read from each results PDF's statement page (pdfplumber text, read independently of the extractor; scripts/show_results_rows.py prints the rows). Values exactly as printed, in the printed unit. Consolidated wherever the filing has it. label_source: claude-provisional; please spot-check against the PDFs.",
+ "label_source": "claude-provisional",
+ "filings": [
+  {
+   "filing_id": 30,
+   "symbol": "ASIANPAINT",
+   "period": "Q2 FY27",
+   "unit": "crore",
+   "basis": "consolidated",
+   "page": 12,
+   "values": {
+    "revenue": {
+     "current": 9976.51,
+     "previous": 10541.94,
+     "year_ago": 8531.27
+    },
+    "pbt": {
+     "current": 1477.78,
+     "previous": 2095.75,
+     "year_ago": 1391.52
+    },
+    "pat": {
+     "current": 1085.35,
+     "previous": 1559.45,
+     "year_ago": 1018.23
+    }
+   },
+   "note": ""
+  },
+  {
+   "filing_id": 76,
+   "symbol": "BAJFINANCE",
+   "period": "Q2 FY27",
+   "unit": "crore",
+   "basis": "consolidated",
+   "page": 14,
+   "values": {
+    "revenue": {
+     "current": 24546.37,
+     "previous": 23165.45,
+     "year_ago": 19990.42
+    },
+    "pbt": {
+     "current": 8537.2,
+     "previous": 8149.0,
+     "year_ago": 6608.13
+    },
+    "pat": {
+     "current": 6366.57,
+     "previous": 6080.6,
+     "year_ago": 4947.76
+    }
+   },
+   "note": ""
+  },
+  {
+   "filing_id": 113,
+   "symbol": "CAMS",
+   "period": "Q2 FY27",
+   "unit": "lakh",
+   "basis": "consolidated",
+   "page": 7,
+   "values": {
+    "revenue": {
+     "current": 41446.57,
+     "previous": 39502.95,
+     "year_ago": 37673.79
+    },
+    "pbt": {
+     "current": 17426.07,
+     "previous": 17304.8,
+     "year_ago": 15336.89
+    },
+    "pat": {
+     "current": 13066.27,
+     "previous": 12709.52,
+     "year_ago": 11393.59
+    }
+   },
+   "note": "OCR prints 'Revenue from operalions' on the consolidated page"
+  },
+  {
+   "filing_id": 757,
+   "symbol": "CHOLAFIN",
+   "period": "Q2 FY27",
+   "unit": "crore",
+   "basis": "consolidated",
+   "page": 8,
+   "values": {
+    "revenue": {
+     "current": 9270.92,
+     "previous": 8856.29,
+     "year_ago": 7491.38
+    },
+    "pbt": {
+     "current": 2188.38,
+     "previous": 2223.56,
+     "year_ago": 1565.91
+    },
+    "pat": {
+     "current": 1630.34,
+     "previous": 1656.22,
+     "year_ago": 1159.61
+    }
+   },
+   "note": ""
+  },
+  {
+   "filing_id": 211,
+   "symbol": "DMART",
+   "period": "Q2 FY27",
+   "unit": "crore",
+   "basis": "consolidated",
+   "page": 9,
+   "values": {
+    "revenue": {
+     "current": 19644.01,
+     "previous": 18794.53,
+     "year_ago": 16676.3
+    },
+    "pbt": {
+     "current": 1024.84,
+     "previous": 1183.14,
+     "year_ago": 944.79
+    },
+    "pat": {
+     "current": 742.98,
+     "previous": 860.44,
+     "year_ago": 684.85
+    }
+   },
+   "note": ""
+  },
+  {
+   "filing_id": 820,
+   "symbol": "KPITTECH",
+   "period": "Q2 FY27",
+   "unit": "million",
+   "basis": "consolidated",
+   "page": 9,
+   "values": {
+    "revenue": {
+     "current": 16909.66,
+     "previous": 16749.94,
+     "year_ago": 15877.11
+    },
+    "pbt": {
+     "current": 1680.37,
+     "previous": 1602.98,
+     "year_ago": 2305.65
+    },
+    "pat": {
+     "current": 1206.57,
+     "previous": 1164.12,
+     "year_ago": 1690.87
+    }
+   },
+   "note": ""
+  },
+  {
+   "filing_id": 574,
+   "symbol": "POLYCAB",
+   "period": "Q2 FY27",
+   "unit": "million",
+   "basis": "consolidated",
+   "page": 4,
+   "values": {
+    "revenue": {
+     "current": 98989.01,
+     "previous": 82097.32,
+     "year_ago": 64772.11
+    },
+    "pbt": {
+     "current": 13062.2,
+     "previous": 10582.23,
+     "year_ago": 9210.01
+    },
+    "pat": {
+     "current": 9899.97,
+     "previous": 7966.54,
+     "year_ago": 6929.59
+    }
+   },
+   "note": ""
+  },
+  {
+   "filing_id": 686,
+   "symbol": "TCS",
+   "period": "Q2 FY27",
+   "unit": "crore",
+   "basis": "consolidated",
+   "page": 8,
+   "values": {
+    "revenue": {
+     "current": 73188,
+     "previous": 72275,
+     "year_ago": 65799
+    },
+    "pbt": {
+     "current": 18638,
+     "previous": 17944,
+     "year_ago": 16068
+    },
+    "pat": {
+     "current": 13934,
+     "previous": 13420,
+     "year_ago": 12131
+    }
+   },
+   "note": ""
+  },
+  {
+   "filing_id": 365,
+   "symbol": "MARUTI",
+   "period": "Q2 FY27",
+   "unit": "million",
+   "basis": "standalone",
+   "page": 2,
+   "values": {
+    "revenue": {
+     "current": 533402,
+     "previous": 524551,
+     "year_ago": 423323
+    },
+    "pbt": {
+     "current": 31658,
+     "previous": 43413,
+     "year_ago": 42909
+    },
+    "pat": {
+     "current": 24149,
+     "previous": 33521,
+     "year_ago": 33028
+    }
+   },
+   "note": "scan prints thousands separators as dots ('31.658' = 31,658); BSE's snapshot (₹53,340.2 cr) confirms ₹ million"
+  },
+  {
+   "filing_id": 793,
+   "symbol": "HAVELLS",
+   "period": "Q2 FY27",
+   "unit": "crore",
+   "basis": "consolidated",
+   "page": 9,
+   "values": {
+    "revenue": {
+     "current": 6431.99,
+     "previous": 6518.19,
+     "year_ago": 4779.33
+    },
+    "pbt": {
+     "current": 472.62,
+     "previous": 392.29,
+     "year_ago": 414.59
+    },
+    "pat": {
+     "current": 349.22,
+     "previous": 289.71,
+     "year_ago": 318.28
+    }
+   },
+   "note": ""
+  },
+  {
+   "filing_id": 142,
+   "symbol": "DEEPAKNTR",
+   "status": "unparseable",
+   "note": "scanned PDF: the card must say figures not extracted"
+  }
+ ]
+}

@@ -2,7 +2,7 @@
 import re
 from rapidfuzz import fuzz
 
-THRESHOLD = 85
+THRESHOLD = 90  # spec §7: rapidfuzz partial_ratio >= 90 on the cited page (±1)
 
 
 def _norm(s: str) -> str:

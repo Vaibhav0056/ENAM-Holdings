@@ -23,6 +23,9 @@ MIN_CHARS_PER_PAGE = 200   # below this on average, treat the PDF as scanned
 def fetch_bytes(url: str, http: PoliteHTTP) -> bytes:
     referer = "https://www.bseindia.com/" if "bseindia.com" in url else None
     r = http.get(url, referer=referer, timeout=120)
+    if r.status_code == 404 and "/AttachLive/" in url:
+        # BSE moves older attachments from AttachLive to AttachHis (probed in Step 1).
+        r = http.get(url.replace("/AttachLive/", "/AttachHis/"), referer=referer, timeout=120)
     r.raise_for_status()
     if not r.content.startswith(b"%PDF"):
         raise ValueError(f"not a PDF ({r.headers.get('content-type')}, {len(r.content)} bytes)")
