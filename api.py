@@ -232,6 +232,16 @@ def research_recent():
     return {"reports": db.q("SELECT symbol, created_at FROM research_reports ORDER BY created_at DESC LIMIT 10")}
 
 
+STARTED_AT = datetime.utcnow().isoformat() + "Z"
+
+
+@app.get("/health")
+def liveness():
+    """Keep-awake and platform health check. Deliberately touches no database, so a ping every 10 minutes
+    never wakes Neon's compute or spends anything."""
+    return {"ok": True, "service": "finn", "started_at": STARTED_AT}
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "announcements": db.q("SELECT count(*) n FROM announcements", one=True)["n"]}

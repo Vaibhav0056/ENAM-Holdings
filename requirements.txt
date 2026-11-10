@@ -13,3 +13,9 @@ python-dotenv
 google-genai
 pydantic
 pytest
+sqlalchemy>=2.0
+alembic
+psycopg[binary]
+pgvector
+httpx
+tavily-python

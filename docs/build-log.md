@@ -39,3 +39,42 @@
 - What: replayed the scoring, alert and matching logic against the real local data (239 filings, 4 cached research reports) and replaced the rules that were wrong on it. Novelty: same-event window is 12 hours outside results (was ±3 days for every type). Magnitude: text cues for non-events plus a market-reaction boost, with recent filings re-scored each run. Alerts: median volume baseline with an escalation-only cooldown, and a volatility-relative, market-adjusted price trigger beside the fixed %. Research: period length and unit are part of the match, repeated promises are collapsed, direction is right for savings/reductions, figures must be printed in their quote, and a Python hit rate is shown.
 - Decision: every change had to fix a row in the data. Text similarity was rejected for duplicates: CRISIL and ICRA rating filings are near-identical text and different events, while true duplicates are always filed within minutes. Volume alone does not earn a reaction boost (2× median happens too often to attribute to a filing), and on a results day the reaction belongs to the results filing.
 - Issue: on the 239 filings, 46 scores changed: 7 distinct events wrongly halved as duplicates are back (L&T order win, Polycab NCLAT order, Persistent ICRA rating), 4 non-events left Attention (two shell-subsidiary incorporations, a rating re-affirmation, a re-appointment). Alerts went 30 → 31: five repeat volume alerts inside one burst dropped, TITAN +4.2% (3.2σ) and TATAPOWER −3.3% (4.0σ) added. BEL's table went from 24 rows to 14 distinct promises (75% hit rate on 4 checkable). Targets stated only in words ("three million vehicles") now show as unverifiable. The committed seed.db still carries scores from the old logic until it is re-exported.
+
+---
+
+# FINN v2: ENAM AI Engineer Build Challenge
+
+The challenge spec supersedes Steps 1-8. Those built a working SQLite MVP; v2 rebuilds it on Postgres (Neon) phase by phase, porting the logic that already proved itself (scoring, results parsing, grounding, guidance matching) rather than rewriting it.
+
+## Phase 0: Setup + probes
+
+**Plan.** What: repo layout, `.env.example`, `tasks.py`, SQLAlchemy models + Alembic on a Neon dev branch, `finn/fiscal.py` with tests, a probe per source, validation of the 25 tickers, `/health` without a DB call. Why: every later phase stands on the schema, the fiscal calendar and verified source shapes. Risks: Neon latency from India against the < 300 ms feed target; Gemini free-tier quotas and no Pro model; BSE listing gaps for NSE-only stocks.
+
+**Built.**
+- Neon: project green-breeze-48350921 (aws-ap-southeast-1, Singapore, Postgres 18.6). A `dev` branch was created with `neon branches create` rather than `neon checkout --create`, because the `neon.ts` policy that `neon init` wrote gives new branches a 7-day TTL and the dev data would vanish. `.env` points at the dev branch; Alembic uses the unpooled endpoint for DDL, the app the pooled one.
+- Schema (Alembic `1396ff35f08f`): the 26 tables of spec §4.1 plus `calendar_events` (catalysts), `research_jobs`, `llm_quota` and `ingest_runs`. pgvector `vector(768)` on `chunks` with an HNSW cosine index; generated `tsvector` columns + GIN on `pages`, `chunks` and `filings`. JSONB for payloads. SQLite fallback for unit tests maps JSONB to JSON and vectors to JSON lists.
+- `finn/fiscal.py`: Indian FY periods (quarter/half/9M/year, ordered by end date), a parser for the forms filings use ("Q2 FY26", "2QFY26", "FY2025-26", "quarter ended 30 September 2025", "H1 FY26"…), IST↔UTC, ₹ lakh/million/billion/'000 → crore, NSE trading days and "first session that could react to a filing" (15:30 IST close). 46 tests.
+- `finn/llm/router.py`: `call(task, prompt_id, inputs, schema, tier)`. Versioned prompt files, sha256 cache key over model + prompt@version + canonical inputs + schema, Pydantic validation with one corrective retry, 30 s timeout with SDK retries off, exponential backoff on transient errors, daily-quota rotation inside a tier, no cheap→strong escalation (raises), per-report budget guard, every call logged with tokens/cost/latency. `embed()` for 768-dim vectors, cached per text. 11 tests with a fake client. The Step 1-8 gateway moved to `finn/llm/legacy.py` and stays only until each old module is ported.
+- `tasks.py` (setup, migrate, seed, validate, probes, ingest, pipeline, serve, test, evals); `finn/seed.py` (idempotent: second run adds 0); `/health` returns without touching the DB (tested by making any DB access raise).
+
+**Probes (raw output in `docs/probes/`).**
+| Source | Real shape and finding |
+|---|---|
+| Neon | Postgres 18.6, pgvector 0.8.6, pg_trgm available. First connect 1.5-1.9 s (compute wake), warm round trip 0.30-0.38 s from this machine |
+| BSE (`bse` 3.3.4) | `announcements(scripcode, from_date, to_date)` → `{"Table": rows, "Table1": [{"ROWCNT"}]}`; 28 fields incl. NEWSID, DissemDT (IST, naive), CATEGORYNAME, SUBCATNAME, NEWSSUB, HEADLINE, MORE, ATTACHMENTNAME, XML_NAME (set on all 43 TCS rows). One page held all 43 TCS filings for 90 days (0.5 s). `resultCalendar()` → scrip_Code, short_name, meeting_date ("11 Nov 2026"); `actions()` → Purpose, Ex_date, RD_Date, BCRD_FROM/TO; `equityMetaInfo()` → ISIN, Sector, Industry, ISubGroup |
+| yfinance 1.8.0 | `download(period="90d")` → 90 rows, MultiIndex columns (Adj Close, Close, High, Low, Open, Volume), naive dates. ^NSEI works (market leg for relative moves). Dividends/splits available for ex-date suppression. 10 Nov 2026 is missing from both series, matching the NSE Diwali holiday |
+| screener.in | `section#documents`: `.concalls li` with a "Transcript" link (18-26 per company), `.annual-reports li a` (4-15). Links are mostly BSE `AnnPdfOpen.aspx?Pname=` or `AttachHis/`, some on company sites (divislabs.com) |
+| Gemini | 25 generate models. gemini-2.5-* → 404 for new users. gemini-4-carbon / gemini-4-argon (the only Pro-class options) → 429 with zero quota on this key. gemini-3.5-flash structured output OK in 3.3 s; gemini-3.8-flash answered once in 295 s and then hit 504 at a 45 s deadline; gemini-3.7-flash 503 (high demand). gemini-embedding-2 and -001 honour `output_dimensionality=768` |
+| Tavily | No `TAVILY_API_KEY`: skipped. Management bios fall back to the profile in the filing itself, cited to the filing |
+
+**Tickers.** 25 checked, 25 pass after one swap. CDSL → **CAMS**: CDSL is listed on NSE only (BSE is one of its promoters), so it has no BSE scrip code and no BSE filings. CAMS is the closest BSE-listed peer: asset-light capital-market infrastructure with annuity-like fees. No holding or peer falls in ENAM's excluded industries (checked against BSE industry). A BSE timeout once failed DEEPAKNTR; the validator now retries timeouts, since a timeout is no evidence a scrip doesn't exist.
+
+**Decisions and rejected alternatives.**
+- Strong tier = gemini-3.8-flash with gemini-3.7-flash / 3.5-flash as same-tier fallbacks. No Pro model is usable on this key, so "strong" means "the best Flash available", stated in every report receipt. Rejected: silently using the cheap model for synthesis.
+- Kept Python 3.14 locally (3.11 isn't installed); the Dockerfile will pin 3.11 and CI runs there.
+- Kept the Step 1-8 app serving from SQLite during the port, so there is always a working build. Rejected: a big-bang rewrite.
+- Cost is estimated at list prices (flash-lite $0.10/$0.40, flash $0.30/$2.50 per 1M tokens in/out). The free tier bills $0, but receipts and the budget guard should reflect what a paid key would cost.
+
+**Problems.** gemini-3.8-flash latency is the biggest risk for the < 90 s cold-research target; the router's 30 s timeout plus fallback contains it. A Neon round trip of ~0.3 s means the feed must be one query (or cached in-process) to hit p95 < 300 ms. The bash heredoc in this environment mangles long Python files, so code is written with the editor tool.
+
+**Checkpoint.** 25/25 tickers resolve (1 swap, logged). Every probe is recorded above with its real response shape. Tests: 120 passed (46 fiscal, 11 router, 1 health, 62 carried over). ✅

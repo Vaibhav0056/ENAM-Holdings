@@ -1,0 +1,26 @@
+"""Unit tests never touch Neon or Gemini: DATABASE_URL is blanked so finn.database falls back to a throwaway
+SQLite file, and LLM tests inject a fake client."""
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+os.environ["DATABASE_URL"] = ""          # load_dotenv never overrides a variable that is already set
+os.environ["DATABASE_URL_UNPOOLED"] = ""
+os.environ["FINN_TEST_DB"] = str(Path(tempfile.mkdtemp()) / "finn_test.sqlite")
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture()
+def sqldb():
+    """Fresh schema on the SQLite fallback for each test."""
+    from finn import database
+    from finn.models import Base
+    database.reset_engine()
+    eng = database.engine()
+    Base.metadata.drop_all(eng)
+    Base.metadata.create_all(eng)
+    yield eng
+    database.reset_engine()
