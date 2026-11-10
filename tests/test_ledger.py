@@ -99,3 +99,9 @@ def test_money_units_are_compared_in_crore():
     assert L.verdict_for(p, A("capital expenditure", 14.2, "INR billion", "FY26"), latest) == "delivered"
     assert L.verdict_for(p, A("capex", 9000, "million", "FY26"), latest) == "missed"
     assert L.unit_key("₹ million") == L.unit_key("crore") == "crore" and L.unit_key("%") == "%"
+
+
+def test_share_of_revenue_never_matches_a_growth_rate():
+    assert not L.metric_match("exports revenue contribution", "export revenue growth")
+    assert not L.metric_match("EPC business contribution to revenue", "EPC revenue growth")
+    assert L.metric_match("export share of revenue", "export contribution to revenue")

@@ -178,6 +178,11 @@ def to_ist_date(dt: datetime):
     return to_ist(dt).date()
 
 
+def _thesis_factor(impact: str | None) -> tuple[float, str] | None:
+    from ..thesis.guardian import multiplier
+    return multiplier(impact)
+
+
 def _order_factor(payload: dict) -> tuple[float, str] | None:
     if payload.get("kind") != "order":
         return None
@@ -210,7 +215,7 @@ def score_pass(stats: dict, rescore_all: bool, since: datetime, new_ids: list[in
                     order=_order_factor(payload),
                     reacted=reaction(f.filed_at, by_company.get(f.company_id, []), market),
                     results_same_day=(f.company_id, to_ist_date(f.filed_at)) in results_days and e.type != "results",
-                    thesis=None, feedback=feedback)
+                    thesis=_thesis_factor(e.thesis_impact), feedback=feedback)
                 e.score, e.bucket, e.score_breakdown = b.score, b.bucket, b.as_dict()
                 if not payload.get("ok") or e.type not in ("results", "mgmt_change"):
                     e.headline = headline(f.subject, f.body, f.subcategory_raw)
@@ -289,11 +294,17 @@ def run(rescore_all: bool = False, use_llm: bool = True, reclassify_llm: bool = 
     score_pass(stats, rescore_all, since, new_ids)
     if enrich:  # enrichment needs pass-1 novelty (which results filing leads its event); pass 2 uses the payloads
         from ..enrich import run as enrich_run
+        from ..thesis import guardian
         stats["enriched"] = enrich_run.run(use_llm=use_llm)
+        stats["thesis_impacts"] = guardian.impacts(use_llm=use_llm)
+        stats["results_day"] = guardian.results_day()
         stats["buckets"] = defaultdict(int)
         stats["scored"] = 0
         score_pass(stats, rescore_all, since, new_ids)
     stats["event_payloads_shared"] = share_event_payloads()
+    if enrich:
+        from ..thesis import guardian
+        stats["thesis_status"] = guardian.statuses()
     with session() as s:
         need_line = [_filing_dict(f) for f, e in s.execute(
             select(Filing, Enrichment).join(Enrichment, Enrichment.filing_id == Filing.id)

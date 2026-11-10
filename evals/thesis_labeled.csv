@@ -1,0 +1,31 @@
+filing_id,symbol,type,headline,affects_thesis,label_source,note
+64,BAJFINANCE,fundraise,Outcome Of The Meeting Of PI 2026- Special Committee Of Board Of Directors Held On 10 November 2026,yes,claude-provisional,promoter warrant issue funds growth (dilution)
+336,LT,m_and_a,Disposal Of Stake Held By The Company In L&T Metro Rail (Hyderabad) Limited - Extension Of Timeline Of Completion.,yes,claude-provisional,stake-sale timeline bears on cash generation
+248,HAL,m_and_a,Announcement as attached,no,claude-provisional,no content in the filing summary
+142,DEEPAKNTR,results,"Unaudited Financial Result For The Quarter And Half Year Ended 30Th September, 2026",yes,claude-provisional,results bear on every thesis
+170,DIXON,mgmt_change,"Mr. Sunil Vachani, Whole Time Director: appointed (+1 more)",no,claude-provisional,"board appointment, no change of control"
+442,NAUKRI,m_and_a,"Disclosure under Regulation 30 of the Securities and Exchange Board of India (Listing Obligations and Disclosure Requirements) Regulations, 2015",no,claude-provisional,no content in the filing summary
+544,PIDILITIND,mgmt_change,"Mr. Amit Agarwal, Chief Financial Officer – Designate (CFO Designate): appointed",yes,claude-provisional,CFO change
+280,HDFCBANK,mgmt_change,"Mr. Rakesh Kumar Rajput, Chief Compliance Officer: ceases (+1 more)",yes,claude-provisional,chief compliance officer exit at a bank
+323,LT,results,"Q2 FY27 results: Revenue ₹78,750 cr (+15.8% YoY), PAT ₹5,915 cr (+26.2% YoY)",yes,claude-provisional,results
+664,TATAPOWER,order_win,"Press release titled "" Tata Power Renewables Powers Tata Steel''s Decarbonization Journey with 72.5 MW Captive Solar Project in Rajasthan.""",yes,claude-provisional,clean-energy project supports the transition thesis
+674,TCS,m_and_a,Updates on Acquisition,yes,claude-provisional,acquisition completed
+326,LT,order_win,Bagging/receiving of order(s) or contract(s),yes,claude-provisional,major order supports the growth plan
+5,APOLLOHOSP,results,"Q2 FY27 results: Revenue ₹2,903 cr (+23.2% YoY), PAT ₹476 cr (+13.3% YoY)",yes,claude-provisional,results
+402,NAUKRI,mgmt_change,"Mr. Hitesh Oberoi, Managing Director and Chief Executive Officer: resigns (+2 more)",yes,claude-provisional,MD & CEO transition
+158,DIXON,results,"Results For The Quarter And Half Year Ended 30Th September, 2026",yes,claude-provisional,results
+569,POLYCAB,litigation_regulatory,Corporate Insolvency Resolution Process (CIRP)-Updates - Corporate Insolvency Resolution Process  (CIRP),yes,claude-provisional,insolvency appeal against the company (legal risk)
+703,TCS,other,"Press Release Titled 'TCS' Hypervault To Establish Large-Scale AI Data Center Campus In Telangana' Being Issued By Hypervault AI Data Center Limited, A Subsidia",yes,claude-provisional,large AI data-centre bet bears on strategy
+737,TITAN,credit_rating,Ratings update from CARE Ratings Ltd.,no,claude-provisional,"rating update, direction unknown"
+441,NAUKRI,other,Company Update On Naukri Jobspeak Report,no,claude-provisional,industry report
+547,PIDILITIND,other,Press Release,no,claude-provisional,no content
+258,HAL,other,Announcement is attached,no,claude-provisional,no content
+546,PIDILITIND,other,"Regulation 30 Of The SEBI (Listing Obligation And Disclosure Requirements) Regulations, 2015",no,claude-provisional,no content
+149,DEEPAKNTR,other,"Disclosure under Regulation 30 of SEBI (LODR) Regulations, 2015",no,claude-provisional,no content
+279,HDFCBANK,mgmt_change,"Mr. Sudhir Kumar Jha, Group Head - Legal & Group General Counsel: retires",no,claude-provisional,routine retirement
+259,HAL,other,General Updates,no,claude-provisional,no content
+62,ASIANPAINT,insider_pledge,"The Exchange has received Disclosure under Regulation 31(1) and 31(2) of SEBI (Substantial Acquisition of Shares & Takeovers) Regulations, 2011 on August 14, 20",no,claude-provisional,routine promoter disclosure
+725,TITAN,m_and_a,The Company has incorporated a Wholly Owned Subsidiary in Carada in the name and Style of Titan Company Canada Inc.,no,claude-provisional,shell subsidiary
+58,ASIANPAINT,insider_pledge,"The Exchange has received Disclosure under Regulation 31(1) and 31(2) of SEBI (Substantial Acquisition of Shares & Takeovers) Regulations, 2011 on August 26, 20",no,claude-provisional,routine promoter disclosure
+243,HAL,other,General Updates,no,claude-provisional,no content
+700,TCS,other,Press Release - TCS Launches India'S First Lights-Out Factory Lab To Advance AI-First Manufacturing,no,claude-provisional,lab launch press release

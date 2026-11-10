@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from evals import guidance_eval, push_eval, results_eval  # noqa: E402
+from evals import guidance_eval, push_eval, results_eval, thesis_eval  # noqa: E402
 
 
 def main() -> int:
@@ -37,6 +37,8 @@ def main() -> int:
         rows.append(("guidance (POLYCAB, 4 calls)", "verdict agreement", f"{g['verdict_agreement']:.0%}", "≥ 80%",
                      (g["verdict_agreement"] or 0) >= 0.8))
         rows.append(("guidance (POLYCAB, 4 calls)", "unverified citations shown", str(g["unverified_shown"]), "0", g["unverified_shown"] == 0))
+    t = thesis_eval.run(verbose=False)
+    rows.append(("thesis (30 cards)", "affects-thesis agreement", f"{t['agreement']:.0%}", "≥ 80%", t["agreement"] >= 0.8))
     w = max(len(r[0]) + len(r[1]) for r in rows) + 3
     for suite, metric, value, target, passed in rows:
         print(f"{(suite + ' · ' + metric):<{w}} {value:>6}   target {target:<7} {'PASS' if passed else 'FAIL'}")

@@ -47,6 +47,11 @@ def metric_match(a: str, b: str) -> bool:
         return False
     if (set(ta) ^ set(tb)) - _GENERIC - {"and"}:
         return False
+    # A share of revenue and a growth rate are different measures even though both words are generic
+    # ("export revenue contribution" is not "export revenue growth").
+    share, growth = {"contribution", "share", "mix", "salience"}, {"growth", "increase", "cagr"}
+    if (share & set(ta) and growth & set(tb) and not share & set(tb)) or (share & set(tb) and growth & set(ta) and not share & set(ta)):
+        return False
     return fuzz.token_sort_ratio(" ".join(ta), " ".join(tb)) >= 70 or set(ta) - _GENERIC == set(tb) - _GENERIC
 
 
