@@ -119,3 +119,136 @@ def research_report(ticker: str):
     if not hit:
         raise HTTPException(404, "no report in the last 24 hours; POST to start one")
     return hit
+
+
+# ---------- alerts, rules, push, catalysts ----------
+
+@router.get("/api/v2/alerts")
+def alerts_list(limit: int = 100):
+    from sqlalchemy import select as _select
+    from .database import read_session_run
+    from .fiscal import to_ist
+    from .models import Alert, AlertRule, Company
+
+    def q(s):
+        rows = s.execute(_select(Alert, AlertRule.kind, Company.nse_symbol).join(AlertRule, AlertRule.id == Alert.rule_id)
+                         .join(Company, Company.id == Alert.company_id)
+                         .order_by(Alert.triggered_on.desc(), Alert.id.desc()).limit(limit)).all()
+        return [{"id": a.id, "kind": kind, "symbol": sym, "date": a.triggered_on.isoformat(), "title": a.title,
+                 "line": a.line, "link": a.deep_link, "filing_id": a.filing_id, "read": a.read,
+                 "created_at": to_ist(a.created_at).isoformat()} for a, kind, sym in rows]
+    items = read_session_run(q)
+    return {"alerts": items, "unread": sum(1 for a in items if not a["read"])}
+
+
+@router.post("/api/v2/alerts/{alert_id}/read")
+def alert_read(alert_id: int):
+    from .database import session as _s
+    from .models import Alert
+    with _s() as s:
+        a = s.get(Alert, alert_id)
+        if not a:
+            raise HTTPException(404, "no such alert")
+        a.read = True
+    return {"ok": True}
+
+
+@router.post("/api/v2/alerts/read_all")
+def alerts_read_all():
+    from sqlalchemy import update
+    from .database import session as _s
+    from .models import Alert
+    with _s() as s:
+        n = s.execute(update(Alert).where(Alert.read.is_(False)).values(read=True)).rowcount
+    return {"ok": True, "marked": n}
+
+
+@router.get("/api/v2/rules")
+def rules_get():
+    from sqlalchemy import select as _select
+    from .database import session as _s
+    from .models import AlertRule
+    with _s() as s:
+        return {"rules": [{"id": r.id, "kind": r.kind, "label": r.label, "params": r.params, "enabled": r.enabled}
+                          for r in s.scalars(_select(AlertRule).order_by(AlertRule.id))]}
+
+
+RULE_LIMITS = {"multiple": (1.2, 10.0), "pct": (1.0, 20.0), "min_new": (1, 20)}
+FILING_TYPES = {"results", "mgmt_change", "governance", "m_and_a", "fundraise", "order_win", "credit_rating",
+                "litigation_regulatory", "insider_pledge", "dividend_action"}
+
+
+@router.put("/api/v2/rules/{kind}")
+async def rules_put(kind: str, request: Request):
+    from sqlalchemy import select as _select
+    from .database import session as _s
+    from .models import AlertRule
+    body = await request.json()
+    with _s() as s:
+        r = s.scalar(_select(AlertRule).where(AlertRule.kind == kind))
+        if not r:
+            raise HTTPException(404, "no such rule")
+        params = dict(r.params or {})
+        for k, v in (body.get("params") or {}).items():
+            if k in RULE_LIMITS:
+                lo, hi = RULE_LIMITS[k]
+                v = float(v)
+                if not lo <= v <= hi:
+                    raise HTTPException(400, f"{k} must be between {lo} and {hi}")
+                params[k] = v
+            elif k == "types":
+                bad = set(v) - FILING_TYPES
+                if bad:
+                    raise HTTPException(400, f"unknown types {sorted(bad)}")
+                params[k] = sorted(set(v))
+        r.params = params
+        if "enabled" in body:
+            r.enabled = bool(body["enabled"])
+        return {"kind": r.kind, "params": r.params, "enabled": r.enabled}
+
+
+@router.post("/api/v2/alerts/evaluate")
+def alerts_evaluate():
+    from .alerting import engine as ae, notify
+    out = ae.evaluate()
+    out["push"] = notify.notify_new_alerts()
+    return out
+
+
+@router.get("/api/v2/push/key")
+def push_key():
+    from .alerting import notify
+    return {"key": notify.public_key(), "configured": notify.configured()}
+
+
+@router.post("/api/v2/push/subscribe")
+async def push_subscribe(request: Request):
+    from .alerting import notify
+    try:
+        sid = notify.subscribe(await request.json())
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "id": sid}
+
+
+@router.post("/api/v2/push/test")
+def push_test():
+    from .alerting import notify
+    return notify.send_to_all("FINN test", "Notifications are working. Tap to open your Alerts.", "/#alerts")
+
+
+@router.get("/api/v2/catalysts")
+def catalysts(days: int = 7):
+    from datetime import date as _date, timedelta as _td
+    from sqlalchemy import select as _select
+    from .database import read_session_run
+    from .models import CalendarEvent, Company
+
+    def q(s):
+        today = _date.today()
+        rows = s.execute(_select(CalendarEvent, Company.nse_symbol).join(Company, Company.id == CalendarEvent.company_id)
+                         .where(CalendarEvent.event_date >= today, CalendarEvent.event_date <= today + _td(days=min(days, 30)),
+                                Company.is_portfolio.is_(True))
+                         .order_by(CalendarEvent.event_date)).all()
+        return [{"date": e.event_date.isoformat(), "symbol": sym, "kind": e.kind, "title": e.title} for e, sym in rows]
+    return {"days": days, "events": read_session_run(q)}

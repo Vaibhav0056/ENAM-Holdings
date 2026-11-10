@@ -186,3 +186,21 @@ The challenge spec supersedes Steps 1-8. Those built a working SQLite MVP; v2 re
 **Problems.** The thesis eval was tuned on the same 30 cards (labelled before tuning, then the rules were changed), so 90 % flatters a fresh sample. The material share of attention fell to 44 % (tuning set) and 40 % (holdout) because results, senior changes and capital raises now also earn "watch"; material recall stayed at 100 %.
 
 **Checkpoint.** `evals/thesis_labeled.csv` (30 cards, 15 attention + 15 worth a look, provisional labels): affects-thesis agreement 90 % (target ≥ 80 %). All earlier evals still pass. Tests: 217 passed. ✅
+
+## Phase 6: Alerts + push
+
+**Plan.** What: the alert rules (volume, price, filing types), new-promise and peer read-across alerts, dedupe, the catalysts strip, Web Push with a test endpoint. Why: the brief's triggered alerts, and the inbox needs a way to reach the investor. Risks: noisy alerts, ex-dates looking like crashes, re-runs repeating alerts, research re-runs looking like management changing its story.
+
+**Built.** `finn/alerting/engine.py` (five rules over Postgres, dedupe by the `(rule, company, day)` unique key via `ON CONFLICT DO NOTHING RETURNING`), `finn/alerting/notify.py` (pywebpush, VAPID, 5 pushes + 1 summary per burst, 404/410 subscriptions deleted), `finn/pipeline.py` (`python tasks.py pipeline`: feed → alerts → notify, each stage isolated). Routes: `/api/v2/alerts` (+ read, read_all, evaluate), `/api/v2/rules` (GET, PUT with bounds), `/api/v2/push/key|subscribe|test`, `/api/v2/catalysts`.
+
+**Results (last 30 days).** 85 alerts: 41 volume spikes, 13 price moves, 25 material filings, 6 peer read-across (e.g. Divi's results → Sun Pharma), 0 new-promise. Examples: Titan at 6.7× its median volume; Tata Power −3.3 % on a day the NIFTY rose 2.0 % (5.1σ for the stock); Apollo −2.7 % (3.6σ). Catalysts in the next 7 days: Tata Power, HAL and Kaynes results meetings; CAMS ex-date for ₹3.25. Incremental pipeline run: 36 s.
+
+**Decisions and rejected alternatives.**
+- Price moves use adjusted closes and are suppressed on the stock's ex-dates and record dates from the BSE calendar.
+- A new-promise alert compares only promises said on a newer call than the previous report's newest call. The first version raised "Polycab: 7 new promises" because I had re-extracted the same calls with a better prompt; re-research must never look like management changing its story.
+- Peer read-across shows a research-only peer's material filing against the holding it is a peer of, not as a standalone item.
+- Alert counts come from `RETURNING`: the driver's rowcount reported 93 inserts where 86 rows existed.
+
+**Problems.** Real-device push needs a browser to subscribe, which arrives with the frontend (Phase 7). The path was checked against Google's push service: a VAPID-signed, encrypted message to a fake FCM subscription was rejected and the subscription deleted.
+
+**Checkpoint.** A rule fires once (second evaluation adds 0) ✅, alerts appear in `/api/v2/alerts` ✅, rule edits are bounded (pct 50 → 400) ✅. Push arriving in Chrome on localhost: pending the Phase 7 UI. Tests: 221 passed.
