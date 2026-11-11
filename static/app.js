@@ -1,311 +1,316 @@
-/* FINN single-page app (Alpine.js). Hash routes: #today #alerts #research/SYM #settings #card/ID */
-const ICONS = {
-  today: '<path d="M4 6h16M4 12h16M4 18h10"/>',
-  alerts: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
-  research: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
-  settings: '<path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>',
+/* FINN PWA: one Alpine component. Every number on screen comes from the API (Python computed it); this file only
+   formats and arranges. Hash routes: #today #holdings #holding/SYM #research #research/SYM #alerts #settings
+   #card/ID #gallery */
+
+const TYPE_LABEL = {
+  results: "Results", mgmt_change: "Management", governance: "Governance", m_and_a: "M&A", fundraise: "Fundraise",
+  order_win: "Order", credit_rating: "Rating", insider_pledge: "Insider / pledge", dividend_action: "Dividend",
+  litigation_regulatory: "Legal / regulatory", investor_meet: "Investor meet", board_meeting_notice: "Board meeting",
+  agm_egm: "AGM / EGM", routine_compliance: "Compliance", other: "Update",
 };
+const STATUS_LABEL = { intact: "Intact", watch: "Watch", at_risk: "At risk" };
+const VERDICT_LABEL = { delivered: "Delivered", partial: "Partial", missed: "Missed", pending: "Pending", unverifiable: "Unverifiable" };
+const KPI_LABEL = { revenue_growth_yoy: "Revenue growth YoY", ebitda_margin: "EBITDA margin", pat_growth_yoy: "PAT growth YoY", pat_margin: "PAT margin" };
+const WINDOWS = [["24h", "24h"], ["3d", "3 days"], ["7d", "7 days"], ["30d", "30 days"], ["since_last", "Since last check"]];
+const WAKING_MS = 2500;
 
-function store(k, v) {
-  try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; }
-}
-
-async function api(path, opts = {}) {
-  const r = await fetch(path, Object.assign({ headers: { "Content-Type": "application/json" } }, opts));
-  if (!r.ok) {
-    let msg = r.statusText;
-    try { msg = (await r.json()).detail || msg; } catch (_) {}
-    throw new Error(msg);
-  }
-  return r.json();
-}
-
-function b64ToUint8(b64) {
-  const pad = "=".repeat((4 - (b64.length % 4)) % 4);
-  const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
-  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+function store(key, val) {           // per-viewer conveniences only; never required for correctness
+  try { if (val === undefined) return JSON.parse(localStorage.getItem(key)); localStorage.setItem(key, JSON.stringify(val)); }
+  catch (e) { return null; }
 }
 
 function finn() {
   return {
-    tabs: [
-      { id: "today", label: "Today", icon: ICONS.today },
-      { id: "alerts", label: "Alerts", icon: ICONS.alerts },
-      { id: "research", label: "Research", icon: ICONS.research },
-      { id: "settings", label: "Settings", icon: ICONS.settings },
-    ],
-    tab: "today",
-    feed: null, feedWindow: "24h", routineOpen: false, focusId: null,
-    loading: { feed: false },
-    alerts: [], unread: 0,
-    rq: { query: "", job: null, result: null, open: null, timer: null },
-    recent: [],
-    rules: [], ruleTypes: [], typeLabels: {},
-    holdings: [],
-    pushState: "off", pushMsg: "", iosHint: false,
-    refreshing: false, refreshMsg: "",
-    toast: "", _swipe: {},
+    // route from the URL at construction: starting on "today" and switching after init shifted the whole page
+    route: ((location.hash || "#today").slice(1).split("/")[0]) || "today", param: null, theme: store("finn.theme") || "system",
+    net: { waking: false, error: null, stale: false },
+    win: store("finn.window") || "24h", custom: { from: "", to: "" }, showCustom: false,
+    digest: null, catalysts: [], routineOpen: false,
+    holdings: null, holding: null, editing: false, draft: null,
+    alerts: null, unread: 0, rules: null,
+    rq: { ticker: "", job: null, report: null, stage: null, progress: 0, stages: [], error: null, open: {} },
+    sheet: null, cardDetail: null, evidence: null,
+    push: { supported: "serviceWorker" in navigator && "PushManager" in window, state: "", msg: "" },
+    isIOS: /iphone|ipad|ipod/i.test(navigator.userAgent), standalone: matchMedia("(display-mode: standalone)").matches,
+    toast: "", gallery: null,
 
-    async init() {
-      window.addEventListener("hashchange", () => this.route());
-      if (navigator.serviceWorker) {
+    init() {
+      this.applyTheme();
+      window.addEventListener("hashchange", () => this.go());
+      this.go();
+      this.loadAlerts(true);
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
         navigator.serviceWorker.addEventListener("message", (e) => {
-          if (e.data && e.data.type === "navigate") location.href = e.data.url;
+          if (e.data?.type === "navigate" && e.data.url) location.hash = new URL(e.data.url).hash || "#alerts";
         });
-        navigator.serviceWorker.getRegistration().then(async (reg) => {
-          const sub = reg && reg.pushManager && (await reg.pushManager.getSubscription());
-          if (sub && Notification.permission === "granted") this.pushState = "on";
-        }).catch(() => {});
       }
-      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-      const standalone = window.navigator.standalone || matchMedia("(display-mode: standalone)").matches;
-      this.iosHint = isIOS && !standalone && !store("finn.iosHint");
-      this.loadAlerts();
-      this.loadRecent();
-      await this.route();
-      setInterval(() => this.loadAlerts(), 60000);
     },
 
-    async route() {
+    // ---------- plumbing ----------
+    async api(path, opts = {}) {
+      const t = setTimeout(() => (this.net.waking = true), WAKING_MS);
+      try {
+        const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+        if (!r.ok) {
+          let msg = `${r.status}`;
+          try { msg = (await r.json()).detail || msg; } catch (e) {}
+          throw new Error(msg);
+        }
+        this.net.error = null; this.net.stale = false;
+        return await r.json();
+      } catch (e) {
+        this.net.error = e.message || "Network error";
+        throw e;
+      } finally { clearTimeout(t); this.net.waking = false; }
+    },
+    say(msg) { this.toast = msg; clearTimeout(this._t); this._t = setTimeout(() => (this.toast = ""), 2600); },
+
+    go() {
       const h = (location.hash || "#today").slice(1);
-      const [name, arg] = h.split("/");
-      if (name === "card" && arg) {
-        this.tab = "today";
-        await this.focusCard(parseInt(arg, 10));
-      } else if (name === "research") {
-        this.tab = "research";
-        if (arg && (!this.rq.result || this.rq.result.symbol !== arg.toUpperCase()) &&
-            (!this.rq.job || this.rq.job.symbol !== arg.toUpperCase())) this.startResearch(arg, false);
-      } else if (["today", "alerts", "settings"].includes(name)) {
-        this.tab = name;
-        if (name === "today" && !this.feed) this.loadFeed();
-        if (name === "settings") this.loadSettings();
-        if (name === "alerts") this.loadAlerts();
-      } else {
-        this.tab = "today"; if (!this.feed) this.loadFeed();
+      const [name, ...rest] = h.split("/");
+      const param = rest.join("/") || null;
+      this.sheet = null;
+      if (name === "card" && param) { this.openCard(+param); if (!this.digest) this.route = "today", this.loadDigest(); return; }
+      this.route = ["today", "holdings", "holding", "research", "alerts", "settings", "gallery"].includes(name) ? name : "today";
+      this.param = param;
+      window.scrollTo(0, 0);
+      if (this.route === "today") { this.loadDigest(); this.loadCatalysts(); }
+      if (this.route === "holdings") this.loadHoldings();
+      if (this.route === "holding" && param) this.loadHolding(param);
+      if (this.route === "research" && param) this.openResearch(param);
+      if (this.route === "alerts") this.loadAlerts();
+      if (this.route === "settings") this.loadRules();
+      if (this.route === "gallery") this.gallery = galleryData();
+    },
+    nav(hash) { location.hash = hash; },
+
+    applyTheme() {
+      const t = this.theme;
+      if (t === "system") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", t);
+      store("finn.theme", t);
+    },
+
+    // ---------- Today ----------
+    async loadDigest() {
+      const qs = this.win === "custom" ? `from=${this.custom.from}&to=${this.custom.to}` : `window=${this.win}`;
+      try { this.digest = await this.api(`/digest?${qs}`); }
+      catch (e) { if (this.digest) this.net.stale = true; }
+    },
+    setWindow(w) {
+      if (w === "custom") { this.showCustom = true; return; }
+      this.win = w; store("finn.window", w); this.digest = null; this.loadDigest();
+    },
+    applyCustom() {
+      if (!this.custom.from || !this.custom.to) return this.say("Pick both dates");
+      this.win = "custom"; this.showCustom = false; this.digest = null; this.loadDigest();
+    },
+    async loadCatalysts() { try { this.catalysts = (await this.api("/api/v2/catalysts?days=7")).events; } catch (e) {} },
+    async markChecked() { await this.api("/api/state/checked", { method: "POST" }); this.say("Marked as checked"); },
+    async review(card, undo = false) {
+      card.reviewed = !undo;
+      try { await this.api(`/api/v2/cards/${card.id}/review${undo ? "?undo=true" : ""}`, { method: "POST" }); }
+      catch (e) { card.reviewed = undo; return; }
+      if (!undo) this.say("Reviewed");
+      if (this.digest) {
+        const all = [...this.digest.attention, ...this.digest.worth_a_look];
+        this.digest.caught_up = all.every((c) => c.reviewed);
       }
     },
-    go(t) { if (location.hash === "#" + t) this.route(); else location.hash = t; window.scrollTo(0, 0); },
-
-    flash(msg) { this.toast = msg; clearTimeout(this._t); this._t = setTimeout(() => (this.toast = ""), 2400); },
-
-    /* ---------- today ---------- */
-    async loadFeed() {
-      this.loading.feed = true;
-      try { this.feed = await api(`/api/feed?window=${this.feedWindow}`); }
-      catch (e) { this.flash("Couldn't load feed: " + e.message); }
-      this.loading.feed = false;
-    },
-    setWindow(w) { this.feedWindow = w; this.loadFeed(); },
-    feedHeader() {
-      if (!this.feed) return "";
-      const label = this.feed.note
-        ? "Since " + new Date(this.feed.since).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-        : { "24h": "Last 24h", "3d": "Last 3 days", "7d": "Last 7 days", "30d": "Last 30 days" }[this.feed.window];
-      const c = this.feed.counts;
-      return `${label} · ${c.attention} need attention · ${c.worth_a_look} worth a look · ${c.routine} routine hidden`;
-    },
-    async focusCard(id) {
-      if (!this.feed) await this.loadFeed();
-      let present = this.feed && this.feed.cards.find((c) => c.id === id);
-      if (!present) {
-        try {
-          const c = await api(`/api/cards/${id}`);
-          if (this.feed) { this.feed.cards = [c, ...this.feed.cards.filter((x) => x.id !== id)]; }
-        } catch (_) { this.flash("That filing is no longer available"); return; }
-      }
-      this.focusId = id;
-      this.$nextTick(() => {
-        const el = document.getElementById("card-" + id);
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    swipe(el, card) {      // swipe right on a card = mark reviewed
+      let x0 = null, dx = 0;
+      el.addEventListener("pointerdown", (e) => { x0 = e.clientX; dx = 0; });
+      el.addEventListener("pointermove", (e) => {
+        if (x0 === null) return; dx = e.clientX - x0;
+        if (dx > 0) el.style.transform = `translateX(${Math.min(dx, 120)}px)`;
       });
+      const end = () => {
+        if (x0 !== null && dx > 90 && !card.reviewed) this.review(card);
+        el.style.transform = ""; x0 = null;
+      };
+      el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end); el.addEventListener("pointerleave", end);
     },
-    async review(c) {
-      const el = document.getElementById("card-" + c.id);
-      if (el) { el.style.transform = "translateX(110%)"; el.style.opacity = "0"; }
-      try { await api(`/api/cards/${c.id}/review`, { method: "POST" }); } catch (_) {}
-      setTimeout(() => {
-        this.feed.cards = this.feed.cards.filter((x) => x.id !== c.id);
-        this.feed.reviewed.push(c);
-        if (c.bucket === "attention") this.feed.counts.attention--; else this.feed.counts.worth_a_look--;
-      }, 180);
-    },
-    async unreviewAll() {
-      for (const c of this.feed.reviewed) await api(`/api/cards/${c.id}/review?undo=1`, { method: "POST" });
-      this.loadFeed();
-    },
-    swipeStart(e, c) { this._swipe = { x: e.touches[0].clientX, y: e.touches[0].clientY, id: c.id, dx: 0 }; },
-    swipeMove(e, c) {
-      if (this._swipe.id !== c.id) return;
-      const dx = e.touches[0].clientX - this._swipe.x, dy = e.touches[0].clientY - this._swipe.y;
-      if (Math.abs(dx) > Math.abs(dy) && dx > 0) {
-        this._swipe.dx = dx;
-        const el = document.getElementById("card-" + c.id);
-        if (el) { el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(Math.max(0.3, 1 - dx / 300)); }
-      }
-    },
-    swipeEnd(e, c) {
-      if (this._swipe.id !== c.id) return;
-      const el = document.getElementById("card-" + c.id);
-      if (this._swipe.dx > 110) this.review(c);
-      else if (el) { el.style.transform = ""; el.style.opacity = ""; }
-      this._swipe = {};
+    unreviewedCount() {
+      if (!this.digest) return 0;
+      return [...this.digest.attention, ...this.digest.worth_a_look].filter((c) => !c.reviewed).length;
     },
 
-    /* ---------- alerts ---------- */
-    async loadAlerts() {
-      try { const r = await api("/api/alerts"); this.alerts = r.alerts; this.unread = r.unread; } catch (_) {}
+    // ---------- card sheet ----------
+    async openCard(id) {
+      this.sheet = "card"; this.cardDetail = null; this.evidence = null;
+      try { this.cardDetail = await this.api(`/api/v2/cards/${id}`); } catch (e) { this.sheet = null; this.say("Card not found"); }
+    },
+    closeSheet() {
+      this.sheet = null; this.evidence = null;
+      if (location.hash.startsWith("#card/")) history.replaceState(null, "", "#today");
+    },
+    async openEvidence(docId, page, quote) {
+      if (!docId || !page) return;
+      this.evidence = { loading: true, quote };
+      try { this.evidence = { ...(await this.api(`/api/v2/documents/${docId}/pages/${page}`)), quote }; }
+      catch (e) { this.evidence = { error: "That page isn't stored yet. Open the PDF instead." }; }
+    },
+    highlight(text, quote) {
+      const esc = (s) => (s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      if (!quote) return esc(text);
+      const words = quote.split(/\s+/).filter((w) => w.length > 3).slice(0, 6).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      let out = esc(text);
+      if (words.length) {
+        const first = words[0];
+        out = out.replace(new RegExp(`(${first})`, "i"), "<mark>$1</mark>");
+      }
+      return out;
+    },
+
+    // ---------- Holdings ----------
+    async loadHoldings() { try { this.holdings = (await this.api("/api/v2/holdings")).holdings; } catch (e) {} },
+    async loadHolding(sym) {
+      this.holding = null; this.editing = false;
+      try { this.holding = await this.api(`/api/v2/holdings/${sym}`); } catch (e) {}
+    },
+    startEdit() {
+      const t = this.holding.thesis || { statement: "", kpis: [], breakers: [] };
+      this.draft = { statement: t.statement, breakers: (t.breakers || []).map((b) => b.text).join("\n"),
+                     kpis: JSON.parse(JSON.stringify(t.kpis || [])) };
+      this.editing = true;
+    },
+    addKpi() { this.draft.kpis.push({ metric: "ebitda_margin", op: ">=", threshold: 10, why: "" }); },
+    async saveThesis() {
+      const body = { statement: this.draft.statement, breakers: this.draft.breakers.split("\n"),
+                     kpis: this.draft.kpis.map((k) => ({ ...k, threshold: Number(k.threshold) })) };
+      try {
+        await this.api(`/api/v2/holdings/${this.holding.symbol}/thesis`, { method: "PUT", body: JSON.stringify(body) });
+        this.say("Thesis saved"); this.loadHolding(this.holding.symbol);
+      } catch (e) { this.say(this.net.error); }
+    },
+
+    // ---------- Research ----------
+    startResearch() {
+      const t = (this.rq.ticker || "").trim().toUpperCase();
+      if (!/^[A-Z0-9&-]{1,20}$/.test(t)) return this.say("Enter an NSE symbol, e.g. POLYCAB");
+      this.nav(`#research/${t}`);
+    },
+    async openResearch(sym, force = false) {
+      Object.assign(this.rq, { ticker: sym, job: null, report: null, stage: null, progress: 0, error: null, open: {} });
+      try {
+        const r = await this.api(`/api/v2/research/${sym}${force ? "?force=true" : ""}`, { method: "POST" });
+        if (r.cached) { this.rq.report = r.report; return; }
+        this.rq.job = r.job_id; this.follow(r.job_id);
+      } catch (e) { this.rq.error = this.net.error; }
+    },
+    follow(jobId) {
+      const done = async () => {
+        try { const j = await this.api(`/api/v2/research/job/${jobId}`); if (j.report) this.rq.report = j.report; else this.rq.error = j.error; }
+        catch (e) { this.rq.error = this.net.error; }
+      };
+      if (!window.EventSource) return this.poll(jobId);
+      const es = new EventSource(`/api/v2/research/job/${jobId}/events`);
+      es.addEventListener("stage", (e) => { const d = JSON.parse(e.data); Object.assign(this.rq, { stage: d.stage, progress: d.progress, stages: d.stages }); });
+      es.addEventListener("done", () => { es.close(); done(); });
+      es.addEventListener("failed", (e) => { es.close(); this.rq.error = JSON.parse(e.data).error || "Research failed"; });
+      es.onerror = () => { es.close(); this.poll(jobId); };
+    },
+    async poll(jobId) {
+      for (let i = 0; i < 400; i++) {
+        let j; try { j = await this.api(`/api/v2/research/job/${jobId}`); } catch (e) { return; }
+        Object.assign(this.rq, { stage: j.stage, progress: j.progress, stages: j.stages });
+        if (j.status === "done") { this.rq.report = j.report; return; }
+        if (j.status === "failed") { this.rq.error = j.error; return; }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    },
+    stageState(s) {
+      const i = this.rq.stages.indexOf(s), cur = this.rq.stages.indexOf(this.rq.stage);
+      return i < cur ? "done" : i === cur ? "now" : "";
+    },
+    source(id) { return (this.rq.report?.sources || []).find((s) => s.id === id) || {}; },
+    gaugeDash(score) { const c = 2 * Math.PI * 30; return `${(c * (score || 0)) / 100} ${c}`; },
+
+    // ---------- Alerts ----------
+    async loadAlerts(quiet = false) {
+      try { const r = await this.api("/api/v2/alerts"); this.alerts = r.alerts; this.unread = r.unread; }
+      catch (e) { if (quiet) this.net.error = null; }
     },
     async openAlert(a) {
-      if (!a.read) { a.read = 1; this.unread = Math.max(0, this.unread - 1); api(`/api/alerts/${a.id}/read`, { method: "POST" }); }
-      location.hash = (a.link || "#alerts").replace(/^\/?#?/, "");
+      if (!a.read) { a.read = true; this.unread = Math.max(0, this.unread - 1); this.api(`/api/v2/alerts/${a.id}/read`, { method: "POST" }).catch(() => {}); }
+      if (a.link) location.hash = a.link.replace(/^\/?#?/, "#");
     },
-    async readAll() { await api("/api/alerts/read_all", { method: "POST" }); this.loadAlerts(); },
+    async readAll() { await this.api("/api/v2/alerts/read_all", { method: "POST" }); this.alerts.forEach((a) => (a.read = true)); this.unread = 0; },
 
-    /* ---------- research ---------- */
-    openResearch(sym) { location.hash = "research/" + sym; },
-    async loadRecent() { try { this.recent = (await api("/api/research/recent")).reports; } catch (_) {} },
-    async startResearch(sym, setHash = true) {
-      sym = (sym || "").trim().toUpperCase();
-      if (!sym) return;
-      this.rq.query = sym;
-      if (setHash && location.hash !== "#research/" + sym) { history.replaceState(null, "", "#research/" + sym); }
-      this.tab = "research";
-      clearTimeout(this.rq.timer);
-      this.rq.result = null; this.rq.open = null;
-      try {
-        const { job_id } = await api(`/research/${encodeURIComponent(sym)}`, { method: "POST" });
-        this.poll(job_id);
-      } catch (e) {
-        this.rq.job = { symbol: sym, status: "error", error: e.message, stages: [] };
-      }
+    // ---------- Settings ----------
+    async loadRules() { try { this.rules = (await this.api("/api/v2/rules")).rules; } catch (e) {} },
+    async saveRule(r) {
+      try { await this.api(`/api/v2/rules/${r.kind}`, { method: "PUT", body: JSON.stringify({ params: r.params, enabled: r.enabled }) }); this.say("Rule saved"); }
+      catch (e) { this.say(this.net.error); this.loadRules(); }
     },
-    async poll(id) {
-      try {
-        const j = await api(`/research/job/${id}`);
-        this.rq.job = j;
-        if (j.status === "done") { this.rq.result = j.result; this.rq.job = null; this.loadRecent(); return; }
-        if (j.status === "error") return;
-      } catch (e) { this.rq.job = { status: "error", error: e.message, stages: [] }; return; }
-      this.rq.timer = setTimeout(() => this.poll(id), 1500);
-    },
-    stageState(i) {
-      const j = this.rq.job; if (!j) return "todo";
-      const cur = j.stages.indexOf(j.stage);
-      return i < cur ? "done" : i === cur ? "now" : "todo";
-    },
-    verdictSummary() {
-      const c = this.rq.result && this.rq.result.counts; if (!c) return "";
-      return ["delivered", "partially", "missed", "pending", "unverifiable"].filter((k) => c[k]).map((k) => `${c[k]} ${k}`).join(" · ");
-    },
-    verdictCls(v) {
-      return { delivered: "bg-up/15 text-up", partially: "bg-accent/15 text-accent", missed: "bg-down/15 text-down",
-               pending: "bg-raised text-mute", unverifiable: "bg-raised text-faint" }[v] || "bg-raised text-mute";
-    },
-    actualText(r) {
-      const f = (a) => `${this.fmt(a.value)}${a.unit === "%" ? "%" : " " + a.unit} (${a.period})`;
-      if (r.actual) return "Actual: " + f(r.actual);
-      if (r.progress) return "Latest: " + f(r.progress) + (r.tracking ? " · " + r.tracking : "");
-      if (r.verdict === "unverifiable") return r.guidance.target_low == null ? "Vague target, can't be checked" : "Not found in sources";
-      return "Not reported yet";
-    },
-    docLabel(id) {
-      const s = this.rq.result && this.rq.result.sources.find((x) => x.id === id);
-      if (!s) return id || "";
-      return s.kind === "transcript" ? `Concall ${s.quarter || s.label}` : "Annual report";
-    },
-
-    /* ---------- settings ---------- */
-    async loadSettings() {
-      try {
-        const r = await api("/api/rules");
-        this.rules = r.rules.map((x) => Object.assign(x, { enabled: !!x.enabled }));
-        this.ruleTypes = r.types; this.typeLabels = r.type_labels;
-        this.holdings = (await api("/api/portfolio")).portfolio;
-        const st = await api("/api/refresh");
-        this.refreshing = st.running;
-        this.refreshMsg = st.running ? "Refreshing…" : (st.error ? "Last refresh failed: " + st.error : "");
-      } catch (e) { this.flash("Couldn't load settings"); }
-    },
-    ruleLabel(r) {
-      return { volume_spike: "Volume spike", price_move: "Big price move", announcement_type: "Filing types" }[r.kind] || r.label;
-    },
-    hasType(r, t) { return (r.types || "").split(",").includes(t); },
-    toggleType(r, t) {
-      const s = new Set((r.types || "").split(",").filter(Boolean));
-      s.has(t) ? s.delete(t) : s.add(t);
-      r.types = [...s].join(",");
-    },
-    async saveRules() {
-      try {
-        await api("/api/rules", { method: "PUT", body: JSON.stringify(this.rules.map((r) => ({
-          kind: r.kind, threshold: r.threshold, types: r.types, enabled: !!r.enabled })) ) });
-        const ev = await api("/api/alerts/evaluate", { method: "POST" });
-        this.flash(`Saved. ${ev.new} new alert${ev.new === 1 ? "" : "s"}`);
-        this.loadAlerts();
-      } catch (e) { this.flash("Save failed: " + e.message); }
-    },
-    async refreshData() {
-      this.refreshing = true; this.refreshMsg = "Fetching prices and BSE filings…";
-      await api("/api/refresh", { method: "POST" });
-      const tick = async () => {
-        const st = await api("/api/refresh");
-        if (st.running) { setTimeout(tick, 3000); return; }
-        this.refreshing = false;
-        const l = st.last || {};
-        this.refreshMsg = st.error ? "Refresh failed: " + st.error :
-          `Done. ${(l.ingest && l.ingest.new_announcements) || 0} new filings, ${(l.alerts && typeof l.alerts === "number") ? l.alerts : 0} new alerts.`;
-        this.feed = null; this.loadAlerts();
-      };
-      setTimeout(tick, 3000);
-    },
-    dismissIosHint() { this.iosHint = false; store("finn.iosHint", "1"); },
     async enablePush() {
-      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-        this.pushMsg = /iphone|ipad/i.test(navigator.userAgent)
-          ? "On iPhone, add FINN to your Home Screen first, then open it from there."
-          : "This browser doesn't support push notifications.";
-        return;
-      }
-      try {
-        const perm = await Notification.requestPermission();  // asked only on this tap
-        if (perm !== "granted") { this.pushMsg = "Permission was not granted."; return; }
-        const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-        await navigator.serviceWorker.ready;
-        const { key, configured } = await api("/api/push/key");
-        if (!configured) { this.pushMsg = "Server has no VAPID keys configured."; return; }
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(key) });
-        await api("/api/push/subscribe", { method: "POST", body: JSON.stringify(sub.toJSON()) });
-        this.pushState = "on"; this.pushMsg = "You'll get a notification when an alert fires.";
-      } catch (e) { this.pushMsg = "Couldn't enable notifications: " + e.message; }
+      if (!this.push.supported) return (this.push.msg = "This browser can't receive web push.");
+      if (this.isIOS && !this.standalone) return (this.push.msg = "On iPhone, add FINN to your Home Screen first, then enable notifications from there.");
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") return (this.push.msg = "Notifications are blocked for this site.");
+      const { key, configured } = await this.api("/api/v2/push/key");
+      if (!configured) return (this.push.msg = "The server has no VAPID keys configured.");
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+      await this.api("/api/v2/push/subscribe", { method: "POST", body: JSON.stringify(sub.toJSON()) });
+      this.push.state = "on"; this.push.msg = "Notifications are on.";
     },
     async testPush() {
-      try {
-        const r = await api("/api/push/test", { method: "POST" });
-        this.pushMsg = r.skipped ? r.skipped : `Sent to ${r.sent} device${r.sent === 1 ? "" : "s"}.` + (r.sent ? "" : " Enable notifications first.");
-      } catch (e) { this.pushMsg = "Test failed: " + e.message; }
+      const r = await this.api("/api/v2/push/test", { method: "POST" });
+      this.push.msg = r.sent ? `Sent to ${r.sent} device${r.sent > 1 ? "s" : ""}.` : (r.skipped || "No subscribed device yet.");
     },
+    async runPipeline() { this.say("Checking for new alerts…"); const r = await this.api("/api/v2/alerts/evaluate", { method: "POST" }); this.loadAlerts(); this.say(`Done: ${JSON.stringify(r).length ? "alerts updated" : ""}`); },
 
-    /* ---------- formatting ---------- */
-    metricLabel(m) { return { revenue: "Revenue", ebitda: "EBITDA", pbt: "PBT", pat: "PAT" }[m] || m; },
-    fmt(v) {
-      if (v == null || isNaN(v)) return "—";
-      const a = Math.abs(v);
-      return v.toLocaleString("en-IN", { maximumFractionDigits: a >= 100 ? 0 : a >= 10 ? 1 : 2 });
-    },
-    crore(v) { return v == null ? "—" : this.fmt(v); },
-    pct(v) { return v == null ? "—" : (v > 0 ? "+" : "") + v.toFixed(1) + "%"; },
-    deltaCls(v) { return v == null ? "text-faint" : v > 0 ? "text-up" : v < 0 ? "text-down" : "text-mute"; },
-    score(c) { return c.score != null ? c.score.toFixed(2) : ""; },
-    ago(iso) {
+    // ---------- formatting ----------
+    type(t) { return TYPE_LABEL[t] || t; },
+    status(s) { return STATUS_LABEL[s] || s; },
+    verdict(v) { return VERDICT_LABEL[v] || v; },
+    kpi(m) { return KPI_LABEL[m] || m; },
+    windows() { return WINDOWS; },
+    cr(n) { return n == null ? "–" : "₹" + Number(n).toLocaleString("en-IN", { maximumFractionDigits: n >= 100 ? 0 : 1 }) + " cr"; },
+    pct(n) { return n == null ? "–" : (n > 0 ? "+" : "") + Number(n).toFixed(1) + "%"; },
+    cls(n) { return n == null ? "mute" : n > 0 ? "up" : n < 0 ? "down" : "mute"; },
+    when(iso) {
       if (!iso) return "";
-      const d = new Date(iso), s = (Date.now() - d.getTime()) / 1000;
-      if (s < 3600) return Math.max(1, Math.round(s / 60)) + "m ago";
-      if (s < 86400) return Math.round(s / 3600) + "h ago";
-      if (s < 7 * 86400) return Math.round(s / 86400) + "d ago";
+      const d = new Date(iso), now = new Date(), mins = (now - d) / 60000;
+      if (mins < 60) return `${Math.max(1, Math.round(mins))}m ago`;
+      if (mins < 60 * 24) return `${Math.round(mins / 60)}h ago`;
       return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
     },
-    shortDate(d) { return d ? new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""; },
+    day(iso) { return iso ? new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) : ""; },
+    metricName(m) { return { revenue: "Revenue", ebitda: "EBITDA", pbt: "PBT", pat: "PAT" }[m] || m; },
+  };
+}
+
+function b64ToBytes(b64) {
+  const s = atob(b64.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b64.length + 3) % 4));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+}
+
+// Sample data for #gallery: every card kind and every state, rendered with the real templates.
+function galleryData() {
+  const base = { symbol: "TCS", company: "Tata Consultancy Services Ltd", filed_at: new Date().toISOString(), reviewed: false,
+                 why: { reasons: [], score: 0.8, type_weight: 1, magnitude: 1, novelty: 1, thesis_multiplier: 1 } };
+  return {
+    results: { ...base, id: -1, type: "results", bucket: "attention", headline: "Q2 FY27 results: Revenue ₹73,188 cr (+11.2% YoY), PAT ₹13,934 cr (+14.9% YoY)",
+      symbol: "SAMPLECO", company: "Sample Company Ltd (fictional)",
+      payload: { ok: true, basis: "consolidated", confidence: "high", period: "Q2 FY27", table: [
+        { metric: "revenue", found: true, current: 73188, qoq: 1.3, yoy: 11.2 }, { metric: "ebitda", found: true, current: 19882, qoq: 2.0, yoy: 9.8 },
+        { metric: "pbt", found: true, current: 18638, qoq: 3.9, yoy: 16.0 }, { metric: "pat", found: true, current: 13934, qoq: 3.8, yoy: 14.9 }],
+        results_day: { comparisons: [{ metric: "EBITDA margin", promised: "26-28%", delivered: 27.2, verdict: "on track" }] } },
+      thesis_impact: "watch", why_it_matters: "Quarterly results: check them against the thesis." },
+    lowconf: { ...base, id: -2, symbol: "SAMPLECO", type: "results", bucket: "attention", headline: "Un-Audited Financial Results For The Quarter Ended 30 September 2026",
+      payload: { ok: false, reason: "figures are 100× off BSE's own numbers (unit or digit misread); not shown" } },
+    mgmt: { ...base, id: -3, symbol: "SAMPLECO", type: "mgmt_change", bucket: "attention", headline: "A. Sample, Managing Director and Chief Executive Officer: resigns",
+      payload: { people: [{ name: "A. Sample", role: "Managing Director and Chief Executive Officer", direction: "resigned", senior: true,
+        profile_quote: "A fictional profile quote.", quote: "A. Sample will step down as MD & CEO", page: 1 }],
+        governance_flags: [{ kind: "senior_exit", severity: "high", summary: "A. Sample (MD & CEO) resigned" }] }, thesis_impact: "watch",
+      why_it_matters: "Senior leadership change: management quality is part of every thesis." },
+    governance: { ...base, id: -4, symbol: "SAMPLECO", type: "governance", bucket: "attention", headline: "Resignation of Statutory Auditor (fictional example)",
+      payload: { kind: "governance", ok: true, flags: [{ kind: "auditor_resignation", severity: "high", summary: "The statutory auditor resigned before completing its term." }] },
+      thesis_impact: "threatens", why_it_matters: "An auditor resigning mid-term is a classic integrity red flag." },
+    worth: { ...base, id: -5, symbol: "SAMPLECO", type: "order_win", bucket: "worth_a_look", headline: "Sample Company wins orders (Large*) (fictional example)",
+      one_liner: "A fictional order win, to show the compact row.", thesis_impact: "supports", why_it_matters: null },
   };
 }

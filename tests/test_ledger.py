@@ -105,3 +105,8 @@ def test_share_of_revenue_never_matches_a_growth_rate():
     assert not L.metric_match("exports revenue contribution", "export revenue growth")
     assert not L.metric_match("EPC business contribution to revenue", "EPC revenue growth")
     assert L.metric_match("export share of revenue", "export contribution to revenue")
+
+
+def test_placeholder_leaks_are_removed():
+    clean, removed, _ = guards.scrub("The score is null for now. None of the targets matured.", set())
+    assert clean == "None of the targets matured." and removed == 1

@@ -21,6 +21,9 @@ ADVICE = re.compile(
     r"\b(?:is|looks|appears) (?:a )?(?:cheap|expensive|undervalued|overvalued)\b", re.I)
 
 
+PLACEHOLDER = re.compile(r"\b(?:null|undefined)\b|\bNaN\b")   # evidence is JSON, so a leak reads null; "None of" is English
+
+
 def numbers(text: str) -> set[float]:
     return {v for v, _ in _numbers_with_places(text)}
 
@@ -68,6 +71,8 @@ def scrub(text: str, allowed: set[float]) -> tuple[str, int, int]:
     for s in sentences(text):
         if ADVICE.search(s):
             bad_adv += 1
+        elif PLACEHOLDER.search(s):   # "a credibility score of null": a JSON placeholder leaked into prose
+            bad_num += 1
         elif not all(number_ok(n, allowed, d) for n, d in _numbers_with_places(s)):
             bad_num += 1
         else:

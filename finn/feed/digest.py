@@ -90,7 +90,10 @@ def digest(window: str | None = "24h", start: str | None = None, end: str | None
             as_of_dt = as_of_dt.replace(tzinfo=IST) if "T" in as_of else ist_day_bounds(as_of_dt.date())[1]
     last_checked = _last_checked() if window == "since_last" and not (start or end) else None
     w = resolve_window(window, start, end, now=as_of_dt, last_checked=last_checked)
-    key = (round(w["from"].timestamp() // 60), round(w["to"].timestamp() // 60), include_peers, w["preset"])
+    if w["preset"] in PRESETS and not as_of:   # rolling windows: one entry each, kept fresh by the warmer
+        key = ("preset", None, include_peers, w["preset"])
+    else:
+        key = (round(w["from"].timestamp() // 60), round(w["to"].timestamp() // 60), include_peers, w["preset"])
     with _lock:
         hit = _cache.get(key)
         if hit and time.monotonic() - hit[0] < CACHE_TTL:
@@ -99,7 +102,9 @@ def digest(window: str | None = "24h", start: str | None = None, end: str | None
             out["cached"] = True
             return out
     def query(s):
+        from sqlalchemy.orm import defer
         q = (select(Filing, Enrichment, Company)
+             .options(defer(Filing.raw), defer(Filing.body), defer(Company.bse_snapshot), defer(Company.note))
              .join(Enrichment, Enrichment.filing_id == Filing.id).join(Company, Company.id == Filing.company_id)
              .where(Filing.filed_at >= w["from"], Filing.filed_at <= w["to"])
              .order_by(Enrichment.score.desc(), Filing.filed_at.desc()))
@@ -132,6 +137,32 @@ def _last_checked():
         st = s.get(UserState, 1)
         return st.last_checked_at if st else None
     return read_session_run(get)
+
+
+_warmer_started = False
+
+
+def start_warmer(interval: float = 50.0):
+    """Keep the standard windows precomputed in this process, so a request almost never pays for a query
+    (the feed's p95 target is 300 ms and one Neon round trip from India is ~85 ms)."""
+    global _warmer_started
+    if _warmer_started:
+        return
+    _warmer_started = True
+
+    def loop():
+        import logging
+        while True:
+            for w in ("24h", "3d", "7d", "30d"):
+                try:
+                    with _lock:
+                        for k in [k for k in _cache if k[3] == w and k[0] == "preset"]:
+                            _cache.pop(k, None)
+                    digest(w)
+                except Exception as e:  # noqa: BLE001 - a failed warm-up just means the next request queries
+                    logging.getLogger("finn.digest").warning("warm-up failed for %s: %s", w, e)
+            time.sleep(interval)
+    threading.Thread(target=loop, daemon=True, name="digest-warmer").start()
 
 
 def mark_checked(at: datetime | None = None) -> str:

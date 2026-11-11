@@ -204,3 +204,30 @@ The challenge spec supersedes Steps 1-8. Those built a working SQLite MVP; v2 re
 **Problems.** Real-device push needs a browser to subscribe, which arrives with the frontend (Phase 7). The path was checked against Google's push service: a VAPID-signed, encrypted message to a fake FCM subscription was rejected and the subscription deleted.
 
 **Checkpoint.** A rule fires once (second evaluation adds 0) ✅, alerts appear in `/api/v2/alerts` ✅, rule edits are bounded (pct 50 → 400) ✅. Push arriving in Chrome on localhost: pending the Phase 7 UI. Tests: 221 passed.
+
+## Phase 7: Frontend
+
+**Plan.** What: every screen (Today, Holdings + holding page with thesis editor, Research with live progress and the ledger, Alerts, Settings), the card sheet with layered depth and evidence, the `#gallery` page, every state (loading, waking, stale, error, empty, low confidence), dark and light themes at 375 px. Why: the evaluators see FINN through this. Risks: render-blocking CSS, layout shift from late data, contrast in two themes. `docs/UI_BRIEF.md` was not added, so the §8 principles were followed.
+
+**Built.** `static/index.html` (Alpine templates, inline SVG icon sprite), `static/app.js` (routing, data, swipe-to-review, SSE with polling fallback, push opt-in, theme), `static/app.css` (design tokens for light and dark), `static/sw.js` (app shell stale-while-revalidate, API never cached, push + click-through), `static/vendor/alpine-3.14.8.min.js`. New routes in `finn/web_ui.py`: holdings with status, holding page, thesis editor (PUT, validated, re-runs the status engine), card detail, evidence page text, user state. Company names filled from BSE announcements (the BSE lookup had returned symbols as names).
+
+**Layering.** Card: headline → summary (results mini-table, people IN/OUT, governance flags, results-day verdict, thesis "why it matters") → sheet ("Go deeper": full table with previous quarter and year ago, notes, confidence, against-guidance, people with verified profile quotes, flags, "Why am I seeing this?" score breakdown) → evidence (the stored page text with the quote highlighted, or the PDF). Research ledger rows expand to the quote, speaker, document and page.
+
+**Decisions and rejected alternatives.**
+- Plain CSS with design tokens instead of the Tailwind CDN. The Tailwind play CDN compiles CSS in the browser and blocks rendering; the Lighthouse ≥ 90 target was the reason. No build step either way.
+- Alpine served from FINN itself (same pinned version, 44 KB): one less cross-origin connection; Research went from 77 to 91 after this plus the layout fixes.
+- Network notices (waking, stale, error) float over the content: inline, they appeared and vanished above the feed and caused most of the layout shift.
+- The route is read from the URL when the component is constructed: starting on Today and switching after init moved the whole page (CLS 0.23 on Research).
+- Rolling windows are precomputed in-process every 50 s and cached under one key each; the first version keyed the cache by the minute and missed constantly.
+- The gallery's invented examples use a fictional "SAMPLECO": its first draft paired real companies (Polycab, TCS, Info Edge) with made-up events.
+- Found while reviewing the research screen: a JSON `null` leaked into prose ("a credibility score of null") and a government forecast ("17,000 circuit km") was extracted as a Polycab promise. A placeholder guard now removes such sentences, and promise prompt v4 excludes market, industry and government forecasts. Polycab recall rose to 83 %, verdict agreement 96 %.
+- A status timeline reset: entries created by the senior-exit rule fixed in Phase 5 were artefacts of my own fix, not history, so the timeline was recomputed.
+
+**Checkpoint.**
+| Screen | Performance | Accessibility | CLS |
+|---|---|---|---|
+| Today | 92 | 100 | 0.107 |
+| Research (POLYCAB) | 91 | 100 | 0 |
+| Holdings | 95 | 100 | 0.061 |
+| Alerts | 95 | 100 | 0.008 |
+Lighthouse 12.8.2, mobile, headless Chrome 157, local server. Feed `/digest`: p50 3.8 ms, p95 20.2 ms over 80 requests (target < 300 ms). App shell 0.22 s from the server, served from the service-worker cache on repeat visits. Every screen checked at 375 px in dark and light (screenshots in the session scratchpad). Real-device push still needs a person to tap "Enable notifications" in Chrome; the subscribe → sign → send → prune path is verified. Tests: 222 passed. ✅

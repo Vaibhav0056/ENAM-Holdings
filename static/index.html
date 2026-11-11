@@ -1,453 +1,576 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>FINN</title>
-  <meta name="description" content="Your portfolio's daily inbox: what changed and why you should care.">
-  <meta name="theme-color" content="#0b0d10">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="FINN">
-  <link rel="manifest" href="/manifest.json">
-  <link rel="icon" href="/static/icons/icon-192.png">
-  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
-  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
-  <script>
-    tailwind.config = { darkMode: "class", theme: { extend: {
-      colors: { bg: "#0b0d10", surface: "#14171c", raised: "#1b1f26", line: "#262b33", ink: "#e6e8eb",
-                mute: "#8b93a1", faint: "#5d6470", accent: "#8ab4ff", up: "#3ecf8e", down: "#ff6b6b" },
-      fontFamily: { sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"] } } } };
-  </script>
-  <style>
-    :root { color-scheme: dark; }
-    body { background: #0b0d10; color: #e6e8eb; -webkit-tap-highlight-color: transparent; }
-    .num { font-variant-numeric: tabular-nums; }
-    .clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .clamp1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-    [x-cloak] { display: none !important; }
-    .safe-b { padding-bottom: max(env(safe-area-inset-bottom), 8px); }
-    .card-swipe { transition: transform .18s ease, opacity .18s ease; touch-action: pan-y; }
-    .spin { animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
-    .flash { animation: flash 1.6s ease; } @keyframes flash { 0% { box-shadow: 0 0 0 2px #8ab4ff; } 100% { box-shadow: 0 0 0 0 transparent; } }
-    input[type=number]::-webkit-inner-spin-button { opacity: .4; }
-  </style>
-  <script defer src="/static/app.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FINN</title>
+<meta name="description" content="FINN: has anything happened that changes why I own this?">
+<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/static/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="stylesheet" href="/static/app.css">
+<script defer src="/static/app.js"></script>
+<script defer src="/static/vendor/alpine-3.14.8.min.js"></script>
 </head>
-<body class="min-h-screen font-sans text-[15px] leading-snug">
-<div x-data="finn()" x-init="init()" x-cloak class="max-w-md mx-auto min-h-screen flex flex-col">
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-today" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 9h16M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-hold" viewBox="0 0 24 24"><path d="M3 20h18M6 16V9m6 7V5m6 11v-4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+</svg>
 
-  <!-- ===================== TODAY ===================== -->
-  <main x-show="tab==='today'" class="flex-1 pb-24">
-    <header class="sticky top-0 z-10 bg-bg/95 backdrop-blur px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2 border-b border-line">
-      <div class="flex items-center justify-between">
-        <h1 class="text-lg font-semibold tracking-tight">Today</h1>
-        <div class="flex bg-surface border border-line rounded-lg p-0.5 text-xs">
-          <template x-for="w in ['24h','3d','7d','30d']" :key="w">
-            <button @click="setWindow(w)" class="px-2.5 py-1 rounded-md num"
-                    :class="feedWindow===w ? 'bg-raised text-ink' : 'text-mute'" x-text="w"></button>
-          </template>
-        </div>
-      </div>
-      <p class="text-xs text-mute mt-1 num" x-text="feedHeader()"></p>
-      <p x-show="feed && feed.note" class="text-[11px] text-faint mt-0.5" x-text="feed && feed.note"></p>
-    </header>
+<div class="app" x-data="finn()" x-init="init()">
 
-    <div class="px-3 pt-3 space-y-3">
-      <template x-if="loading.feed && !feed"><p class="text-mute text-sm px-1">Loading filings…</p></template>
-      <template x-if="feed && feed.cards.length===0">
-        <div class="text-center text-mute text-sm py-10">Nothing needs you right now.</div>
+  <!-- ===== header ===== -->
+  <header class="top">
+    <div class="top-row">
+      <template x-if="['holding'].includes(route) || (route==='research' && param)">
+        <button class="avatar" @click="history.back()" aria-label="Back"><svg class="i s"><use href="#i-back"/></svg></button>
+      </template>
+      <span class="brand" x-show="route==='today' || route==='gallery'">FINN</span>
+      <h1 x-show="route==='holdings'">Holdings</h1>
+      <h1 x-show="route==='holding'" x-text="holding?.symbol || param"></h1>
+      <h1 x-show="route==='research'" x-text="param ? (rq.report?.name || param) : 'Research'"></h1>
+      <h1 x-show="route==='alerts'">Alerts</h1>
+      <h1 x-show="route==='settings'">Settings</h1>
+      <span class="spacer"></span>
+      <span class="xs mute" x-show="route==='today' && digest" x-text="digest?.window.label"></span>
+      <button class="avatar" @click="nav('#settings')" aria-label="Settings"><svg class="i s"><use href="#i-user"/></svg></button>
+    </div>
+    <div class="chips" x-show="route==='today'" role="group" aria-label="Time window">
+      <template x-for="[w, label] in windows()" :key="w">
+        <button class="chip" :aria-pressed="win===w" @click="setWindow(w)" x-text="label"></button>
+      </template>
+      <button class="chip" :aria-pressed="win==='custom'" @click="setWindow('custom')">Custom…</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- network states -->
+    <div class="netbar">
+      <div class="notice" x-show="net.waking" role="status">Waking the server… the first request after a quiet spell takes a few seconds.</div>
+      <div class="notice warn" x-show="net.stale" role="status">Showing the last copy: the server didn't answer just now.</div>
+      <div class="notice err" x-show="net.error && !net.stale && !net.waking" role="alert" x-text="'Couldn\'t load: ' + net.error"></div>
+    </div>
+
+    <!-- ===== Today (also renders the #gallery sample feed) ===== -->
+    <section x-show="route==='today' || route==='gallery'">
+      <template x-if="route==='gallery'">
+        <div class="notice">Component gallery: sample cards rendered with the live templates, then every screen state.</div>
       </template>
 
-      <template x-for="c in (feed ? feed.cards : [])" :key="c.id">
-        <article :id="'card-'+c.id" class="card-swipe bg-surface border border-line rounded-xl p-3"
-                 :class="{'flash': focusId===c.id}"
-                 @touchstart.passive="swipeStart($event, c)" @touchmove.passive="swipeMove($event, c)" @touchend="swipeEnd($event, c)">
-          <div class="flex items-start justify-between gap-2">
-            <div class="min-w-0">
-              <div class="flex items-center gap-1.5">
-                <span x-show="c.bucket==='attention'" class="w-1.5 h-1.5 rounded-full bg-accent shrink-0"></span>
-                <span class="font-semibold" x-text="c.symbol"></span>
-                <span class="text-[11px] px-1.5 py-0.5 rounded bg-raised text-mute border border-line" x-text="c.type_label"></span>
-              </div>
-              <p class="text-xs text-mute clamp1 mt-0.5" x-text="c.name"></p>
-            </div>
-            <span class="text-[11px] text-faint num shrink-0" x-text="score(c)"></span>
-          </div>
-
-          <!-- results card -->
-          <template x-if="c.type==='results' && c.enrichment && c.enrichment.ok">
-            <div class="mt-2">
-              <table class="w-full text-sm num">
-                <thead><tr class="text-[11px] text-faint">
-                  <th class="text-left font-normal pb-1">₹ cr</th><th class="text-right font-normal">This qtr</th>
-                  <th class="text-right font-normal">QoQ</th><th class="text-right font-normal">YoY</th></tr></thead>
-                <tbody>
-                  <template x-for="r in c.enrichment.table" :key="r.metric">
-                    <tr class="border-t border-line/60">
-                      <td class="py-1 text-mute" x-text="metricLabel(r.metric)"></td>
-                      <td class="py-1 text-right" x-text="r.found ? crore(r.current) : '—'"></td>
-                      <td class="py-1 text-right" :class="deltaCls(r.qoq)" x-text="pct(r.qoq)"></td>
-                      <td class="py-1 text-right" :class="deltaCls(r.yoy)" x-text="pct(r.yoy)"></td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-              <div class="flex items-center gap-1.5 mt-1.5 text-[11px]">
-                <span class="px-1.5 py-0.5 rounded bg-raised text-mute capitalize" x-text="c.enrichment.basis"></span>
-                <span class="px-1.5 py-0.5 rounded border"
-                      :class="c.enrichment.confidence==='high' ? 'border-line text-mute' : 'border-accent/50 text-accent'"
-                      x-text="c.enrichment.confidence + ' confidence'"></span>
-                <span class="text-faint" x-show="c.enrichment.table.find(t=>t.metric==='ebitda' && t.derived)">EBITDA derived</span>
-              </div>
-            </div>
-          </template>
-          <template x-if="c.type==='results' && c.enrichment && !c.enrichment.ok">
-            <p class="text-xs text-mute mt-2" x-text="'Figures not extracted: ' + c.enrichment.reason"></p>
-          </template>
-
-          <!-- mgmt change card -->
-          <template x-if="c.type==='mgmt_change' && c.enrichment && c.enrichment.people && c.enrichment.people.length">
-            <div class="mt-2 space-y-2">
-              <template x-for="p in c.enrichment.people.slice(0,3)" :key="p.name">
-                <div class="text-sm">
-                  <div class="flex items-center gap-1.5">
-                    <span class="text-xs px-1.5 rounded" :class="p.direction==='appointed' ? 'bg-accent/15 text-accent' : 'bg-raised text-mute'"
-                          x-text="p.direction==='appointed' ? 'IN' : 'OUT'"></span>
-                    <span class="font-medium" x-text="p.name"></span>
-                  </div>
-                  <p class="text-xs text-mute clamp1" x-text="p.role + (p.effective_date ? ' · from ' + p.effective_date : '')"></p>
-                  <p x-show="p.bio" class="text-xs text-ink/80 clamp2 mt-0.5" x-text="p.bio"></p>
-                  <a x-show="p.bio_url" :href="p.bio_url" target="_blank" rel="noopener" class="text-[11px] text-accent">Bio source ↗</a>
-                </div>
-              </template>
-            </div>
-          </template>
-
-          <!-- generic one-liner -->
-          <template x-if="c.one_liner && !(c.type==='results' && c.enrichment && c.enrichment.ok) && !(c.type==='mgmt_change' && c.enrichment && c.enrichment.people && c.enrichment.people.length)">
-            <p class="text-sm mt-2 clamp2" x-text="c.one_liner.text"></p>
-          </template>
-          <template x-if="!c.one_liner && !c.enrichment">
-            <p class="text-sm mt-2 clamp2 text-ink/90" x-text="c.subject"></p>
-          </template>
-          <p x-show="c.status==='error'" class="text-xs text-down mt-1">Couldn't process this filing. Open it directly.</p>
-
-          <div class="flex items-center gap-1.5 mt-2 text-[11px] text-faint whitespace-nowrap">
-            <span class="px-1.5 py-0.5 rounded bg-raised text-mute">BSE</span>
-            <span class="num" x-text="ago(c.filed_at)"></span>
-            <span>·</span>
-            <a x-show="c.pdf_url" :href="c.pdf_url" target="_blank" rel="noopener" class="text-mute underline underline-offset-2 decoration-line">Open filing</a>
-          </div>
-          <div class="flex items-center gap-2 mt-2 text-xs whitespace-nowrap">
-            <button @click="review(c)" class="flex-1 text-mute py-2 rounded-lg border border-line">Mark reviewed</button>
-            <button @click="openResearch(c.symbol)" class="flex-1 text-accent font-medium py-2 rounded-lg bg-accent/10">Dig deeper →</button>
-          </div>
-        </article>
-      </template>
-
-      <!-- routine, collapsed -->
-      <template x-if="feed && feed.routine.length">
-        <div class="bg-surface/60 border border-line rounded-xl">
-          <button @click="routineOpen=!routineOpen" class="w-full flex items-center justify-between px-3 py-3 text-sm text-mute">
-            <span class="num" x-text="feed.routine.length + ' routine filings'"></span>
-            <span x-text="routineOpen ? 'Hide' : 'Show'"></span>
-          </button>
-          <div x-show="routineOpen" class="border-t border-line divide-y divide-line">
-            <template x-for="r in feed.routine" :key="r.id">
-              <div class="px-3 py-2 text-xs">
-                <div class="flex items-center gap-1.5">
-                  <span class="font-medium text-ink" x-text="r.symbol"></span>
-                  <span class="text-faint" x-text="r.type_label"></span>
-                  <span class="flex-1"></span>
-                  <span class="text-faint num" x-text="ago(r.filed_at)"></span>
-                </div>
-                <div class="flex gap-2">
-                  <p class="text-mute clamp1 flex-1" x-text="r.subject"></p>
-                  <a x-show="r.pdf_url" :href="r.pdf_url" target="_blank" rel="noopener" class="text-accent shrink-0">PDF</a>
-                </div>
-              </div>
+      <template x-if="route==='today' && catalysts.length">
+        <div>
+          <div class="section-h"><h2>Week ahead</h2></div>
+          <div class="strip">
+            <template x-for="c in catalysts" :key="c.date + c.symbol + c.title">
+              <button class="cat" style="text-align:left" @click="nav('#holding/' + c.symbol)">
+                <div class="d" x-text="day(c.date)"></div>
+                <div><strong x-text="c.symbol"></strong> <span class="small ink2" x-text="c.title"></span></div>
+              </button>
             </template>
           </div>
         </div>
       </template>
-      <template x-if="feed && feed.reviewed.length">
-        <button @click="unreviewAll()" class="w-full text-xs text-faint py-2 num" x-text="feed.reviewed.length + ' reviewed · restore'"></button>
-      </template>
-    </div>
-  </main>
 
-  <!-- ===================== ALERTS ===================== -->
-  <main x-show="tab==='alerts'" class="flex-1 pb-24">
-    <header class="sticky top-0 z-10 bg-bg/95 backdrop-blur px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2 border-b border-line flex items-center justify-between">
-      <h1 class="text-lg font-semibold">Alerts</h1>
-      <button x-show="unread" @click="readAll()" class="text-xs text-mute">Mark all read</button>
-    </header>
-    <div class="divide-y divide-line">
-      <template x-if="alerts.length===0"><p class="text-mute text-sm p-4">No alerts yet. Thresholds live in Settings.</p></template>
-      <template x-for="a in alerts" :key="a.id">
-        <button @click="openAlert(a)" class="w-full text-left px-4 py-3 flex gap-3 active:bg-surface">
-          <span class="mt-1.5 w-2 h-2 rounded-full shrink-0" :class="a.read ? 'bg-transparent' : 'bg-accent'"></span>
-          <span class="min-w-0 flex-1">
-            <span class="flex justify-between gap-2">
-              <span class="font-medium clamp1" :class="a.read ? 'text-mute' : 'text-ink'" x-text="a.title"></span>
-              <span class="text-[11px] text-faint num shrink-0" x-text="shortDate(a.date)"></span>
-            </span>
-            <span class="block text-xs text-mute clamp2 mt-0.5" x-text="a.body"></span>
-          </span>
-        </button>
-      </template>
-    </div>
-  </main>
-
-  <!-- ===================== RESEARCH ===================== -->
-  <main x-show="tab==='research'" class="flex-1 pb-24">
-    <header class="sticky top-0 z-10 bg-bg/95 backdrop-blur px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 border-b border-line">
-      <h1 class="text-lg font-semibold mb-2">Research</h1>
-      <form @submit.prevent="startResearch(rq.query)" class="flex gap-2">
-        <input x-model="rq.query" placeholder="Any NSE symbol, e.g. TRENT" autocapitalize="characters" autocomplete="off" spellcheck="false"
-               class="flex-1 bg-surface border border-line rounded-lg px-3 py-2 uppercase placeholder:normal-case placeholder:text-faint focus:outline-none focus:border-accent">
-        <button class="bg-accent text-bg font-semibold rounded-lg px-4">Go</button>
-      </form>
-      <div class="flex gap-1.5 mt-2 overflow-x-auto text-xs" x-show="recent.length">
-        <template x-for="r in recent" :key="r.symbol">
-          <button @click="startResearch(r.symbol)" class="px-2 py-1 rounded-md bg-surface border border-line text-mute shrink-0" x-text="r.symbol"></button>
-        </template>
-      </div>
-    </header>
-
-    <div class="px-3 pt-3 space-y-3">
-      <!-- progress -->
-      <template x-if="rq.job && rq.job.status==='running'">
-        <div class="bg-surface border border-line rounded-xl p-4">
-          <div class="flex justify-between text-sm mb-2"><span class="font-medium" x-text="rq.job.symbol"></span>
-            <span class="text-mute num" x-text="Math.round((rq.job.progress||0)*100)+'%'"></span></div>
-          <div class="h-1 bg-raised rounded"><div class="h-1 bg-accent rounded transition-all" :style="'width:'+Math.round((rq.job.progress||0)*100)+'%'"></div></div>
-          <ol class="mt-3 space-y-1.5 text-sm">
-            <template x-for="(s,i) in rq.job.stages" :key="s">
-              <li class="flex items-center gap-2" :class="stageState(i)==='todo' ? 'text-faint' : 'text-ink'">
-                <span class="w-4 text-center" x-show="stageState(i)==='done'">✓</span>
-                <span class="w-4 h-4 border-2 border-accent border-t-transparent rounded-full spin" x-show="stageState(i)==='now'"></span>
-                <span class="w-4 text-center" x-show="stageState(i)==='todo'">·</span>
-                <span x-text="s"></span>
-              </li>
-            </template>
-          </ol>
-          <p class="text-xs text-faint mt-3">First run reads every document, so it can take a few minutes. Reports are cached for 24h.</p>
-        </div>
-      </template>
-      <template x-if="rq.job && rq.job.status==='error'">
-        <div class="bg-surface border border-line rounded-xl p-4 text-sm">
-          <p class="text-down">Research failed for <span x-text="rq.job.symbol"></span>.</p>
-          <p class="text-mute text-xs mt-1" x-text="rq.job.error"></p>
-        </div>
+      <template x-if="route==='today' && !digest && !net.error">
+        <div><div class="skel" style="width:40%"></div><div class="card"><div class="card-main"><div class="skel"></div><div class="skel" style="width:70%"></div></div></div>
+          <div class="card"><div class="card-main"><div class="skel"></div><div class="skel" style="width:60%"></div></div></div></div>
       </template>
 
-      <!-- result -->
-      <template x-if="rq.result">
-        <div class="space-y-3">
-          <div class="px-1">
-            <div class="flex items-baseline justify-between">
-              <h2 class="text-base font-semibold" x-text="rq.result.symbol"></h2>
-              <span class="text-[11px] text-faint" x-text="'Generated ' + ago(rq.result.generated_at)"></span>
-            </div>
-            <p class="text-xs text-mute" x-text="rq.result.name"></p>
-            <div class="flex flex-wrap gap-1.5 mt-2 text-[11px]">
-              <template x-for="s in rq.result.sources" :key="s.id">
-                <a :href="s.url" target="_blank" rel="noopener" class="px-1.5 py-0.5 rounded border"
-                   :class="s.ok ? 'border-line text-mute' : 'border-line text-faint line-through'"
-                   x-text="s.id + ' · ' + (s.kind==='transcript' ? 'Concall ' + (s.quarter || s.label) : 'Annual report')"></a>
-              </template>
-            </div>
-            <template x-for="n in rq.result.notes" :key="n"><p class="text-xs text-accent mt-1" x-text="n"></p></template>
-          </div>
+      <template x-if="(route==='today' && digest) || route==='gallery'">
+        <div>
+          <!-- caught up -->
+          <template x-if="route==='today' && digest.caught_up && (digest.attention.length + digest.worth_a_look.length)">
+            <div class="empty"><div class="big">You're caught up</div><div>Everything in this window is reviewed.</div></div>
+          </template>
+          <template x-if="route==='today' && !(digest.attention.length + digest.worth_a_look.length)">
+            <div class="empty"><div class="big">Nothing material in this window</div>
+              <div class="small" x-text="digest.routine.length ? digest.routine.length + ' routine filings, collapsed below.' : 'No filings at all.'"></div>
+              <button class="btn ghost" @click="setWindow('7d')">Look at the last 7 days</button></div>
+          </template>
 
-          <section class="bg-surface border border-line rounded-xl">
-            <div class="px-3 pt-3 pb-2 flex items-center justify-between">
-              <h3 class="font-semibold text-sm">Promised vs Delivered</h3>
-              <span class="text-[11px] text-faint num" x-text="verdictSummary()"></span>
-            </div>
-            <template x-if="!rq.result.rows.length"><p class="px-3 pb-3 text-sm text-mute">Not found in sources: no verifiable guidance in the transcripts.</p></template>
-            <div class="divide-y divide-line">
-              <template x-for="(r,i) in rq.result.rows" :key="r.guidance.id">
-                <div>
-                  <button @click="rq.open = rq.open===i ? null : i" class="w-full text-left px-3 py-2.5">
-                    <div class="flex items-start gap-2">
-                      <div class="min-w-0 flex-1">
-                        <p class="text-sm clamp1" x-text="r.guidance.metric"></p>
-                        <p class="text-xs text-mute clamp2 num"><span x-text="r.guidance.target_text"></span>
-                          <span class="text-faint" x-text="' · ' + r.guidance.horizon"></span></p>
-                        <p class="text-xs num mt-0.5" :class="r.actual ? 'text-ink' : 'text-faint'" x-text="actualText(r)"></p>
-                      </div>
-                      <span class="text-[11px] px-1.5 py-0.5 rounded shrink-0 capitalize" :class="verdictCls(r.verdict)" x-text="r.verdict"></span>
+          <!-- Needs attention -->
+          <template x-if="(route==='gallery' ? Object.values(gallery||{}).filter(c=>c.bucket==='attention') : digest.attention).length">
+            <div>
+              <div class="section-h"><h2>Needs attention</h2>
+                <span class="xs mute" x-show="route==='today'" x-text="digest?.unreviewed.attention + ' to review'"></span></div>
+              <template x-for="c in (route==='gallery' ? Object.values(gallery).filter(c=>c.bucket==='attention') : digest.attention)" :key="c.id">
+                <article class="card" :class="c.reviewed && 'reviewed'" x-init="swipe($el, c)">
+                  <button class="card-main" @click="c.id > 0 ? nav('#card/' + c.id) : (cardDetail = c, sheet = 'card')">
+                    <div class="card-meta">
+                      <span class="sym" x-text="c.symbol"></span><span>·</span><span x-text="type(c.type)"></span><span>·</span><span x-text="when(c.filed_at)"></span>
+                      <span class="spacer"></span>
+                      <span class="pill neutral" x-show="c.revised">Revised</span>
+                      <span class="pill watch" x-show="c.payload && c.payload.ok === false">Not extracted</span>
                     </div>
-                  </button>
-                  <div x-show="rq.open===i" class="px-3 pb-3 space-y-2">
-                    <blockquote class="text-xs text-ink/90 border-l-2 border-accent pl-2">
-                      <span x-text="'“' + r.guidance.quote + '”'"></span>
-                      <span class="block text-faint mt-0.5" x-text="r.guidance.speaker + ' · ' + docLabel(r.guidance.doc) + ' · p.' + r.guidance.page"></span>
-                    </blockquote>
-                    <template x-if="r.actual || r.progress">
-                      <blockquote class="text-xs text-ink/90 border-l-2 border-line pl-2">
-                        <span x-text="'“' + (r.actual||r.progress).quote + '”'"></span>
-                        <span class="block text-faint mt-0.5" x-text="docLabel((r.actual||r.progress).doc) + ' · p.' + (r.actual||r.progress).page"></span>
-                      </blockquote>
+                    <div class="card-h" x-text="c.headline"></div>
+                    <!-- results mini table -->
+                    <template x-if="c.payload?.kind === 'results' && c.payload?.ok || (c.payload?.table && c.payload?.ok)">
+                      <table class="mini num">
+                        <thead><tr><th>₹ crore</th><th>Current</th><th>QoQ</th><th>YoY</th></tr></thead>
+                        <tbody>
+                          <template x-for="r in c.payload.table.filter(r=>r.found)" :key="r.metric">
+                            <tr><td x-text="metricName(r.metric) + (r.derived ? '*' : '')"></td><td x-text="Number(r.current).toLocaleString('en-IN',{maximumFractionDigits:0})"></td>
+                              <td :class="cls(r.qoq)" x-text="pct(r.qoq)"></td><td :class="cls(r.yoy)" x-text="pct(r.yoy)"></td></tr>
+                          </template>
+                        </tbody>
+                      </table>
                     </template>
+                    <template x-if="c.payload?.results_day?.comparisons?.length">
+                      <div class="card-sub small"><template x-for="x in c.payload.results_day.comparisons.slice(0,2)" :key="x.metric + x.promised">
+                        <div>Promised <strong x-text="x.metric + ' ' + x.promised"></strong> → <span x-text="x.delivered + '%'"></span> · <span x-text="x.verdict"></span></div>
+                      </template></div>
+                    </template>
+                    <template x-if="c.payload && c.payload.ok === false">
+                      <div class="card-sub small" x-text="c.payload.reason"></div>
+                    </template>
+                    <template x-if="c.payload?.people?.length">
+                      <div class="card-sub small"><template x-for="p in c.payload.people.slice(0,2)" :key="p.name">
+                        <div><span x-text="p.direction === 'appointed' ? 'IN' : 'OUT'" class="pill" :class="p.direction === 'appointed' ? 'intact' : 'watch'"></span>
+                          <span x-text="' ' + p.name + ' · ' + (p.role || '')"></span></div></template></div>
+                    </template>
+                    <template x-if="(c.payload?.flags || c.payload?.governance_flags || []).filter(f=>f.severity==='high').length">
+                      <div class="row wrap" style="margin-top:6px"><template x-for="f in (c.payload.flags || c.payload.governance_flags).filter(f=>f.severity==='high')" :key="f.kind">
+                        <span class="pill at_risk" x-text="f.kind.replace(/_/g,' ')"></span></template></div>
+                    </template>
+                    <div class="card-sub" x-show="!c.payload?.ok && !c.payload?.people && c.one_liner" x-text="c.one_liner"></div>
+                    <div class="card-why" :class="c.thesis_impact" x-show="c.why_it_matters" x-text="c.why_it_matters"></div>
+                  </button>
+                  <div class="card-actions">
+                    <button class="btn" @click="review(c, c.reviewed)" x-text="c.reviewed ? 'Undo' : 'Mark reviewed'"></button>
+                    <button class="btn" @click="nav('#research/' + c.symbol)">Dig deeper →</button>
                   </div>
-                </div>
+                </article>
               </template>
             </div>
-          </section>
+          </template>
 
-          <section class="bg-surface border border-line rounded-xl p-3">
-            <h3 class="font-semibold text-sm mb-2">Business snapshot</h3>
-            <template x-if="!rq.result.snapshot.what_it_does && !rq.result.snapshot.segments.length">
-              <p class="text-sm text-mute">Not found in sources.</p></template>
-            <p x-show="rq.result.snapshot.what_it_does" class="text-sm" x-text="rq.result.snapshot.what_it_does && rq.result.snapshot.what_it_does.text"></p>
-            <ul class="mt-2 space-y-1.5">
-              <template x-for="s in rq.result.snapshot.segments" :key="s.name">
-                <li class="text-sm"><span class="font-medium" x-text="s.name"></span>
-                  <span class="text-mute num" x-show="s.share_pct!=null" x-text="' · ' + s.share_pct + '%'"></span>
-                  <p class="text-xs text-mute clamp2" x-text="s.description"></p>
-                  <p class="text-[11px] text-faint" x-text="docLabel(s.doc) + ' · p.' + s.page"></p></li>
-              </template>
-            </ul>
-            <ul class="mt-2 space-y-1" x-show="rq.result.snapshot.revenue_mix.length">
-              <template x-for="m in rq.result.snapshot.revenue_mix" :key="m.quote">
-                <li class="text-xs text-mute num"><span x-text="m.text"></span> <span class="text-faint" x-text="'p.' + m.page"></span></li>
-              </template>
-            </ul>
-          </section>
+          <!-- Worth a look -->
+          <template x-if="(route==='gallery' ? Object.values(gallery||{}).filter(c=>c.bucket==='worth_a_look') : digest.worth_a_look).length">
+            <div>
+              <div class="section-h"><h2>Worth a look</h2></div>
+              <div class="list">
+                <template x-for="c in (route==='gallery' ? Object.values(gallery).filter(c=>c.bucket==='worth_a_look') : digest.worth_a_look)" :key="c.id">
+                  <button class="compact" :class="c.reviewed && 'reviewed'" @click="c.id > 0 ? nav('#card/' + c.id) : (cardDetail = c, sheet = 'card')" :style="c.reviewed ? 'opacity:.55' : ''">
+                    <div style="flex:1">
+                      <div class="card-meta"><span class="sym" x-text="c.symbol"></span><span>·</span><span x-text="type(c.type)"></span><span>·</span><span x-text="when(c.filed_at)"></span></div>
+                      <div class="small" style="font-weight:560" x-text="c.headline"></div>
+                      <div class="xs ink2" x-show="c.one_liner && c.one_liner !== c.headline" x-text="c.one_liner"></div>
+                    </div>
+                    <svg class="i s mute" x-show="c.reviewed"><use href="#i-check"/></svg>
+                  </button>
+                </template>
+              </div>
+            </div>
+          </template>
 
-          <section class="bg-surface border border-line rounded-xl p-3">
-            <h3 class="font-semibold text-sm mb-2">Credibility read</h3>
-            <template x-if="rq.result.scorecard">
-              <p class="text-sm text-mute num mb-2" x-text="rq.result.scorecard.hit_rate != null
-                ? `Hit rate ${rq.result.scorecard.hit_rate}% on ${rq.result.scorecard.checked} promises that could be checked (partial counts half).`
-                : `${rq.result.scorecard.checked} promise${rq.result.scorecard.checked === 1 ? '' : 's'} could be checked so far: too few for a hit rate.`"></p>
-            </template>
-            <template x-if="!rq.result.synthesis.credibility.length"><p class="text-sm text-mute">Not enough verified evidence.</p></template>
-            <ul class="space-y-2">
-              <template x-for="b in rq.result.synthesis.credibility" :key="b.text">
-                <li class="text-sm"><span x-text="b.text"></span> <span class="text-[11px] text-accent" x-text="b.evidence.join(' ')"></span></li>
-              </template>
-            </ul>
-          </section>
-
-          <div class="grid grid-cols-1 gap-3">
-            <template x-for="side in ['bull','bear']" :key="side">
-              <section class="bg-surface border border-line rounded-xl p-3">
-                <h3 class="font-semibold text-sm mb-2" x-text="side==='bull' ? 'Bull case' : 'Bear case'"></h3>
-                <template x-if="!rq.result.synthesis[side].length"><p class="text-sm text-mute">Not enough verified evidence.</p></template>
-                <ul class="space-y-2">
-                  <template x-for="b in rq.result.synthesis[side]" :key="b.text">
-                    <li class="text-sm"><span x-text="b.text"></span> <span class="text-[11px] text-accent" x-text="b.evidence.join(' ')"></span></li>
-                  </template>
-                </ul>
-              </section>
-            </template>
+          <!-- Routine (collapsed) -->
+          <template x-if="route==='today' && digest.routine.length">
+            <div>
+              <button class="block row" style="width:100%; margin-top:14px" @click="routineOpen = !routineOpen" :aria-expanded="routineOpen">
+                <span class="small"><strong x-text="digest.routine.length"></strong> routine filings (board notices, compliance, AGM papers)</span>
+                <span class="spacer"></span><span class="xs mute" x-text="routineOpen ? 'Hide' : 'Show'"></span>
+              </button>
+              <div class="list" x-show="routineOpen">
+                <template x-for="r in digest.routine" :key="r.id">
+                  <a class="compact" :href="r.pdf_url || '#'" target="_blank" rel="noopener">
+                    <div style="flex:1"><div class="card-meta"><span class="sym" x-text="r.symbol"></span><span>·</span><span x-text="type(r.type)"></span></div>
+                      <div class="xs ink2" x-text="r.headline"></div></div>
+                  </a>
+                </template>
+              </div>
+            </div>
+          </template>
+          <div class="row" x-show="route==='today' && digest" style="justify-content:center; margin-top:14px">
+            <button class="btn ghost small" @click="markChecked()">Mark this as my last check</button>
           </div>
-          <p class="text-[11px] text-faint px-1 pb-2">Built only from the linked concall transcripts and annual report. Every quote was matched to its page. Decision support only, not investment advice.</p>
+
+          <!-- gallery: states -->
+          <template x-if="route==='gallery'">
+            <div>
+              <div class="section-h"><h2>States</h2></div>
+              <div class="block"><h2>Loading</h2><div class="skel"></div><div class="skel" style="width:60%"></div></div>
+              <div class="notice">Waking the server… the first request after a quiet spell takes a few seconds.</div>
+              <div class="notice warn">Showing the last copy: the server didn't answer just now.</div>
+              <div class="notice err">Couldn't load: 503</div>
+              <div class="block"><div class="empty"><div class="big">You're caught up</div><div>Everything in this window is reviewed.</div></div></div>
+              <div class="block"><div class="empty"><div class="big">Nothing material in this window</div><div class="small">3 routine filings, collapsed below.</div></div></div>
+              <div class="block"><h2>Low confidence</h2><span class="pill watch">Low confidence</span> <span class="small ink2">Figures differ from BSE's snapshot; shown with this label, never silently.</span></div>
+              <div class="block"><h2>Research progress</h2><ul class="steps">
+                <li class="done"><span class="dot"></span>Finding documents</li><li class="done"><span class="dot"></span>Fetching documents</li>
+                <li class="now"><span class="dot"></span>Extracting promises and facts</li><li><span class="dot"></span>Writing the verdict</li></ul></div>
+            </div>
+          </template>
         </div>
       </template>
+    </section>
 
-      <template x-if="!rq.job && !rq.result">
-        <p class="text-sm text-mute px-1">Search any NSE symbol to see what management promised on earnings calls and what they actually delivered, with the exact quote and page.</p>
-      </template>
-    </div>
-  </main>
-
-  <!-- ===================== SETTINGS ===================== -->
-  <main x-show="tab==='settings'" class="flex-1 pb-24">
-    <header class="sticky top-0 z-10 bg-bg/95 backdrop-blur px-4 pt-[max(env(safe-area-inset-top),12px)] pb-2 border-b border-line">
-      <h1 class="text-lg font-semibold">Settings</h1>
-    </header>
-    <div class="px-3 pt-3 space-y-3">
-      <div x-show="iosHint" class="bg-accent/10 border border-accent/40 rounded-xl p-3 text-sm flex gap-2">
-        <p class="flex-1">Add FINN to your Home Screen to get notifications.</p>
-        <button @click="dismissIosHint()" class="text-mute text-xs">Got it</button>
-      </div>
-
-      <section class="bg-surface border border-line rounded-xl p-3 space-y-3">
-        <h3 class="font-semibold text-sm">Notifications</h3>
-        <div class="flex gap-2">
-          <button @click="enablePush()" class="flex-1 bg-accent text-bg font-semibold rounded-lg py-2 text-sm" x-text="pushState==='on' ? 'Notifications on' : 'Enable notifications'"></button>
-          <button @click="testPush()" class="flex-1 bg-raised border border-line rounded-lg py-2 text-sm">Send test</button>
+    <!-- ===== Holdings ===== -->
+    <section x-show="route==='holdings'">
+      <template x-if="!holdings"><div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div></template>
+      <template x-if="holdings">
+        <div class="list">
+          <template x-for="h in holdings" :key="h.symbol">
+            <button class="compact" @click="nav('#holding/' + h.symbol)">
+              <div style="flex:1; min-width:0">
+                <div class="row"><strong x-text="h.symbol"></strong><span class="pill" :class="h.status" x-text="status(h.status)"></span>
+                  <span class="badge" x-show="h.unreviewed_attention_7d" x-text="h.unreviewed_attention_7d" :aria-label="h.unreviewed_attention_7d + ' unreviewed'"></span></div>
+                <div class="xs mute" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis" x-text="h.status !== 'intact' && h.reason ? h.reason : h.name"></div>
+              </div>
+              <div style="text-align:right" class="num"><div class="small" x-text="h.close ? '₹' + Number(h.close).toLocaleString('en-IN',{maximumFractionDigits:0}) : ''"></div>
+                <div class="xs" :class="cls(h.day_pct)" x-text="pct(h.day_pct)"></div></div>
+            </button>
+          </template>
         </div>
-        <p class="text-xs text-mute" x-text="pushMsg"></p>
-      </section>
+      </template>
+    </section>
 
-      <section class="bg-surface border border-line rounded-xl p-3 space-y-3">
-        <h3 class="font-semibold text-sm">Alert rules</h3>
-        <template x-for="r in rules" :key="r.kind">
-          <div>
-            <label class="flex items-center justify-between gap-2 text-sm">
-              <span x-text="ruleLabel(r)"></span>
-              <input type="checkbox" x-model="r.enabled" class="accent-[#8ab4ff] w-4 h-4">
-            </label>
-            <template x-if="r.kind!=='announcement_type'">
-              <div class="flex items-center gap-2 mt-1">
-                <input type="number" step="0.5" min="0" x-model.number="r.threshold"
-                       class="w-24 bg-raised border border-line rounded-md px-2 py-1 text-sm num">
-                <span class="text-xs text-mute" x-text="r.kind==='volume_spike' ? '× 20-day average volume' : '% daily move (either way)'"></span>
+    <!-- ===== Holding page ===== -->
+    <section x-show="route==='holding'">
+      <template x-if="!holding"><div><div class="skel"></div><div class="skel"></div></div></template>
+      <template x-if="holding">
+        <div>
+          <div class="row" style="margin:4px 0 10px"><span class="ink2 small" x-text="holding.name + ' · ' + (holding.sector || '')"></span></div>
+          <div class="block">
+            <div class="row"><h2 style="margin:0">Thesis</h2><span class="spacer"></span>
+              <span class="pill" :class="holding.timeline[0]?.status || 'intact'" x-text="status(holding.timeline[0]?.status || 'intact')"></span></div>
+            <p class="xs mute" x-show="holding.timeline[0]" x-text="holding.timeline[0]?.reason"></p>
+            <template x-if="!editing && holding.thesis">
+              <div>
+                <span class="pill accent" x-show="holding.thesis.source === 'draft'">Draft from management's claims</span>
+                <span class="pill neutral" x-show="holding.thesis.source === 'user'">Your thesis</span>
+                <p x-text="holding.thesis.statement"></p>
+                <div class="small ink2" x-show="holding.thesis.kpis.length"><strong>KPIs</strong>
+                  <template x-for="k in holding.thesis.kpis" :key="k.metric"><div x-text="kpi(k.metric) + ' ' + k.op + ' ' + k.threshold + '%'"></div></template></div>
+                <div class="small ink2" x-show="!holding.thesis.kpis.length">No checkable KPIs yet: management gave no company-wide numeric targets. Add your own below.</div>
+                <div class="small ink2" style="margin-top:6px"><strong>What would break it</strong>
+                  <template x-for="b in holding.thesis.breakers" :key="b.text"><div x-text="'• ' + b.text"></div></template></div>
+                <details class="small" style="margin-top:6px" x-show="holding.thesis.citations?.items?.length"><summary class="mute">Evidence behind the draft</summary>
+                  <template x-for="it in holding.thesis.citations.items" :key="it.id"><div class="quote" x-text="it.quote || it.text"></div></template></details>
+                <button class="btn block" style="margin-top:10px" @click="startEdit()">Edit thesis</button>
               </div>
             </template>
-            <template x-if="r.kind==='announcement_type'">
-              <div class="flex flex-wrap gap-1.5 mt-1.5">
-                <template x-for="t in ruleTypes" :key="t">
-                  <button @click="toggleType(r,t)" class="text-[11px] px-2 py-1 rounded-md border"
-                          :class="hasType(r,t) ? 'border-accent text-accent bg-accent/10' : 'border-line text-mute'" x-text="typeLabels[t]"></button>
+            <template x-if="editing">
+              <div>
+                <label class="f" for="t-st">Statement</label><textarea id="t-st" x-model="draft.statement"></textarea>
+                <label class="f" for="t-br">What would break it (one per line)</label><textarea id="t-br" x-model="draft.breakers"></textarea>
+                <label class="f">KPIs (checked on every verified results card)</label>
+                <template x-for="(k, i) in draft.kpis" :key="i">
+                  <div class="row" style="margin-bottom:6px">
+                    <select x-model="k.metric" aria-label="KPI metric"><option value="revenue_growth_yoy">Revenue growth YoY</option><option value="ebitda_margin">EBITDA margin</option>
+                      <option value="pat_growth_yoy">PAT growth YoY</option><option value="pat_margin">PAT margin</option></select>
+                    <select x-model="k.op" style="width:80px" aria-label="Comparison"><option value=">=">≥</option><option value="<=">≤</option></select>
+                    <input type="number" x-model="k.threshold" style="width:90px" aria-label="Threshold %">
+                    <button class="btn ghost" @click="draft.kpis.splice(i,1)" aria-label="Remove KPI">✕</button>
+                  </div>
+                </template>
+                <button class="btn ghost" @click="addKpi()">+ Add KPI</button>
+                <div class="row" style="margin-top:10px"><button class="btn" @click="editing=false">Cancel</button><button class="btn primary" style="flex:1" @click="saveThesis()">Save</button></div>
+              </div>
+            </template>
+          </div>
+
+          <div class="block" x-show="holding.research">
+            <div class="row"><h2 style="margin:0">Management credibility</h2><span class="spacer"></span>
+              <button class="btn ghost small" @click="nav('#research/' + holding.symbol)">Open ledger →</button></div>
+            <template x-if="holding.research">
+              <p class="small" x-text="holding.research.credibility.score != null ? holding.research.credibility.score + '/100 on ' + holding.research.credibility.measured + ' promises that could be checked' : 'Not enough matured promises for a score (' + holding.research.credibility.measured + ' measured, ' + holding.research.credibility.total + ' tracked)'"></p>
+            </template>
+          </div>
+          <div class="block" x-show="!holding.research"><h2>Management credibility</h2>
+            <p class="small ink2">No ledger yet.</p><button class="btn" @click="nav('#research/' + holding.symbol)">Build the promise ledger</button></div>
+
+          <div class="block" x-show="holding.catalysts.length"><h2>Coming up</h2>
+            <template x-for="e in holding.catalysts" :key="e.date + e.title"><div class="small"><span class="mute" x-text="day(e.date) + ' · '"></span><span x-text="e.title"></span></div></template></div>
+
+          <div class="block" x-show="holding.timeline.length > 1"><h2>Status timeline</h2>
+            <template x-for="t in holding.timeline" :key="t.at"><div class="small row" style="align-items:flex-start; margin:4px 0">
+              <span class="pill" :class="t.status" x-text="status(t.status)"></span><span class="ink2" x-text="t.reason"></span></div></template></div>
+
+          <div class="section-h"><h2>Recent filings</h2></div>
+          <div class="list">
+            <template x-for="c in holding.cards" :key="c.id">
+              <button class="compact" @click="nav('#card/' + c.id)">
+                <div style="flex:1"><div class="card-meta"><span x-text="type(c.type)"></span><span>·</span><span x-text="when(c.filed_at)"></span>
+                  <span class="pill" :class="c.bucket === 'attention' ? 'accent' : 'neutral'" x-text="c.bucket === 'attention' ? 'Attention' : 'Worth a look'"></span></div>
+                  <div class="small" x-text="c.headline"></div></div>
+              </button>
+            </template>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- ===== Research ===== -->
+    <section x-show="route==='research'" style="min-height:70dvh">
+      <form class="row" @submit.prevent="startResearch()" style="margin-bottom:10px">
+        <label class="sr" for="tk">NSE symbol</label>
+        <input id="tk" type="text" x-model="rq.ticker" placeholder="Any NSE symbol, e.g. KEI" autocapitalize="characters" autocomplete="off">
+        <button class="btn primary" type="submit">Research</button>
+      </form>
+      <p class="small ink2" x-show="!param">Builds a promise ledger from the last 8 earnings calls and 2 annual reports: what management promised, what it delivered, every line with its quote and page. Primary documents only.</p>
+
+      <template x-if="param && !rq.report && !rq.error">
+        <div class="block"><h2 x-text="'Reading ' + param"></h2>
+          <ul class="steps"><template x-for="s in rq.stages.length ? rq.stages : ['Finding documents']" :key="s">
+            <li :class="stageState(s)"><span class="dot"></span><span x-text="s"></span></li></template></ul>
+          <p class="xs mute">A first report takes one to two minutes. Reopening it later is instant.</p></div>
+      </template>
+      <div class="notice err" x-show="rq.error" x-text="rq.error"></div>
+
+      <template x-if="rq.report">
+        <div>
+          <div class="block">
+            <div class="gauge">
+              <svg viewBox="0 0 76 76" role="img" :aria-label="'Credibility ' + (rq.report.credibility.score ?? 'not scored')">
+                <circle cx="38" cy="38" r="30" fill="none" stroke="var(--line)" stroke-width="8"/>
+                <circle cx="38" cy="38" r="30" fill="none" stroke="var(--accent)" stroke-width="8" stroke-linecap="round"
+                        :stroke-dasharray="gaugeDash(rq.report.credibility.score)" transform="rotate(-90 38 38)"/>
+              </svg>
+              <div>
+                <div class="big num" x-text="rq.report.credibility.score != null ? rq.report.credibility.score + '/100' : 'Not scored'"></div>
+                <div class="small ink2" x-text="rq.report.credibility.score != null ? 'credibility on ' + rq.report.credibility.measured + ' promises whose deadline has passed' : 'fewer than ' + rq.report.credibility.min_measured + ' promises have matured (' + rq.report.credibility.measured + ' so far)'"></div>
+                <div class="xs mute" x-text="rq.report.credibility.total + ' promises tracked · ' + rq.report.credibility.vagueness_pct + '% too vague to check'"></div>
+              </div>
+            </div>
+            <div class="row wrap" style="margin-top:8px"><template x-for="[v, n] in Object.entries(rq.report.credibility.counts)" :key="v">
+              <span class="pill" :class="v" x-text="verdict(v) + ' ' + n"></span></template></div>
+            <template x-for="n in rq.report.notes" :key="n"><div class="notice warn small" x-text="n"></div></template>
+          </div>
+
+          <div class="block" x-show="rq.report.synthesis.credibility.length || rq.report.synthesis.bull.length">
+            <h2>Credibility read</h2><template x-for="b in rq.report.synthesis.credibility" :key="b.text"><p class="small" x-text="b.text"></p></template>
+            <div class="row" style="align-items:flex-start; gap:12px">
+              <div style="flex:1"><h2>Bull</h2><template x-for="b in rq.report.synthesis.bull" :key="b.text"><p class="small" x-text="b.text"></p></template></div>
+              <div style="flex:1"><h2>Bear</h2><template x-for="b in rq.report.synthesis.bear" :key="b.text"><p class="small" x-text="b.text"></p></template></div>
+            </div>
+            <template x-if="rq.report.synthesis.devils_advocate.length"><div><h2>Devil's advocate</h2>
+              <template x-for="b in rq.report.synthesis.devils_advocate" :key="b.text"><p class="small" x-text="b.text"></p></template></div></template>
+          </div>
+
+          <div class="section-h"><h2>Promise ledger</h2><span class="xs mute">tap a row for the quote</span></div>
+          <div class="list">
+            <template x-for="l in rq.report.ledger.slice(0, rq.open.all ? 999 : 12)" :key="l.id">
+              <div class="ledger-row">
+                <button style="background:none;border:0;padding:0;width:100%;text-align:left" @click="rq.open[l.id] = !rq.open[l.id]" :aria-expanded="!!rq.open[l.id]">
+                  <div class="row"><span class="pill" :class="l.verdict" x-text="verdict(l.verdict)"></span>
+                    <span class="xs mute" x-show="l.tracking" x-text="l.tracking"></span><span class="spacer"></span>
+                    <span class="xs mute" x-text="'said ' + (l.said_in || '')"></span></div>
+                  <div class="small" style="margin-top:4px"><strong x-text="l.metric"></strong> <span x-text="l.target_text"></span>
+                    <span class="mute" x-text="'· ' + (l.horizon || '')"></span></div>
+                  <div class="xs ink2" x-show="l.actual" x-text="'Delivered ' + l.actual?.value + ' ' + (l.actual?.unit || '') + ' (' + l.actual?.period + ')'"></div>
+                  <div class="xs ink2" x-show="!l.actual && l.latest" x-text="'Latest ' + l.latest?.value + ' ' + (l.latest?.unit || '') + ' (' + l.latest?.period + ')'"></div>
+                </button>
+                <template x-if="rq.open[l.id]">
+                  <div>
+                    <div class="quote" x-text="l.quote"></div>
+                    <button class="cite" @click="openEvidence(source(l.doc).document_id, l.page, l.quote); sheet='evidence'"
+                            x-text="(source(l.doc).title || l.doc) + ', page ' + l.page + (l.speaker ? ' · ' + l.speaker : '')"></button>
+                    <template x-if="l.actual"><div><div class="quote" x-text="l.actual.quote"></div>
+                      <button class="cite" @click="openEvidence(source(l.actual.doc).document_id, l.actual.page, l.actual.quote); sheet='evidence'"
+                              x-text="(source(l.actual.doc).title || l.actual.doc) + ', page ' + l.actual.page"></button></div></template>
+                  </div>
                 </template>
               </div>
             </template>
           </div>
+          <button class="btn ghost" x-show="rq.report.ledger.length > 12 && !rq.open.all" @click="rq.open.all = true" x-text="'Show all ' + rq.report.ledger.length"></button>
+
+          <div class="block" x-show="rq.report.drift.length" style="margin-top:10px"><h2>Guidance drift</h2>
+            <template x-for="d in rq.report.drift" :key="d.id"><div class="small" style="margin:4px 0">
+              <strong x-text="d.metric"></strong> <span class="mute" x-text="'(' + (d.horizon || '') + ')'"></span>
+              <template x-for="s in d.steps" :key="s.from + s.to"><span class="ink2" x-text="' · ' + s.change + ' ' + s.before + ' → ' + s.after + ' (' + s.to + ')'"></span></template>
+              <span class="pill watch" x-show="d.dropped">No longer repeated</span></div></template></div>
+
+          <div class="block" x-show="rq.report.snapshot.what_it_does"><h2>Business snapshot</h2>
+            <p class="small" x-text="rq.report.snapshot.what_it_does?.text"></p>
+            <template x-for="s in rq.report.snapshot.segments" :key="s.name"><div class="small"><strong x-text="s.name"></strong> <span class="ink2" x-text="s.description"></span>
+              <span class="mute" x-show="s.share_pct" x-text="'· ' + s.share_pct + '%'"></span></div></template>
+            <template x-if="rq.report.snapshot.risks.length"><div class="small" style="margin-top:6px"><strong>Risks they name</strong>
+              <template x-for="r in rq.report.snapshot.risks.slice(0,4)" :key="r.text"><div class="ink2" x-text="'• ' + r.text"></div></template></div></template>
+          </div>
+
+          <details class="block"><summary><strong class="small">Receipt</strong> <span class="xs mute" x-text="rq.report.receipt.sources_read + ' of ' + rq.report.receipt.sources_listed + ' sources · ' + rq.report.receipt.seconds + ' s · $' + rq.report.receipt.cost_usd"></span></summary>
+            <dl class="kv small" style="margin-top:8px">
+              <dt>Unverified claims shown</dt><dd x-text="rq.report.receipt.unverified_claims_shown"></dd>
+              <dt>Facts dropped (quote not on page)</dt><dd x-text="rq.report.receipt.facts_dropped_unverified"></dd>
+              <dt>Sentences removed (numbers)</dt><dd x-text="rq.report.receipt.sentences_removed_unsupported_numbers"></dd>
+              <dt>Model calls / cache hits</dt><dd x-text="rq.report.receipt.llm_calls + ' / ' + rq.report.receipt.cache_hits"></dd>
+              <dt>Tokens in / out</dt><dd x-text="rq.report.receipt.in_tokens + ' / ' + rq.report.receipt.out_tokens"></dd>
+              <dt>Models</dt><dd x-text="rq.report.receipt.models.join(', ')"></dd></dl>
+            <p class="xs mute" x-text="rq.report.receipt.strong_tier_note"></p>
+            <template x-for="s in rq.report.sources" :key="s.id"><div class="xs" style="margin:3px 0">
+              <a :href="s.url" target="_blank" rel="noopener" x-text="s.id + ' ' + (s.title || s.kind)"></a>
+              <span class="mute" x-text="' · ' + s.status + (s.pages ? ' · ' + s.pages + ' pp' : '') + (s.reason ? ' · ' + s.reason.slice(0,80) : '')"></span></div></template>
+            <button class="btn ghost small" @click="openResearch(param, true)">Rebuild report</button>
+          </details>
+        </div>
+      </template>
+    </section>
+
+    <!-- ===== Alerts ===== -->
+    <section x-show="route==='alerts'">
+      <template x-if="!alerts"><div><div class="skel"></div><div class="skel"></div></div></template>
+      <template x-if="alerts && !alerts.length"><div class="empty"><div class="big">No alerts yet</div><div class="small">Set thresholds in Settings.</div></div></template>
+      <template x-if="alerts && alerts.length">
+        <div>
+          <div class="row" style="margin-bottom:8px"><span class="small ink2" x-text="unread + ' unread'"></span><span class="spacer"></span>
+            <button class="btn ghost small" @click="readAll()" x-show="unread">Mark all read</button></div>
+          <div class="list">
+            <template x-for="a in alerts" :key="a.id">
+              <button class="compact" @click="openAlert(a)">
+                <span class="unread" :style="a.read ? 'visibility:hidden' : ''" aria-hidden="true"></span>
+                <div style="flex:1"><div class="small" :style="a.read ? '' : 'font-weight:620'" x-text="a.title"></div>
+                  <div class="xs ink2" x-text="a.line"></div><div class="xs mute" x-text="day(a.date)"></div></div>
+              </button>
+            </template>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- ===== Settings ===== -->
+    <section x-show="route==='settings'">
+      <div class="block"><h2>Notifications</h2>
+        <p class="small ink2" x-show="isIOS && !standalone">On iPhone, web notifications only work once FINN is on your Home Screen: tap Share → Add to Home Screen, open FINN from the icon, then enable here.</p>
+        <div class="row"><button class="btn primary" @click="enablePush()">Enable notifications</button><button class="btn" @click="testPush()">Send a test</button></div>
+        <p class="small" x-show="push.msg" x-text="push.msg"></p></div>
+      <div class="block"><h2>Alert rules</h2>
+        <template x-if="!rules"><div class="skel"></div></template>
+        <template x-for="r in rules || []" :key="r.kind">
+          <div style="margin:10px 0">
+            <label class="row small"><input type="checkbox" x-model="r.enabled" @change="saveRule(r)"> <strong x-text="r.label"></strong></label>
+            <template x-if="r.params.multiple !== undefined"><div class="row"><label class="f" :for="'m'+r.id" style="margin:0">Multiple of the 20-day median</label>
+              <input :id="'m'+r.id" type="number" step="0.1" style="width:90px" x-model.number="r.params.multiple" @change="saveRule(r)"></div></template>
+            <template x-if="r.params.pct !== undefined"><div class="row"><label class="f" :for="'p'+r.id" style="margin:0">Daily move ≥ ± %</label>
+              <input :id="'p'+r.id" type="number" step="0.5" style="width:90px" x-model.number="r.params.pct" @change="saveRule(r)"></div></template>
+            <template x-if="r.params.types"><div class="row wrap" style="margin-top:4px">
+              <template x-for="t in ['results','mgmt_change','governance','m_and_a','fundraise','order_win','credit_rating','litigation_regulatory','insider_pledge']" :key="t">
+                <button class="chip" :aria-pressed="r.params.types.includes(t)" @click="r.params.types.includes(t) ? r.params.types.splice(r.params.types.indexOf(t),1) : r.params.types.push(t); saveRule(r)" x-text="type(t)"></button>
+              </template></div></template>
+          </div>
         </template>
-        <button @click="saveRules()" class="w-full bg-raised border border-line rounded-lg py-2 text-sm">Save rules</button>
-      </section>
-
-      <section class="bg-surface border border-line rounded-xl p-3">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="font-semibold text-sm">Data</h3>
-          <button @click="refreshData()" class="text-sm bg-raised border border-line rounded-lg px-3 py-1.5" :disabled="refreshing"
-                  x-text="refreshing ? 'Refreshing…' : 'Refresh data'"></button>
-        </div>
-        <p class="text-xs text-mute" x-text="refreshMsg"></p>
-      </section>
-
-      <section class="bg-surface border border-line rounded-xl">
-        <h3 class="font-semibold text-sm px-3 pt-3 pb-2">Portfolio <span class="text-faint font-normal num" x-text="'(' + holdings.length + ')'"></span></h3>
-        <div class="divide-y divide-line">
-          <template x-for="p in holdings" :key="p.nse_symbol">
-            <button @click="openResearch(p.nse_symbol)" class="w-full flex items-center justify-between px-3 py-2 text-left">
-              <span class="min-w-0"><span class="text-sm font-medium" x-text="p.nse_symbol"></span>
-                <span class="block text-[11px] text-faint clamp1" x-text="p.sector + ' · BSE ' + p.bse_code"></span></span>
-              <span class="text-right num text-sm"><span x-text="p.close ? '₹' + fmt(p.close) : '—'"></span>
-                <span class="block text-[11px]" :class="deltaCls(p.change_pct)" x-text="pct(p.change_pct)"></span></span>
-            </button>
-          </template>
-        </div>
-      </section>
-      <p class="text-[11px] text-faint px-1 pb-4">FINN is decision support only. It never gives buy or sell calls.</p>
-    </div>
+        <button class="btn" @click="runPipeline()">Check for new alerts now</button>
+      </div>
+      <div class="block"><h2>Appearance</h2>
+        <div class="row" role="group" aria-label="Theme"><template x-for="t in ['system','light','dark']" :key="t">
+          <button class="chip" :aria-pressed="theme===t" @click="theme=t; applyTheme()" x-text="t[0].toUpperCase()+t.slice(1)"></button></template></div></div>
+      <div class="block"><h2>About</h2><p class="small ink2">Decision support only: FINN never says buy, sell or hold. Research uses primary documents only (annual reports, earnings-call transcripts, exchange filings); every fact links to its quote and page.</p>
+        <a class="small" href="#gallery">Component gallery</a></div>
+    </section>
   </main>
 
-  <!-- toast -->
-  <div x-show="toast" x-transition class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-raised border border-line text-sm px-3 py-2 rounded-lg shadow-lg" x-text="toast"></div>
+  <!-- ===== card sheet ===== -->
+  <template x-if="sheet === 'card'">
+    <div>
+      <div class="scrim" @click="closeSheet()"></div>
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="Filing detail" @keydown.escape.window="closeSheet()">
+        <div class="grab"></div>
+        <template x-if="!cardDetail"><div><div class="skel"></div><div class="skel"></div></div></template>
+        <template x-if="cardDetail">
+          <div>
+            <div class="card-meta"><span class="sym" x-text="cardDetail.symbol"></span><span>·</span><span x-text="type(cardDetail.type)"></span><span>·</span><span x-text="when(cardDetail.filed_at)"></span></div>
+            <h2 style="font-size:18px; margin:4px 0 10px" x-text="cardDetail.headline"></h2>
+            <div class="card-why" :class="cardDetail.thesis_impact" x-show="cardDetail.why_it_matters" x-text="cardDetail.why_it_matters"></div>
 
-  <!-- bottom tabs -->
-  <nav class="fixed bottom-0 inset-x-0 bg-bg/95 backdrop-blur border-t border-line safe-b">
-    <div class="max-w-md mx-auto grid grid-cols-4 text-[11px]">
-      <template x-for="t in tabs" :key="t.id">
-        <button @click="go(t.id)" class="relative flex flex-col items-center gap-0.5 pt-2 pb-1" :class="tab===t.id ? 'text-accent' : 'text-mute'">
-          <span class="relative">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" x-html="t.icon"></svg>
-            <span x-show="t.id==='alerts' && unread" class="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-accent text-bg text-[10px] font-bold leading-4 text-center num" x-text="unread > 99 ? '99+' : unread"></span>
-          </span>
-          <span x-text="t.label"></span>
-        </button>
-      </template>
+            <template x-if="cardDetail.payload?.table && cardDetail.payload?.ok">
+              <div class="block" style="margin-top:10px"><h2 x-text="(cardDetail.payload.period || 'Quarter') + ' · ' + cardDetail.payload.basis"></h2>
+                <table class="mini num"><thead><tr><th>₹ crore</th><th>Current</th><th>Prev qtr</th><th>Year ago</th><th>QoQ</th><th>YoY</th></tr></thead>
+                  <tbody><template x-for="r in cardDetail.payload.table.filter(r=>r.found)" :key="r.metric"><tr>
+                    <td x-text="metricName(r.metric) + (r.derived ? '*' : '')"></td><td x-text="Math.round(r.current).toLocaleString('en-IN')"></td>
+                    <td x-text="r.previous != null ? Math.round(r.previous).toLocaleString('en-IN') : '–'"></td><td x-text="r.year_ago != null ? Math.round(r.year_ago).toLocaleString('en-IN') : '–'"></td>
+                    <td :class="cls(r.qoq)" x-text="pct(r.qoq)"></td><td :class="cls(r.yoy)" x-text="pct(r.yoy)"></td></tr></template></tbody></table>
+                <p class="xs mute" x-show="cardDetail.payload.table.some(r=>r.derived)">* EBITDA derived: PBT + finance costs + depreciation − other income.</p>
+                <div class="row wrap"><span class="pill" :class="cardDetail.payload.confidence === 'high' ? 'intact' : 'watch'" x-text="'Confidence ' + cardDetail.payload.confidence"></span>
+                  <span class="xs mute" x-text="cardDetail.payload.source"></span></div>
+                <template x-for="n in cardDetail.payload.notes || []" :key="n"><div class="xs ink2" x-text="'• ' + n"></div></template>
+                <template x-for="r in cardDetail.payload.table.filter(r=>r.found && r.quote)" :key="'q'+r.metric">
+                  <button class="cite" @click="openEvidence(cardDetail.document_id, r.page, r.quote)" x-text="metricName(r.metric) + ': page ' + r.page"></button></template>
+              </div>
+            </template>
+            <template x-if="cardDetail.payload?.results_day?.comparisons?.length">
+              <div class="block"><h2>Against management's own guidance</h2>
+                <template x-for="x in cardDetail.payload.results_day.comparisons" :key="x.metric + x.promised"><div class="small" style="margin:4px 0">
+                  <strong x-text="x.metric"></strong>: promised <span x-text="x.promised"></span> (<span x-text="x.said_in"></span>) → <span x-text="x.delivered"></span><span x-text="x.delivered_unit || '%'"></span>
+                  <span class="pill" :class="x.verdict === 'on track' || x.verdict === 'delivered' ? 'intact' : 'watch'" x-text="x.verdict"></span></div></template></div>
+            </template>
+            <template x-if="cardDetail.payload && cardDetail.payload.ok === false">
+              <div class="notice warn" x-text="cardDetail.payload.reason"></div></template>
+            <template x-if="cardDetail.payload?.people?.length">
+              <div class="block"><h2>People</h2>
+                <template x-for="p in cardDetail.payload.people" :key="p.name"><div style="margin-bottom:8px">
+                  <div class="small"><span class="pill" :class="p.direction === 'appointed' ? 'intact' : 'watch'" x-text="p.direction"></span> <strong x-text="p.name"></strong> <span class="ink2" x-text="p.role"></span></div>
+                  <div class="xs mute" x-show="p.effective_date" x-text="'Effective ' + p.effective_date"></div>
+                  <div class="quote" x-show="p.profile_quote" x-text="p.profile_quote"></div>
+                  <div class="quote" x-show="p.reason_quote" x-text="'Reason given: ' + p.reason_quote"></div>
+                  <template x-if="p.web_bio"><div class="xs">Web bio: <span x-text="p.web_bio.text"></span> <a :href="p.web_bio.url" target="_blank" rel="noopener">source</a></div></template>
+                  <button class="cite" x-show="p.page" @click="openEvidence(cardDetail.document_id, p.page, p.quote)" x-text="'Filing, page ' + p.page"></button></div></template></div>
+            </template>
+            <template x-if="(cardDetail.payload?.flags || cardDetail.payload?.governance_flags || []).length">
+              <div class="block"><h2>Governance flags</h2><template x-for="f in (cardDetail.payload.flags || cardDetail.payload.governance_flags)" :key="f.kind + f.summary">
+                <div class="small"><span class="pill" :class="f.severity === 'high' ? 'at_risk' : 'watch'" x-text="f.kind.replace(/_/g,' ')"></span> <span class="ink2" x-text="f.summary"></span></div></template></div>
+            </template>
+            <div class="block" x-show="cardDetail.one_liner"><h2>Summary</h2><p class="small" x-text="cardDetail.one_liner"></p></div>
+
+            <details class="block"><summary class="row"><svg class="i s"><use href="#i-info"/></svg><strong class="small">Why am I seeing this?</strong></summary>
+              <dl class="kv small num" style="margin-top:8px">
+                <dt>Type weight</dt><dd x-text="cardDetail.why?.type_weight"></dd><dt>Magnitude</dt><dd x-text="cardDetail.why?.magnitude"></dd>
+                <dt>Novelty</dt><dd x-text="cardDetail.why?.novelty"></dd><dt>Thesis</dt><dd x-text="cardDetail.why?.thesis_multiplier"></dd>
+                <dt><strong>Score</strong></dt><dd><strong x-text="cardDetail.why?.score"></strong></dd></dl>
+              <template x-for="r in cardDetail.why?.reasons || []" :key="r"><div class="xs ink2" x-text="'• ' + r"></div></template>
+              <p class="xs mute" x-text="cardDetail.why?.formula"></p></details>
+
+            <div class="row" style="margin-top:6px">
+              <a class="btn" style="flex:1; text-align:center" :href="cardDetail.pdf_url" target="_blank" rel="noopener" x-show="cardDetail.pdf_url">Open filing PDF</a>
+              <button class="btn primary" style="flex:1" @click="nav('#research/' + cardDetail.symbol)">Dig deeper →</button>
+            </div>
+            <template x-if="evidence"><div style="margin-top:12px">
+              <div class="notice err" x-show="evidence.error" x-text="evidence.error"></div>
+              <template x-if="evidence.text"><div><div class="xs mute" x-text="(evidence.title || '') + ' · page ' + evidence.page"></div>
+                <div class="page-text" x-html="highlight(evidence.text, evidence.quote)"></div></div></template></div></template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </template>
+
+  <!-- ===== evidence sheet (research quotes) ===== -->
+  <template x-if="sheet === 'evidence'">
+    <div>
+      <div class="scrim" @click="sheet=null"></div>
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="Source page" @keydown.escape.window="sheet=null">
+        <div class="grab"></div>
+        <template x-if="!evidence || evidence.loading"><div class="skel"></div></template>
+        <div class="notice err" x-show="evidence?.error" x-text="evidence?.error"></div>
+        <template x-if="evidence?.text"><div>
+          <div class="row"><strong class="small" x-text="(evidence.title || '') + ' · page ' + evidence.page"></strong><span class="spacer"></span>
+            <a class="small" :href="evidence.url" target="_blank" rel="noopener">PDF</a></div>
+          <div class="quote" x-text="evidence.quote"></div>
+          <div class="page-text" x-html="highlight(evidence.text, evidence.quote)"></div></div></template>
+      </div>
+    </div>
+  </template>
+
+  <div class="notice" x-show="toast" x-transition role="status" aria-live="polite"
+       style="position:fixed; left:16px; right:16px; bottom:84px; z-index:50; max-width:600px; margin:0 auto" x-text="toast"></div>
+
+  <!-- ===== tabs ===== -->
+  <nav class="tabs" aria-label="Main">
+    <div class="tabs-in">
+      <button class="tab" :aria-current="route==='today' && 'page'" @click="nav('#today')"><svg class="i"><use href="#i-today"/></svg>Today</button>
+      <button class="tab" :aria-current="['holdings','holding'].includes(route) && 'page'" @click="nav('#holdings')"><svg class="i"><use href="#i-hold"/></svg>Holdings</button>
+      <button class="tab" :aria-current="route==='research' && 'page'" @click="nav('#research')"><svg class="i"><use href="#i-search"/></svg>Research</button>
+      <button class="tab" :aria-current="route==='alerts' && 'page'" @click="nav('#alerts')"><svg class="i"><use href="#i-bell"/></svg>Alerts
+        <span class="badge" x-show="unread" x-text="unread > 99 ? '99+' : unread" :aria-label="unread + ' unread alerts'"></span></button>
     </div>
   </nav>
 </div>

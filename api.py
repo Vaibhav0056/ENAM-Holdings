@@ -14,6 +14,8 @@ IST = ZoneInfo("Asia/Kolkata")
 app = FastAPI(title="FINN")
 from finn import web as web_v2  # noqa: E402  (v2 Postgres routes)
 app.include_router(web_v2.router)
+from finn import web_ui  # noqa: E402  (Phase 7 screen routes)
+app.include_router(web_ui.router)
 app.middleware("http")(web_v2.timing_middleware)
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 WINDOWS = {"24h": timedelta(hours=24), "3d": timedelta(days=3), "7d": timedelta(days=7), "30d": timedelta(days=30)}
@@ -267,6 +269,13 @@ def manifest():
 @app.get("/")
 def index():
     return FileResponse(os.path.join(STATIC, "index.html"))
+
+
+@app.on_event("startup")
+def _warm_feed():
+    if os.getenv("FINN_NO_WARMER") != "1":
+        from finn.feed import digest as _dg
+        _dg.start_warmer()
 
 
 @app.on_event("startup")

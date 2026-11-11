@@ -7,6 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ["DATABASE_URL"] = ""          # load_dotenv never overrides a variable that is already set
+os.environ["FINN_NO_WARMER"] = "1"
 os.environ["DATABASE_URL_UNPOOLED"] = ""
 os.environ["FINN_TEST_DB"] = str(Path(tempfile.mkdtemp()) / "finn_test.sqlite")
 
