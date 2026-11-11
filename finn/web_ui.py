@@ -145,6 +145,24 @@ def document_page(doc_id: int, page_no: int):
     return r
 
 
+@router.get("/api/v2/deep/{symbol}/{recipe}")
+def deep_dive(symbol: str, recipe: str, force: bool = False):
+    """A deep dive: cached (< 24 h) results return at once; otherwise the recipe runs (a few seconds to a minute)."""
+    from .deep import engine as deep
+    if recipe not in deep.RUNNERS:
+        raise HTTPException(404, f"unknown deep dive; try one of {', '.join(deep.RECIPES)}")
+    try:
+        return deep.run(symbol, recipe, force=force)
+    except deep.NeedsResearch as e:
+        raise HTTPException(409, str(e))
+
+
+@router.get("/api/v2/deep")
+def deep_list():
+    from .deep import engine as deep
+    return {"recipes": [{"id": r, "title": deep.TITLES[r]} for r in deep.RECIPES]}
+
+
 @router.get("/api/v2/state")
 def state():
     def q(s):

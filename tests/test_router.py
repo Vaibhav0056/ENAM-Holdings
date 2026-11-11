@@ -125,3 +125,13 @@ def test_every_call_is_logged(sqldb):
     with session() as s:
         rows = s.scalars(select(LLMCall)).all()
     assert [r.ok for r in rows] == [False, True] and rows[1].in_tokens == 1000
+
+
+def test_embed_wraps_each_text_and_checks_the_count(sqldb):
+    class M:
+        def embed_content(self, model, contents, config):
+            assert all(hasattr(c, "parts") for c in contents)          # one Content per text
+            return SimpleNamespace(embeddings=[SimpleNamespace(values=[0.1] * 768) for _ in contents][:1])
+    router.set_client(SimpleNamespace(models=M()))
+    with pytest.raises(router.LLMUnavailable):
+        router.embed(["a", "b"], sleep=lambda s: None)

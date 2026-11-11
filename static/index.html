@@ -399,6 +399,100 @@
               <template x-for="r in rq.report.snapshot.risks.slice(0,4)" :key="r.text"><div class="ink2" x-text="'• ' + r.text"></div></template></div></template>
           </div>
 
+          <div class="block">
+            <h2>Go deeper</h2>
+            <div class="row wrap"><template x-for="[id, name] in deepRecipes" :key="id">
+              <button class="chip" :aria-pressed="deep.recipe === id" @click="openDeep(id)" x-text="name"></button></template></div>
+            <template x-if="deep.loading"><div><div class="skel"></div><div class="skel" style="width:60%"></div>
+              <p class="xs mute">Reading the documents; a first run takes up to a minute.</p></div></template>
+            <div class="notice warn small" x-show="deep.error" x-text="deep.error"></div>
+            <template x-if="deep.data">
+              <div style="margin-top:8px">
+                <!-- cash quality / balance sheet -->
+                <template x-if="['cash_quality','balance_sheet'].includes(deep.data.recipe)">
+                  <div>
+                    <p class="xs mute" x-text="deep.data.report + ' · ' + deep.data.basis + ' · ₹ crore · ' + deep.data.verified"></p>
+                    <dl class="kv small num"><template x-for="[k, v] in deepRows(deep.data.current)" :key="k">
+                      <div style="display:contents"><dt x-text="label(k)"></dt><dd :class="v == null && 'mute'" x-text="fmt(v)"></dd></div></template></dl>
+                    <template x-for="c in deep.data.current.checks || []" :key="c"><div class="notice warn xs" x-text="c"></div></template>
+                    <details class="small" style="margin-top:6px"><summary class="mute">Inputs and their quotes</summary>
+                      <template x-for="[k, e] in Object.entries(deep.data.evidence.current || {})" :key="k">
+                        <div><span class="ink2" x-text="label(k) + ': ' + e.as_printed"></span>
+                          <button class="cite" @click="openEvidence(deep.data.document_id, e.page, e.quote); sheet='evidence'" x-text="'page ' + e.page"></button></div></template></details>
+                    <p class="xs mute" x-text="deep.data.note"></p>
+                  </div>
+                </template>
+                <!-- hedge-meter -->
+                <template x-if="deep.data.recipe === 'hedge_meter'">
+                  <div>
+                    <template x-for="c in deep.data.calls" :key="c.call"><div class="row small num" style="margin:3px 0">
+                      <span style="width:70px" x-text="c.call"></span>
+                      <span style="flex:1; height:8px; background:var(--surface-2); border-radius:4px; position:relative">
+                        <span style="position:absolute; left:0; top:0; bottom:0; background:var(--watch); border-radius:4px" :style="'width:' + Math.min(100, (c.per_1000_words || 0) * 12) + '%'"></span></span>
+                      <span style="width:44px; text-align:right" x-text="c.per_1000_words"></span></div></template>
+                    <p class="xs ink2" x-show="deep.data.latest_vs_earlier_pct != null" x-text="'Latest call vs earlier average: ' + pct(deep.data.latest_vs_earlier_pct) + ' cautious language'"></p>
+                    <p class="xs mute" x-text="deep.data.method"></p>
+                  </div>
+                </template>
+                <!-- language diff -->
+                <template x-if="deep.data.recipe === 'language_diff'">
+                  <div>
+                    <p class="xs mute" x-text="deep.data.older + ' → ' + deep.data.newer"></p>
+                    <h2 style="margin-top:6px">Said now, not before</h2>
+                    <template x-for="x in deep.data.new.slice(0,4)" :key="x.text"><div><div class="quote small" x-text="x.text"></div>
+                      <button class="cite" @click="openEvidence(x.document_id, x.page, x.text); sheet='evidence'" x-text="x.call + ', page ' + x.page + ' · ' + (x.speaker || '')"></button></div></template>
+                    <h2 style="margin-top:6px">Said before, not now</h2>
+                    <template x-for="x in deep.data.dropped.slice(0,4)" :key="x.text"><div><div class="quote small" x-text="x.text"></div>
+                      <button class="cite" @click="openEvidence(x.document_id, x.page, x.text); sheet='evidence'" x-text="x.call + ', page ' + x.page"></button></div></template>
+                  </div>
+                </template>
+                <!-- dodge detector -->
+                <template x-if="deep.data.recipe === 'dodge_detector'">
+                  <div>
+                    <template x-for="c in deep.data.calls" :key="c.call"><div class="small" x-text="c.call + ': ' + c.answered + ' answered, ' + c.partial + ' partial, ' + c.deflected + ' deflected of ' + c.judged"></div></template>
+                    <template x-for="x in deep.data.flagged.slice(0,5)" :key="x.question"><div style="margin-top:8px">
+                      <div class="small"><span class="pill" :class="x.label === 'deflected' ? 'missed' : 'partial'" x-text="x.label"></span> <span class="ink2" x-text="x.analyst + ' asked: ' + x.question"></span></div>
+                      <div class="quote small" x-text="x.evidence"></div>
+                      <button class="cite" @click="openEvidence(x.document_id, x.page, x.evidence); sheet='evidence'" x-text="x.answered_by + ', ' + x.call + ', page ' + x.page"></button></div></template>
+                  </div>
+                </template>
+                <!-- worry map -->
+                <template x-if="deep.data.recipe === 'worry_map'">
+                  <div style="overflow-x:auto">
+                    <table class="mini num"><thead><tr><th>Topic</th><template x-for="q in deep.data.quarters" :key="q"><th x-text="q.replace(' FY', ' ')"></th></template></tr></thead>
+                      <tbody><template x-for="t in deep.data.topics.slice(0,8)" :key="t"><tr>
+                        <td x-text="t" :style="deep.data.rising.includes(t) ? 'color:var(--watch); font-weight:600' : ''"></td>
+                        <template x-for="q in deep.data.quarters" :key="t+q"><td x-text="deep.data.counts[t][q] || ''"></td></template></tr></template></tbody></table>
+                    <p class="xs ink2" x-show="deep.data.rising.length" x-text="'Rising on the latest call: ' + deep.data.rising.join(', ')"></p>
+                  </div>
+                </template>
+                <!-- fine print -->
+                <template x-if="deep.data.recipe === 'fine_print'">
+                  <div>
+                    <div class="small" x-text="'Contingent liabilities: ' + cr(deep.data.contingent_liabilities_cr.latest) + ' vs ' + cr(deep.data.contingent_liabilities_cr.previous) + (deep.data.contingent_liabilities_cr.change_pct != null ? ' (' + pct(deep.data.contingent_liabilities_cr.change_pct) + ')' : '')"></div>
+                    <div class="small" x-text="'New key audit matters: ' + (deep.data.new_key_audit_matters.map(i=>i.title).join(', ') || 'none')"></div>
+                    <div class="small" x-text="'Qualifications or emphasis of matter: ' + (deep.data.qualifications_or_emphasis.map(i=>i.title).join(', ') || 'none')"></div>
+                    <template x-for="y in deep.data.years" :key="y.period"><details class="small"><summary class="mute" x-text="y.report + ': ' + y.items.length + ' items'"></summary>
+                      <template x-for="i in y.items" :key="i.kind + i.title + i.page"><div><span class="ink2" x-text="i.kind.replace(/_/g,' ') + ': ' + i.title"></span>
+                        <button class="cite" @click="openEvidence(i.document_id, i.page, i.quote); sheet='evidence'" x-text="'page ' + i.page"></button></div></template></details></template>
+                  </div>
+                </template>
+                <!-- peer compare -->
+                <template x-if="deep.data.recipe === 'peer_compare'">
+                  <table class="mini num"><thead><tr><th></th><template x-for="r in deep.data.rows" :key="r.symbol"><th x-text="r.symbol"></th></template></tr></thead>
+                    <tbody>
+                      <tr><td>Credibility</td><template x-for="r in deep.data.rows" :key="'s'+r.symbol"><td x-text="r.score ?? 'n/a'"></td></template></tr>
+                      <tr><td>Measured / tracked</td><template x-for="r in deep.data.rows" :key="'m'+r.symbol"><td x-text="r.measured + ' / ' + r.total"></td></template></tr>
+                      <tr><td>Too vague</td><template x-for="r in deep.data.rows" :key="'v'+r.symbol"><td x-text="r.vagueness_pct + '%'"></td></template></tr>
+                      <tr><td>Delivered / missed</td><template x-for="r in deep.data.rows" :key="'d'+r.symbol"><td x-text="r.counts.delivered + ' / ' + r.counts.missed"></td></template></tr>
+                      <tr><td>Guidance no longer repeated</td><template x-for="r in deep.data.rows" :key="'g'+r.symbol"><td x-text="r.dropped_guidance"></td></template></tr>
+                    </tbody></table>
+                </template>
+                <p class="xs mute" style="margin-top:6px" x-text="(deep.data.cached ? 'Cached · ' : '') + deep.data.receipt.llm_calls + ' model calls · ' + deep.data.receipt.seconds + ' s'"></p>
+              </div>
+            </template>
+          </div>
+
           <details class="block"><summary><strong class="small">Receipt</strong> <span class="xs mute" x-text="rq.report.receipt.sources_read + ' of ' + rq.report.receipt.sources_listed + ' sources · ' + rq.report.receipt.seconds + ' s · $' + rq.report.receipt.cost_usd"></span></summary>
             <dl class="kv small" style="margin-top:8px">
               <dt>Unverified claims shown</dt><dd x-text="rq.report.receipt.unverified_claims_shown"></dd>

@@ -227,6 +227,21 @@ function finn() {
     source(id) { return (this.rq.report?.sources || []).find((s) => s.id === id) || {}; },
     gaugeDash(score) { const c = 2 * Math.PI * 30; return `${(c * (score || 0)) / 100} ${c}`; },
 
+    // ---------- Deep dives ----------
+    deep: { recipe: null, data: null, loading: false, error: null },
+    deepRecipes: [["cash_quality", "Cash quality"], ["balance_sheet", "Balance sheet"], ["language_diff", "Language diff"],
+                  ["hedge_meter", "Hedge-meter"], ["dodge_detector", "Dodge detector"], ["worry_map", "Worry map"],
+                  ["fine_print", "Fine print"], ["peer_compare", "Peer compare"]],
+    async openDeep(recipe) {
+      Object.assign(this.deep, { recipe, data: null, loading: true, error: null });
+      try { this.deep.data = await this.api(`/api/v2/deep/${this.param}/${recipe}`); }
+      catch (e) { this.deep.error = this.net.error; this.net.error = null; }
+      finally { this.deep.loading = false; }
+    },
+    deepRows(obj) { return Object.entries(obj || {}).filter(([k, v]) => typeof v === "number" || v === null); },
+    label(k) { return k.replace(/_/g, " ").replace(/\bocf\b/i, "OCF").replace(/\bfcf\b/i, "FCF").replace(/\bpat\b/i, "PAT").replace(/\bebitda\b/i, "EBITDA"); },
+    fmt(v) { return v == null ? "Not in sources" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 2 }); },
+
     // ---------- Alerts ----------
     async loadAlerts(quiet = false) {
       try { const r = await this.api("/api/v2/alerts"); this.alerts = r.alerts; this.unread = r.unread; }

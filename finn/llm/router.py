@@ -336,9 +336,13 @@ def embed(texts: list[str], task_type: str = "RETRIEVAL_DOCUMENT", budget_key: s
         for attempt in range(1, 4):
             ts = time.monotonic()
             try:
+                # One Content per text: gemini-embedding-2 treats a list of plain strings as ONE multi-part input
+                # and returns a single vector for the whole batch (found when retrieval returned noise).
                 r = get_client().models.embed_content(
-                    model=model, contents=[texts[i] for i in idx],
+                    model=model, contents=[types.Content(parts=[types.Part(text=texts[i])]) for i in idx],
                     config=types.EmbedContentConfig(output_dimensionality=768, task_type=task_type))
+                if len(r.embeddings) != len(idx):
+                    raise LLMUnavailable(f"embed returned {len(r.embeddings)} vectors for {len(idx)} texts")
                 tin = sum(len(texts[i]) for i in idx) // 4  # the embed API doesn't return usage; ~4 chars/token
                 _log(task="embed", prompt_id=None, model=model, tier="cheap", in_tokens=tin,
                      cost_usd=cost(model, tin, 0), latency_ms=int((time.monotonic() - ts) * 1000), budget_key=budget_key)

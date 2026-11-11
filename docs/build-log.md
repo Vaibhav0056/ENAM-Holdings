@@ -231,3 +231,29 @@ The challenge spec supersedes Steps 1-8. Those built a working SQLite MVP; v2 re
 | Holdings | 95 | 100 | 0.061 |
 | Alerts | 95 | 100 | 0.008 |
 Lighthouse 12.8.2, mobile, headless Chrome 157, local server. Feed `/digest`: p50 3.8 ms, p95 20.2 ms over 80 requests (target < 300 ms). App shell 0.22 s from the server, served from the service-worker cache on repeat visits. Every screen checked at 375 px in dark and light (screenshots in the session scratchpad). Real-device push still needs a person to tap "Enable notifications" in Chrome; the subscribe → sign → send → prune path is verified. Tests: 222 passed. ✅
+
+## Phase 8: Deep dives + embeddings
+
+**Plan.** What: hybrid retrieval (full-text + pgvector, Reciprocal Rank Fusion) and the shared recipe engine with eight deep dives in the spec's order. Why: the depth layer the investor taps into from a report. Risks: embedding batches, annual-report tables, recipes that look numeric but rest on unverified lines.
+
+**Built.** `finn/retrieval.py` (transcripts chunked by speaker turn with role; annual reports by page section, embedded lazily; hybrid search with RRF), `finn/deep/maths.py` (all deep-dive figures), `finn/deep/engine.py` (eight recipes, cached as `reports.kind = 'deep:<recipe>'` for 24 h, receipts), prompts `financials_extract.v1-v2`, `dodge_label.v1`, `worry_topic.v1`, `fine_print.v1`, route `GET /api/v2/deep/{symbol}/{recipe}`, and a "Go deeper" block on the research screen.
+
+**Results on Polycab.**
+- Hedge-meter (pure Python): 3.1-5.0 cautious phrases per 1,000 management words across eight calls.
+- Language diff (embeddings, threshold 0.8): the newest call adds "we are expecting the EHV plant to now commission somewhere in FY 2028", a timeline that earlier calls put at FY26 / CY2026.
+- Dodge detector: Q2 FY27 22 answered, 6 partial, 2 deflected of 30 (e.g. "we would not like to give any guidance on that" to a question on wires vs cables growth); every label quotes the answer.
+- Worry map: competition questions rose to 5 on the latest call against ~1.8 before (flagged as rising).
+- Cash quality / balance sheet: OCF ₹3,811 cr, capex ₹1,480 cr, FCF ₹2,330 cr, interest cover 17.5×, net cash ₹3,702 cr (net debt / EBITDA −0.87). PAT and the working-capital lines did not verify, so OCF/PAT and the days show "Not in sources".
+- Fine print: key audit matters (revenue recognition, inventory valuation of wires & cables), no qualification or emphasis of matter, contingent liabilities ₹83.6 cr vs ₹68.1 cr (+22.8 %).
+- Peer compare (vs HAVELLS, whose cold research took 90.3 s): Havells 58/100 on 4 measured promises (40 % too vague to check); Polycab not scored (2 measured of 60).
+
+**Decisions and rejected alternatives.**
+- Found a real bug: `gemini-embedding-2` treats a list of plain strings as ONE multi-part input and returns a single vector. 778 chunks got 16 vectors, each embedding 50 joined passages, and retrieval returned noise ("why did export growth slow" → a capex question). Each text is now wrapped as its own Content and the count is checked; the 19 bad cached vectors were purged and everything re-embedded.
+- Full-text queries OR quoted phrases: `websearch_to_tsquery` ANDs bare words, so "key audit matters emphasis of matter qualified opinion" matched no page and fine print found no audit matters at first.
+- Financial extraction runs as two focused calls (flows: cash flow + P&L; stocks: balance sheet + notes); one call over 16 pages returned ~20 figures.
+- Implausible working-capital days (outside 7-365) carry a visible "check the quoted line" note rather than being hidden or trusted.
+- Peer compare compares stored reports; it never re-reads documents.
+
+**Problems.** PyMuPDF splits statement rows into cells, so a model quote of a full row ("Trade receivables 4,477.84 3,912.10") often isn't a contiguous string on the page and fails verification: correct behaviour, but it leaves cash-quality inputs missing. A table-aware page text (pdfplumber for statement pages) is the next fix. Re-embedding 778 chunks took 7.4 min on the free tier; search is ~2.3 s, mostly the query embedding call.
+
+**Checkpoint.** All 8 recipes run on real documents; LLM-backed ones verify every quote on its page (figures must be printed in the quote) and every number comes from `finn/deep/maths.py`. Cached reopen 0.29-0.37 s (target < 1 s). Tests: 230 passed. ✅
