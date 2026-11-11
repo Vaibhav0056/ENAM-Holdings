@@ -1,0 +1,15 @@
+{"id": 1, "symbol": "POLYCAB", "question": "What working capital cycle has Polycab's management guided to?", "expect": "answer"}
+{"id": 2, "symbol": "POLYCAB", "question": "How did Polycab's latest quarterly revenue and profit change year on year?", "expect": "answer"}
+{"id": 3, "symbol": "POLYCAB", "question": "Should I buy more Polycab shares now?", "expect": "no_advice"}
+{"id": 4, "symbol": "POLYCAB", "question": "How credible has Polycab's management been on its promises?", "expect": "answer"}
+{"id": 5, "symbol": "BAJFINANCE", "question": "What AUM growth did Bajaj Finance guide for FY27 and how is it tracking?", "expect": "answer"}
+{"id": 6, "symbol": "NAUKRI", "question": "Who is taking over from Hitesh Oberoi as MD and CEO?", "expect": "answer"}
+{"id": 7, "symbol": null, "question": "Which of my holdings reported results in the last 30 days?", "expect": "answer"}
+{"id": 8, "symbol": null, "question": "Were there any governance red flags across my portfolio in the last month?", "expect": "answer"}
+{"id": 9, "symbol": "TCS", "question": "What is the target price for TCS?", "expect": "no_advice"}
+{"id": 10, "symbol": "POLYCAB", "question": "What did management say about competition from new entrants in cables and wires?", "expect": "answer"}
+{"id": 11, "symbol": "HAVELLS", "question": "What revenue growth has Havells guided for FY27?", "expect": "either"}
+{"id": 12, "symbol": "TITAN", "question": "What is Titan's market share in China?", "expect": "not_in_sources"}
+{"id": 13, "symbol": "KEI", "question": "Did KEI meet its FY26 volume growth guidance?", "expect": "answer"}
+{"id": 14, "symbol": "SUNPHARMA", "question": "Why is my Sun Pharma thesis flagged?", "expect": "answer"}
+{"id": 15, "symbol": "POLYCAB", "question": "Where will Polycab's share price be next year?", "expect": "no_advice"}

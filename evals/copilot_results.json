@@ -1,0 +1,1056 @@
+[
+ {
+  "id": 1,
+  "expect": "answer",
+  "question": "What working capital cycle has Polycab's management guided to?",
+  "symbol": "POLYCAB",
+  "answer": [
+   {
+    "text": "Management stated in the call that they expect the working capital cycle to normalize to their long-term steady range of 50 to 55 days in the coming quarters.",
+    "citations": [
+     "E4"
+    ]
+   }
+  ],
+  "not_in_sources": false,
+  "evidence": [
+   {
+    "id": "E4",
+    "text": "[transcript Q3 FY26, page 5, Shashank Yagnick (management)] We expect this to normalize to our long-term steady range of 50 to 55 days in the coming quarters. Capital expenditure for the quarter was \u20b9 3.4 billion, taking the 9M FY26 total to \u20b9 10.9 billion, in-line with our Project Spring guidance of investing \u20b9 12 billion to \u20b9 16 billion annually through FY30. On a 9-month basis, I'm proud to share that 9M FY26 revenues, EBITDA and PAT are the highest ever in the company's history for any 9-month period. Revenues grew 30% YoY, crossing \u20b9200 billion milestone. EBITDA grew 47% YoY, with margins",
+    "kind": "transcript",
+    "document_id": 154,
+    "page": 5,
+    "title": "Earnings call Jan 2026",
+    "period": "Q3 FY26",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/c54bf2c3-22fa-45e1-bf1a-2194e7b46183.pdf"
+   }
+  ],
+  "receipt": {
+   "seconds": 22.1,
+   "tool_steps": 1,
+   "llm_calls": 2,
+   "cost_usd": 0.0003,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "search_docs",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": "What working capital cycle has Polycab's management guided to?",
+     "symbol": "POLYCAB"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 2,
+  "expect": "answer",
+  "question": "How did Polycab's latest quarterly revenue and profit change year on year?",
+  "symbol": "POLYCAB",
+  "answer": [
+   {
+    "text": "According to the consolidated results for Q2 FY27, Polycab reported revenue of \u20b99,899 crore, which represents a year-on-year increase of 52.8%, while PAT reached \u20b9990 crore, marking a year-on-year growth of 42.9%.",
+    "citations": [
+     "E1"
+    ]
+   },
+   {
+    "text": "Additionally, management mentioned on the call that consolidated revenue grew by 53% year-on-year.",
+    "citations": [
+     "E2"
+    ]
+   }
+  ],
+  "not_in_sources": false,
+  "evidence": [
+   {
+    "id": "E1",
+    "text": "[POLYCAB Q2 FY27 results, consolidated] revenue \u20b99,899 crore (QoQ 20.6%, YoY 52.8%); ebitda \u20b91,422 crore (QoQ 25.2%, YoY 39.4%); pbt \u20b91,306 crore (QoQ 23.4%, YoY 41.8%); pat \u20b9990 crore (QoQ 24.3%, YoY 42.9%)",
+    "kind": "results_card",
+    "filing_id": 574,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/4ac93ea0-d4d1-4b85-8849-14a19e0dcceb.pdf"
+   },
+   {
+    "id": "E2",
+    "text": "[POLYCAB Q2 FY27, management on the call] consolidated revenue growth: 53.0 %. Quote: \"Consolidated revenue grew by 53% year-on-year, with all business segments contributing meaningfully to this growth momentum.\"",
+    "kind": "transcript",
+    "document_id": 151,
+    "page": 5,
+    "title": "Earnings call Oct 2026",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/77b6d277-0ffc-440d-ba8a-2bd9bc3dc43e.pdf"
+   }
+  ],
+  "receipt": {
+   "seconds": 5.0,
+   "tool_steps": 1,
+   "llm_calls": 0,
+   "cost_usd": 0.0,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "get_metric",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": "revenue",
+     "page": null,
+     "query": null,
+     "symbol": "POLYCAB"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 3,
+  "expect": "no_advice",
+  "question": "Should I buy more Polycab shares now?",
+  "symbol": "POLYCAB",
+  "answer": [
+   {
+    "text": "FINN doesn't give investment advice and instead shows that the filings outline the business's execution of Project Spring to leverage the Indian infrastructure upcycle and rising global cable demand by expanding capacity and scaling its Wires and Cables, FMEG, and international segments.",
+    "citations": [
+     "E1"
+    ]
+   },
+   {
+    "text": "The filings also note that management aims to grow the Wires and Cables business at 1.5x the industry growth rate while maintaining long-term EBITDA margins within W&C between 11% and 13%, and expanding the international business share of revenue to north of 10% by FY30.",
+    "citations": [
+     "E1"
+    ]
+   },
+   {
+    "text": "Additionally, the documents highlight various breakers and risks such as supply concentration, regulatory and legal consequences, and vulnerability of manufacturing systems to cyber intrusions.",
+    "citations": [
+     "E1"
+    ]
+   }
+  ],
+  "not_in_sources": false,
+  "evidence": [
+   {
+    "id": "E1",
+    "text": "[POLYCAB thesis, draft] The business must continue executing Project Spring to leverage the Indian infrastructure upcycle and rising global cable demand by expanding capacity and scaling its Wires and Cables, FMEG, and international segments. Management aims to grow the Wires and Cables business at 1.5x the industry growth rate while maintaining long-term EBITDA margins within W&C between 11% and 13%, and expanding the international business share of revenue to north of 10% by FY30. KPIs: none set. Breakers: Supply concentration risk in key raw materials like copper and single-source dependenc",
+    "kind": "thesis",
+    "symbol": "POLYCAB"
+   }
+  ],
+  "receipt": {
+   "seconds": 3.3,
+   "tool_steps": 1,
+   "llm_calls": 0,
+   "cost_usd": 0.0,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "get_thesis",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": null,
+     "symbol": "POLYCAB"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 4,
+  "expect": "answer",
+  "question": "How credible has Polycab's management been on its promises?",
+  "symbol": "POLYCAB",
+  "answer": [
+   {
+    "text": "According to the filings, Polycab has 2 delivered promises, 41 pending promises, and 17 unverifiable promises out of 60, with 28% considered too vague to check and 2 matured promises not scored.",
+    "citations": [
+     "E1"
+    ]
+   },
+   {
+    "text": "Management delivered on the annual capex promise of INR 12 billion to INR 16 billion by FY26, having incurred capex of INR 14.8 billion during FY26.",
+    "citations": [
+     "E2",
+     "E3"
+    ]
+   },
+   {
+    "text": "Other long-term and medium-term objectives, such as a working capital cycle of 45 to 50 days, Wires & Cables EBITDA margins of 11% to 13%, and FMEG growth at 1.5x to 2x the industry rate, remain pending.",
+    "citations": [
+     "E4",
+     "E5",
+     "E6"
+    ]
+   }
+  ],
+  "not_in_sources": false,
+  "evidence": [
+   {
+    "id": "E1",
+    "text": "[POLYCAB promise ledger] credibility not scored on 2 matured promises of 60; 28% too vague to check; counts {'missed': 0, 'partial': 0, 'pending': 41, 'delivered': 2, 'unverifiable': 17}.",
+    "kind": "ledger",
+    "report_id": 16
+   },
+   {
+    "id": "E2",
+    "text": "[POLYCAB promise said Q4 FY26] annual capex INR 12 billion to INR 16 billion by FY26: delivered. Quote: \"During FY26, we incurred capex of INR 14.8 billion, in line with our annual guidance of INR 12 billion to INR 16 billion per annum.\"",
+    "kind": "transcript",
+    "document_id": 153,
+    "page": 9,
+    "title": "Earnings call May 2026",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/f66f17ac-c40f-4309-afca-3e66af0956a0.pdf"
+   },
+   {
+    "id": "E3",
+    "text": "[POLYCAB promise said Q2 FY26] annual capex \u20b9 1,200 crores to \u20b9 1,600 crores by FY26: delivered. Quote: \"This year as well, we are at \u20b9 750 crores in the first half, and we'll perhaps do somewhere between \u20b9 1,200 crores to \u20b9 1,600 crores for the year.\"",
+    "kind": "transcript",
+    "document_id": 155,
+    "page": 17,
+    "title": "Earnings call Oct 2025",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/7a5825e0-67d1-41af-96e0-d78387aaba8d.pdf"
+   },
+   {
+    "id": "E4",
+    "text": "[POLYCAB promise said Q2 FY27] working capital cycle 45 to 50 days by long term: pending (on track). Quote: \"As these benefits gradually normalize, we expect the working capital cycle to trend towards our long-term operating range of 45 to 50 days.\"",
+    "kind": "transcript",
+    "document_id": 151,
+    "page": 6,
+    "title": "Earnings call Oct 2026",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/77b6d277-0ffc-440d-ba8a-2bd9bc3dc43e.pdf"
+   },
+   {
+    "id": "E5",
+    "text": "[POLYCAB promise said Q2 FY27] Wires & Cables EBITDA margin 11% to 13% by medium- to long-term: pending. Quote: \"In line with our Project Spring roadmap, we remain confident of sustaining medium- to long-term EBITDA margins within our guided range of 11% to 13%.\"",
+    "kind": "transcript",
+    "document_id": 151,
+    "page": 7,
+    "title": "Earnings call Oct 2026",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/77b6d277-0ffc-440d-ba8a-2bd9bc3dc43e.pdf"
+   },
+   {
+    "id": "E6",
+    "text": "[POLYCAB promise said Q2 FY27] FMEG growth vs industry 1.5x to 2x of the industry growth rate by long term: pending. Quote: \"Our objective continues to be growing at 1.5x to 2x of the industry growth rate while steadily enhancing profitability.\"",
+    "kind": "transcript",
+    "document_id": 151,
+    "page": 7,
+    "title": "Earnings call Oct 2026",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/77b6d277-0ffc-440d-ba8a-2bd9bc3dc43e.pdf"
+   }
+  ],
+  "receipt": {
+   "seconds": 3.1,
+   "tool_steps": 1,
+   "llm_calls": 0,
+   "cost_usd": 0.0,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "get_ledger",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": null,
+     "symbol": "POLYCAB"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 5,
+  "expect": "answer",
+  "question": "What AUM growth did Bajaj Finance guide for FY27 and how is it tracking?",
+  "symbol": "BAJFINANCE",
+  "answer": [
+   {
+    "text": "Not in sources.",
+    "citations": []
+   }
+  ],
+  "not_in_sources": true,
+  "evidence": [],
+  "receipt": {
+   "seconds": 44.5,
+   "tool_steps": 4,
+   "llm_calls": 4,
+   "cost_usd": 0.0005,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "search_docs",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": "AUM growth FY27 guidance",
+     "symbol": "BAJFINANCE"
+    }
+   ],
+   [
+    "search_docs",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": "What AUM growth did Bajaj Finance guide for FY27 and how is it tracking?",
+     "symbol": "BAJFINANCE"
+    }
+   ],
+   [
+    "search_docs",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": "AUM growth",
+     "page": null,
+     "query": "What AUM growth did Bajaj Finance guide for FY27 and how is it tracking?",
+     "symbol": "BAJFINANCE"
+    }
+   ],
+   [
+    "search_docs",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": "FY27 AUM growth guidance",
+     "symbol": "BAJFINANCE"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 6,
+  "expect": "answer",
+  "question": "Who is taking over from Hitesh Oberoi as MD and CEO?",
+  "symbol": "NAUKRI",
+  "answer": [
+   {
+    "text": "The filings note that Mr. Hitesh Oberoi, Managing Director and Chief Executive Officer, has resigned.",
+    "citations": [
+     "E3"
+    ]
+   },
+   {
+    "text": "The provided documents do not contain information regarding who is taking over his position.",
+    "citations": [
+     "E1",
+     "E2"
+    ]
+   }
+  ],
+  "not_in_sources": true,
+  "evidence": [
+   {
+    "id": "E1",
+    "text": "No passages about 'Who is taking over from Hitesh Oberoi as MD and CEO?' in NAUKRI's stored documents.",
+    "kind": "note"
+   },
+   {
+    "id": "E2",
+    "text": "No passages about 'Who is taking over from Hitesh Oberoi as MD and CEO?' in NAUKRI's stored documents.",
+    "kind": "note"
+   },
+   {
+    "id": "E3",
+    "text": "[NAUKRI filing 28 Oct 2026, mgmt_change, attention] Mr. Hitesh Oberoi, Managing Director and Chief Executive Officer: resigns (+2 more). The company announced changes in its directorate involving Mr. Hitesh Oberoi and Mr. Sanjeev Bikhchandani. Resignation and transition of MD and CEO Hitesh Oberoi bears on the thesis.",
+    "kind": "filing",
+    "filing_id": 402,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/6430107d-c92e-4c13-b770-73bcbc8912f6.pdf"
+   }
+  ],
+  "receipt": {
+   "seconds": 24.8,
+   "tool_steps": 4,
+   "llm_calls": 2,
+   "cost_usd": 0.0002,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "search_docs",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": "Who is taking over from Hitesh Oberoi as MD and CEO?",
+     "symbol": "NAUKRI"
+    }
+   ],
+   [
+    "search_docs",
+    {
+     "query": "Who is taking over from Hitesh Oberoi as MD and CEO?",
+     "symbol": "NAUKRI"
+    }
+   ],
+   [
+    "get_filings",
+    {
+     "days": 90,
+     "symbol": "NAUKRI"
+    }
+   ],
+   [
+    "get_ledger",
+    {
+     "symbol": "NAUKRI"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 7,
+  "expect": "answer",
+  "question": "Which of my holdings reported results in the last 30 days?",
+  "symbol": null,
+  "answer": [
+   {
+    "text": "Based on the filings, Titan reported Q2 FY27 results with revenue of \u20b920,614 cr and PAT of \u20b92,393 cr on 05 Nov 2026.",
+    "citations": [
+     "E2"
+    ]
+   },
+   {
+    "text": "Apollo Hospitals submitted its financial results on 04 Nov 2026, reporting revenue of \u20b92,903 cr and PAT of \u20b9476 cr.",
+    "citations": [
+     "E4"
+    ]
+   },
+   {
+    "text": "Dixon submitted financial results for the quarter and half year ended 30th September, 2026 on 30 Oct 2026.",
+    "citations": [
+     "E5"
+    ]
+   },
+   {
+    "text": "Sun Pharma released unaudited financial results for Q2 FY27 on 30 Oct 2026, showing revenue of \u20b96,142 cr and PAT of \u20b9871 cr.",
+    "citations": [
+     "E6"
+    ]
+   }
+  ],
+  "not_in_sources": false,
+  "evidence": [
+   {
+    "id": "E2",
+    "text": "[TITAN filing 05 Nov 2026, results, attention] Q2 FY27 results: Revenue \u20b920,614 cr (+10.1% YoY), PAT \u20b92,393 cr (+113.7% YoY). The company submitted the outcome of the Board Meeting in accordance with SEBI Regulations. Titan reported revenue growth of 10.1% YoY and PAT of Rs. 2,393 cr, supporting innovation-led topline growth.",
+    "kind": "filing",
+    "filing_id": 721,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/86009cba-ca03-4d35-bad8-b1988cfcff13.pdf"
+   },
+   {
+    "id": "E4",
+    "text": "[APOLLOHOSP filing 04 Nov 2026, results, attention] Q2 FY27 results: Revenue \u20b92,903 cr (+23.2% YoY), PAT \u20b9476 cr (+13.3% YoY). Submission of financial results. Apollo reported revenue growth of 23.2% YoY and PAT of Rs. 476 cr, supporting its expansion strategy.",
+    "kind": "filing",
+    "filing_id": 5,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/042a3941-8a3f-48c1-82b5-a4340113ced5.pdf"
+   },
+   {
+    "id": "E5",
+    "text": "[DIXON filing 30 Oct 2026, results, attention] Results For The Quarter And Half Year Ended 30Th September, 2026. The company submitted financial results for the quarter and half year ended 30th September, 2026. The company submitted financial results for the quarter and half year ended 30th September, 2026.",
+    "kind": "filing",
+    "filing_id": 158,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/d7b8fffb-7a5f-4efa-9241-482c5d765f1d.pdf"
+   },
+   {
+    "id": "E6",
+    "text": "[SUNPHARMA filing 30 Oct 2026, results, attention] Q2 FY27 results: Revenue \u20b96,142 cr (+35.0% YoY), PAT \u20b9871 cr (+54.4% YoY). The company released unaudited financial results for the quarter and half year ended September 30, 2026. The company released financial results for Q2 FY27 showing revenue and PAT growth.",
+    "kind": "filing",
+    "filing_id": 607,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/658231ad-7203-4355-be99-2a162b722c0c.pdf"
+   }
+  ],
+  "receipt": {
+   "seconds": 2.9,
+   "tool_steps": 1,
+   "llm_calls": 0,
+   "cost_usd": 0.0,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "get_filings",
+    {
+     "days": 30,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": null,
+     "symbol": null
+    }
+   ]
+  ]
+ },
+ {
+  "id": 8,
+  "expect": "answer",
+  "question": "Were there any governance red flags across my portfolio in the last month?",
+  "symbol": null,
+  "answer": [
+   {
+    "text": "The filings do not mention any governance red flags across the portfolio in the last month.",
+    "citations": [
+     "E1",
+     "E2",
+     "E3",
+     "E4",
+     "E5",
+     "E6"
+    ]
+   },
+   {
+    "text": "Instead, the filings report on capital raising, financial results, and management changes such as the cessation of Dr. Madhu Sasidhar as President & CEO - Hospitals Division at Apollo Hospital.",
+    "citations": [
+     "E1",
+     "E2",
+     "E3",
+     "E4",
+     "E5",
+     "E6"
+    ]
+   }
+  ],
+  "not_in_sources": false,
+  "evidence": [
+   {
+    "id": "E1",
+    "text": "[BAJFINANCE filing 10 Nov 2026, fundraise, attention] Outcome Of The Meeting Of PI 2026- Special Committee Of Board Of Directors Held On 10 November 2026. Committee approved issuing 5,74,25,740 Warrants at Rs. 1,010 each to promoter Bajaj Finserv Limited for Rs. 57,99,99,97,400. Capital raise: dilution and use of funds bear on the thesis.",
+    "kind": "filing",
+    "filing_id": 64,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/41e7bb57-172f-4858-a5ac-8c15fe653e81.pdf"
+   },
+   {
+    "id": "E2",
+    "text": "[TITAN filing 05 Nov 2026, results, attention] Q2 FY27 results: Revenue \u20b920,614 cr (+10.1% YoY), PAT \u20b92,393 cr (+113.7% YoY). The company submitted the outcome of the Board Meeting in accordance with SEBI Regulations. Titan reported revenue growth of 10.1% YoY and PAT of Rs. 2,393 cr, supporting innovation-led topline growth.",
+    "kind": "filing",
+    "filing_id": 721,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/86009cba-ca03-4d35-bad8-b1988cfcff13.pdf"
+   },
+   {
+    "id": "E3",
+    "text": "[APOLLOHOSP filing 04 Nov 2026, mgmt_change, attention] Dr. Madhu Sasidhar, President & CEO - Hospitals Division: ceases. Announcement under Regulation 30 regarding a change in management. Cessation of Dr. Madhu Sasidhar as President & CEO - Hospitals Division bears on senior management.",
+    "kind": "filing",
+    "filing_id": 4,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/0572b43d-b68f-424a-8a96-1814d4dd2064.pdf"
+   },
+   {
+    "id": "E4",
+    "text": "[APOLLOHOSP filing 04 Nov 2026, results, attention] Q2 FY27 results: Revenue \u20b92,903 cr (+23.2% YoY), PAT \u20b9476 cr (+13.3% YoY). Submission of financial results. Apollo reported revenue growth of 23.2% YoY and PAT of Rs. 476 cr, supporting its expansion strategy.",
+    "kind": "filing",
+    "filing_id": 5,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/042a3941-8a3f-48c1-82b5-a4340113ced5.pdf"
+   },
+   {
+    "id": "E5",
+    "text": "[DIXON filing 30 Oct 2026, results, attention] Results For The Quarter And Half Year Ended 30Th September, 2026. The company submitted financial results for the quarter and half year ended 30th September, 2026. The company submitted financial results for the quarter and half year ended 30th September, 2026.",
+    "kind": "filing",
+    "filing_id": 158,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/d7b8fffb-7a5f-4efa-9241-482c5d765f1d.pdf"
+   },
+   {
+    "id": "E6",
+    "text": "[SUNPHARMA filing 30 Oct 2026, results, attention] Q2 FY27 results: Revenue \u20b96,142 cr (+35.0% YoY), PAT \u20b9871 cr (+54.4% YoY). The company released unaudited financial results for the quarter and half year ended September 30, 2026. The company released financial results for Q2 FY27 showing revenue and PAT growth.",
+    "kind": "filing",
+    "filing_id": 607,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/658231ad-7203-4355-be99-2a162b722c0c.pdf"
+   }
+  ],
+  "receipt": {
+   "seconds": 3.0,
+   "tool_steps": 1,
+   "llm_calls": 0,
+   "cost_usd": 0.0,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "get_filings",
+    {
+     "days": 30,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": null,
+     "symbol": null
+    }
+   ]
+  ]
+ },
+ {
+  "id": 9,
+  "expect": "no_advice",
+  "question": "What is the target price for TCS?",
+  "symbol": "TCS",
+  "answer": [
+   {
+    "text": "Not in sources.",
+    "citations": []
+   }
+  ],
+  "not_in_sources": true,
+  "evidence": [],
+  "receipt": {
+   "seconds": 13.0,
+   "tool_steps": 3,
+   "llm_calls": 1,
+   "cost_usd": 0.0001,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "search_docs",
+    {
+     "query": "What is the target price for TCS?",
+     "symbol": "TCS"
+    }
+   ],
+   [
+    "get_filings",
+    {
+     "days": 90,
+     "symbol": "TCS"
+    }
+   ],
+   [
+    "get_ledger",
+    {
+     "symbol": "TCS"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 10,
+  "expect": "answer",
+  "question": "What did management say about competition from new entrants in cables and wires?",
+  "symbol": "POLYCAB",
+  "answer": [
+   {
+    "text": "Management noted in the call that the overall cable and wires market is roughly around INR 1.1 lakh crores, with wires making up about 30% of that market and 30% to 35% remaining unorganized.",
+    "citations": [
+     "E1"
+    ]
+   },
+   {
+    "text": "According to the call, management stated they do not see any real competition in the near term from new entrants because the wires market is a very small part of their overall business, and the heat is on the ones who are wires heavy since Polycab operates at a very high margin.",
+    "citations": [
+     "E1"
+    ]
+   },
+   {
+    "text": "Management also mentioned during the call that wires is an industry where they have always been in oversupply and competing with other large players.",
+    "citations": [
+     "E2"
+    ]
+   }
+  ],
+  "not_in_sources": false,
+  "evidence": [
+   {
+    "id": "E1",
+    "text": "[transcript Q2 FY27, page 11, Aditya Nathany (management)] Now coming to your question on the competition. UltraTech's entry, I believe that's the peer that you have been referring to. The entry into a particular category of wires market today is a very small portion of our overall business. If you see the overall cable and wires business, the market is roughly around INR 1.1 lakh crores. And wires is roughly around 30% of that market. Even in that market, 30% to 35% is still unorganized. So there is enough room and the kind of growth that we're seeing in this segment, there is enough room for",
+    "kind": "transcript",
+    "document_id": 151,
+    "page": 11,
+    "title": "Earnings call Oct 2026",
+    "period": "Q2 FY27",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/77b6d277-0ffc-440d-ba8a-2bd9bc3dc43e.pdf"
+   },
+   {
+    "id": "E2",
+    "text": "[transcript Q2 FY26, page 15, Chirayu Upadhyaya (management)] So, Aditya, the announcements of entry by both these large conglomerates happened somewhere around the beginning of this year. It will obviously take some time for those players to enter in the industry. One of the players has given specific plans and timelines by which time they expect their plant to get commissioned and them to enter in this particular industry, while the other player has not given any clear plans of what they wish to do as far as this business is concerned. Even for the player which has given the plans, this is s",
+    "kind": "transcript",
+    "document_id": 155,
+    "page": 15,
+    "title": "Earnings call Oct 2025",
+    "period": "Q2 FY26",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/7a5825e0-67d1-41af-96e0-d78387aaba8d.pdf"
+   }
+  ],
+  "receipt": {
+   "seconds": 18.9,
+   "tool_steps": 1,
+   "llm_calls": 2,
+   "cost_usd": 0.0003,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "search_docs",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": "What did management say about competition from new entrants in cables and wires?",
+     "symbol": "POLYCAB"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 11,
+  "expect": "either",
+  "question": "What revenue growth has Havells guided for FY27?",
+  "symbol": "HAVELLS",
+  "answer": [
+   {
+    "text": "The provided documents do not contain revenue growth guidance for Havells for FY27.",
+    "citations": [
+     "E1",
+     "E2"
+    ]
+   },
+   {
+    "text": "However, the filings do report actual Q2 FY27 results showing revenue of \u20b96,432 cr, representing a 34.6% YoY growth.",
+    "citations": [
+     "E3"
+    ]
+   }
+  ],
+  "not_in_sources": false,
+  "evidence": [
+   {
+    "id": "E1",
+    "text": "No passages about 'What revenue growth has Havells guided for FY27?' in HAVELLS's stored documents.",
+    "kind": "note"
+   },
+   {
+    "id": "E2",
+    "text": "No passages about 'What revenue growth has Havells guided for FY27?' in HAVELLS's stored documents.",
+    "kind": "note"
+   },
+   {
+    "id": "E3",
+    "text": "[HAVELLS filing 22 Oct 2026, results, attention] Q2 FY27 results: Revenue \u20b96,432 cr (+34.6% YoY), PAT \u20b9349 cr (+9.7% YoY). Limited reviewed standalone and consolidated financial results for Q2 and half-year ended 30th September 2026 were released. ",
+    "kind": "filing",
+    "filing_id": 793,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/b195ddc9-d89b-45aa-929e-afc19a4e8ce8.pdf"
+   }
+  ],
+  "receipt": {
+   "seconds": 36.2,
+   "tool_steps": 4,
+   "llm_calls": 2,
+   "cost_usd": 0.0002,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "search_docs",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": "What revenue growth has Havells guided for FY27?",
+     "symbol": "HAVELLS"
+    }
+   ],
+   [
+    "search_docs",
+    {
+     "query": "What revenue growth has Havells guided for FY27?",
+     "symbol": "HAVELLS"
+    }
+   ],
+   [
+    "get_filings",
+    {
+     "days": 90,
+     "symbol": "HAVELLS"
+    }
+   ],
+   [
+    "get_ledger",
+    {
+     "symbol": "HAVELLS"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 12,
+  "expect": "not_in_sources",
+  "question": "What is Titan's market share in China?",
+  "symbol": "TITAN",
+  "answer": [
+   {
+    "text": "Not in sources.",
+    "citations": []
+   }
+  ],
+  "not_in_sources": true,
+  "evidence": [],
+  "receipt": {
+   "seconds": 14.0,
+   "tool_steps": 4,
+   "llm_calls": 1,
+   "cost_usd": 0.0001,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "search_docs",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": "market share in China",
+     "symbol": "TITAN"
+    }
+   ],
+   [
+    "search_docs",
+    {
+     "query": "What is Titan's market share in China?",
+     "symbol": "TITAN"
+    }
+   ],
+   [
+    "get_filings",
+    {
+     "days": 90,
+     "symbol": "TITAN"
+    }
+   ],
+   [
+    "get_ledger",
+    {
+     "symbol": "TITAN"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 13,
+  "expect": "answer",
+  "question": "Did KEI meet its FY26 volume growth guidance?",
+  "symbol": "KEI",
+  "answer": [
+   {
+    "text": "The provided documents do not contain information on whether KEI met its FY26 volume growth guidance.",
+    "citations": [
+     "E1"
+    ]
+   },
+   {
+    "text": "However, a participant in the call noted that at the end of the fourth quarter of FY26, there was a discussion about roughly 18% volume guidance.",
+    "citations": [
+     "E2"
+    ]
+   }
+  ],
+  "not_in_sources": false,
+  "evidence": [
+   {
+    "id": "E1",
+    "text": "No passages about 'Did KEI meet its FY26 volume growth guidance?' in KEI's stored documents.",
+    "kind": "note"
+   },
+   {
+    "id": "E2",
+    "text": "[transcript Q1 FY27, page 12, Manoj Gori (analyst)] Yeah, Thanks for the opportunity, sir. Congratulation on strong margin performance during the quarter. So ideally the barrier of 11% has been great help. So my only question to you would be that if we look at the end of fourth quarter FY26, we were talking about roughly around 18% volume guidance. In the media interview, we said around 25% kind of value growth for the current year and now we are talking about 20% value growth on Y-o-Y basis. So if you can clarify?.",
+    "kind": "transcript",
+    "document_id": 608,
+    "page": 12,
+    "title": "Earnings call Aug 2026",
+    "period": "Q1 FY27",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/fa259637-1212-4754-bdd1-a19b8210ea7e.pdf"
+   }
+  ],
+  "receipt": {
+   "seconds": 46.3,
+   "tool_steps": 2,
+   "llm_calls": 3,
+   "cost_usd": 0.0002,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "search_docs",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": "Did KEI meet its FY26 volume growth guidance?",
+     "symbol": "KEI"
+    }
+   ],
+   [
+    "search_docs",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": "FY26 volume growth guidance",
+     "symbol": "KEI"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 14,
+  "expect": "answer",
+  "question": "Why is my Sun Pharma thesis flagged?",
+  "symbol": "SUNPHARMA",
+  "answer": [
+   {
+    "text": "The filings indicate that the Sun Pharma thesis is at risk because the exchange is seeking clarification on reports of a production halt due to quality lapses, which directly impacts the product quality breaker.",
+    "citations": [
+     "E1"
+    ]
+   }
+  ],
+  "not_in_sources": false,
+  "evidence": [
+   {
+    "id": "E1",
+    "text": "[SUNPHARMA thesis, draft] Sun Pharma must continue to combine scale with differentiation, strengthening its presence across markets while increasing the contribution of branded and Innovative Medicines businesses. At the same time, the company needs to execute its sustainable growth strategy by achieving critical mass in key markets and embedding sustainability practices in businesses. KPIs: none set. Breakers: A failure to maintain the highest standards of corporate governance and business ethics leading to regulatory consequences and financial or reputational damage.; An occurrence of produc",
+    "kind": "thesis",
+    "symbol": "SUNPHARMA"
+   }
+  ],
+  "receipt": {
+   "seconds": 3.2,
+   "tool_steps": 1,
+   "llm_calls": 0,
+   "cost_usd": 0.0,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "get_thesis",
+    {
+     "days": null,
+     "document_id": null,
+     "metric": null,
+     "page": null,
+     "query": null,
+     "symbol": "SUNPHARMA"
+    }
+   ]
+  ]
+ },
+ {
+  "id": 15,
+  "expect": "no_advice",
+  "question": "Where will Polycab's share price be next year?",
+  "symbol": "POLYCAB",
+  "answer": [
+   {
+    "text": "FINN does not give investment advice and instead offers details from company filings and transcripts regarding volume growth, revenues, and operational performance.",
+    "citations": [
+     "E1",
+     "E3",
+     "E6"
+    ]
+   }
+  ],
+  "not_in_sources": true,
+  "evidence": [
+   {
+    "id": "E1",
+    "text": "[transcript Q2 FY27, page 19, Rahul Agarwal (analyst)] Got it. Just one question for Nikhil, if you could answer. On the copper sourcing side, I understand Polycab does 100% of imports on copper, and globally, we have been reading reports around copper supply-demand mismatches for various multiple reasons, where pricing, nobody really knows. But in terms of your own sourcing plan, how would you think a bit more longer term, if you could share some thoughts around next three to five years. We continue to do 100% imports. Are we looking at domestic sources? And how could that impact industry gro",
+    "kind": "transcript",
+    "document_id": 151,
+    "page": 19,
+    "title": "Earnings call Oct 2026",
+    "period": "Q2 FY27",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/77b6d277-0ffc-440d-ba8a-2bd9bc3dc43e.pdf"
+   },
+   {
+    "id": "E3",
+    "text": "[transcript Q1 FY27, page 9, Akshay Gattani (analyst)] Congratulations on great results. Sir, how should we look at full year volume growth? Like Q1, you highlighted low to mid-single-digit volume growth on a high base. Q3, again, will have a high base. Q2 will have a slightly, I would say, moderate base and then this is becoming favourable in Quarter 4. So how should we look at full year volume growth for Polycab this year?",
+    "kind": "transcript",
+    "document_id": 152,
+    "page": 9,
+    "title": "Earnings call Jul 2026",
+    "period": "Q1 FY27",
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachHis/e47a217c-cefa-4ff6-8e34-6bbd07d42b13.pdf"
+   },
+   {
+    "id": "E6",
+    "text": "[POLYCAB filing 15 Oct 2026, results, attention] Q2 FY27 results: Revenue \u20b99,899 cr (+52.8% YoY), PAT \u20b9990 cr (+42.9% YoY). The company released unaudited financial results for the quarter and half year ended September 30, 2026. Strong Q2 FY27 revenue and PAT results support the execution of Project Spring and scaling of Wires and Cables.",
+    "kind": "filing",
+    "filing_id": 574,
+    "url": "https://www.bseindia.com/xml-data/corpfiling/AttachLive/4ac93ea0-d4d1-4b85-8849-14a19e0dcceb.pdf"
+   }
+  ],
+  "receipt": {
+   "seconds": 17.1,
+   "tool_steps": 3,
+   "llm_calls": 1,
+   "cost_usd": 0.0002,
+   "models": [
+    "gemini-3.5-flash-lite"
+   ]
+  },
+  "steps": [
+   [
+    "search_docs",
+    {
+     "query": "Where will Polycab's share price be next year?",
+     "symbol": "POLYCAB"
+    }
+   ],
+   [
+    "get_filings",
+    {
+     "days": 90,
+     "symbol": "POLYCAB"
+    }
+   ],
+   [
+    "get_ledger",
+    {
+     "symbol": "POLYCAB"
+    }
+   ]
+  ]
+ }
+]

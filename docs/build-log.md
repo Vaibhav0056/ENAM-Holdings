@@ -257,3 +257,36 @@ Lighthouse 12.8.2, mobile, headless Chrome 157, local server. Feed `/digest`: p5
 **Problems.** PyMuPDF splits statement rows into cells, so a model quote of a full row ("Trade receivables 4,477.84 3,912.10") often isn't a contiguous string on the page and fails verification: correct behaviour, but it leaves cash-quality inputs missing. A table-aware page text (pdfplumber for statement pages) is the next fix. Re-embedding 778 chunks took 7.4 min on the free tier; search is ~2.3 s, mostly the query embedding call.
 
 **Checkpoint.** All 8 recipes run on real documents; LLM-backed ones verify every quote on its page (figures must be printed in the quote) and every number comes from `finn/deep/maths.py`. Cached reopen 0.29-0.37 s (target < 1 s). Tests: 230 passed. ✅
+
+## Phase 9: Copilot
+
+**Plan.** What: a bounded tool-using agent (≤ 6 steps, cost cap) over FINN's own data, with company and portfolio scope, streamed steps and cited answers. Why: questions the fixed screens don't answer ("what did they say about competition?"). Risks: invented facts, advice language, an agent loop that burns the free tier.
+
+**Built.** `finn/copilot.py`: six tools (`search_docs` = hybrid retrieval, `get_page`, `get_metric`, `get_filings`, `get_thesis`, `get_ledger`); the cheap tier picks each step, the strong tier writes the answer from evidence only; every tool result is evidence `E1…` with its document/page or filing; answers are verified sentence by sentence (citations must exist, numbers must appear in the evidence, advice phrasing removed); `Not in sources.` when nothing supports an answer. Cap: $0.02 per question. Route `GET /api/v2/copilot?q=&symbol=` streams `step` and `answer` events. UI: an "Ask about SYM…" bar on Holding and Research, a sheet with suggested questions, live steps, and citations that open the source page. Prompts `copilot_step.v1`, `copilot_answer.v1-v2`.
+
+**Decisions and rejected alternatives.**
+- Two tiers inside the loop: steps are cheap and frequent; only the final answer uses the strong tier.
+- First eval run: 15/15 cited, 0 unsupported numbers, 0 advice, but only 5 of 10 answerable questions answered. The step model often called `search_docs` with no query; the tool said so, the identical retry ended the loop, and nothing was gathered. Now a missing query defaults to the question, and if a loop ends with no real evidence a fixed plan (search documents, recent filings, promise ledger) runs within the step budget. Answered rose to 8/10.
+- Answer prompt v2 speaks of "the filings" and "the call", never "the evidence".
+
+**Checkpoint.** `evals/copilot.jsonl` (15 questions: 10 answerable, 1 not in FINN's data, 3 advice traps, 1 either): cited or "Not in sources" 15/15, sentences with unsupported numbers 0, buy/sell/hold or price-target language 0 (all three traps answered with "FINN doesn't give investment advice" plus what the filings show); answered when an answer exists 8/10 (misses: Bajaj Finance FY27 AUM guidance; KEI's FY26 volume miss, which the ledger has but the agent didn't fetch). One answer cites Polycab's older 50-55-day working-capital range rather than the newest 45-50. Results stored in `evals/copilot_results.json` and re-scored by `python -m evals.run`. ✅
+
+## Phase 10: Experience extras
+
+**Built.** `finn/experience.py` and UI:
+- Time-travel replay: `/api/v2/replay?as_of=` shows the feed with only what had been filed by that day, plus each surfaced stock's next-5-session move. Replaying 26 Oct 2026: Dixon +10.4 % and L&T +7.1 % over the next five sessions were both on the feed beforehand. A slider (2-88 days back) on Today.
+- Audio brief: "Listen (60 s)" reads the unreviewed attention cards with the browser's Web Speech API (~160 words, en-IN), free and offline.
+- Decision journal: "Acting on this" + a one-line reason from any card; the holding page lists entries with the material filings that came after each.
+- Evidence strength: ledger rows backed by two or more sources (a promise repeated across calls, or matched to a reported actual) are drawn with an accent bar.
+- Feedback loop: Useful / Not useful / Should be higher adjusts that filing type's weight by 0.05 per net signal, bounded to ±0.15 (spec), logged in `user_state.prefs.feedback_log`; recent cards are re-scored immediately.
+- "Why am I seeing this?": the score breakdown sheet on every card (since Phase 7).
+
+**Checkpoint.** Each works locally on the phone layout; replay shows which items FINN surfaced before a ≥ 5 % move. Tests for the bounded feedback maths and forward moves. ✅
+
+## Phase 11: Prepare deploy (not deployed)
+
+**Built.** `Dockerfile` (python:3.11-slim, health check on `/health`), `scripts/start.sh` (migrate on Neon's direct endpoint, idempotent seed, serve; boots even if the database is down), `render.yaml` (Singapore, free plan, `/health`, secrets marked `sync: false`), `.github/workflows/daily.yml` (18:30 IST: migrate, ingest, pipeline, snapshot check, run inside GitHub Actions against Neon so the free web instance never runs long jobs; keep-awake ping to `/health` every 10 minutes), `scripts/export_snapshot.py` + `finn/snapshot.py` (DEMO_SNAPSHOT: `data/demo_snapshot.json`, 1.2 MB, served for the main read routes when the database is unreachable or `DEMO_SNAPSHOT=1`, marked with `X-FINN-Snapshot`). `.dockerignore` excludes secrets, local state and the Node/Neon tooling.
+
+**Seeding production.** The intended path is a Neon branch: `neon branches create --name production-v2 --parent dev` copies the dev data copy-on-write in seconds; `python tasks.py setup` is the idempotent alternative on an empty branch.
+
+**Checkpoint.** Not met: Docker isn't installed on this machine, so `docker build` couldn't run. The start script path was exercised instead (migrate + seed + serve), and both snapshot modes were tested (forced, and with an unreachable database: holdings served from the snapshot, `/health` still 200). The README lists the deploy steps.

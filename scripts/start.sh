@@ -1,11 +1,9 @@
 #!/bin/sh
-# Boot FINN. If the configured database does not exist yet (fresh disk), start from the committed
-# seed snapshot so the demo opens instantly; the app then refreshes from BSE/yfinance on demand.
+# Boot FINN. Migrations use Neon's direct (unpooled) endpoint; the seed is idempotent (adds nothing on re-runs).
+# If the database can't be reached, the app still starts and serves data/demo_snapshot.json for the main screens.
 set -e
-DB="${FINN_DB:-data/finn.db}"
-mkdir -p "$(dirname "$DB")"
-if [ ! -f "$DB" ] && [ -f data/seed.db ]; then
-  echo "Seeding $DB from data/seed.db"
-  cp data/seed.db "$DB"
+if [ -n "$DATABASE_URL" ]; then
+  python -m alembic upgrade head || echo "migration skipped: database unreachable"
+  python -m finn.seed || echo "seed skipped: database unreachable"
 fi
-exec uvicorn api:app --host 0.0.0.0 --port "${PORT:-8000}"
+exec python -m uvicorn api:app --host 0.0.0.0 --port "${PORT:-8000}" --proxy-headers

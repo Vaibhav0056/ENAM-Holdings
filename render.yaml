@@ -1,22 +1,29 @@
+# Render Blueprint: one Docker web service in Singapore (close to Neon ap-southeast-1 and to Indian users).
+# Free plan: the instance sleeps when idle; .github/workflows/daily.yml pings /health every 10 minutes and runs the
+# daily ingest + pipeline itself against Neon, so the web instance never runs long jobs.
 services:
   - type: web
     name: finn
     runtime: docker
-    plan: starter            # persistent disks need a paid plan; on free, drop the disk and FINN_DB (seed.db is used on every boot)
-    healthCheckPath: /api/health
-    disk:
-      name: finn-data
-      mountPath: /var/data
-      sizeGB: 1
+    region: singapore
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
     envVars:
-      - key: FINN_DB
-        value: /var/data/finn.db
+      - key: DATABASE_URL            # Neon pooled connection string (production branch)
+        sync: false
+      - key: DATABASE_URL_UNPOOLED   # Neon direct connection string (migrations)
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: CHEAP_MODEL
         value: gemini-3.5-flash
       - key: STRONG_MODEL
         value: gemini-3.8-flash
+      - key: EMBED_MODEL
+        value: gemini-embedding-2
+      - key: MAX_COST_PER_REPORT_USD
+        value: "0.05"
       - key: VAPID_PUBLIC_KEY
         sync: false
       - key: VAPID_PRIVATE_KEY
@@ -25,3 +32,5 @@ services:
         value: mailto:admin@example.com
       - key: TAVILY_API_KEY
         sync: false
+      - key: APP_TZ
+        value: Asia/Kolkata

@@ -1,0 +1,43 @@
+# Daily refresh at 18:30 IST (13:00 UTC), after Indian markets close and the evening filings land, plus a
+# keep-awake ping every 10 minutes that hits /health only (no database, no model calls).
+name: daily
+on:
+  schedule:
+    - cron: "0 13 * * *"      # 18:30 IST: ingest + pipeline
+    - cron: "*/10 * * * *"    # keep-awake
+  workflow_dispatch: {}
+
+jobs:
+  keep-awake:
+    if: github.event.schedule == '*/10 * * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsS --max-time 30 "${{ secrets.FINN_URL }}/health" || true
+
+  refresh:
+    if: github.event.schedule != '*/10 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      CHEAP_MODEL: gemini-3.5-flash
+      STRONG_MODEL: gemini-3.8-flash
+      EMBED_MODEL: gemini-embedding-2
+      VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+      VAPID_SUBJECT: mailto:admin@example.com
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python tasks.py migrate
+      - run: python -m finn.sources.run prices bse snapshot calendar
+      - run: python tasks.py pipeline
+      - run: python scripts/export_snapshot.py --check

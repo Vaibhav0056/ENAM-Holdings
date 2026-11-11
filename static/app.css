@@ -178,3 +178,14 @@ label.f { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 4
 /* network notices float over the content instead of pushing it down (no layout shift) */
 .netbar { position: fixed; top: 60px; left: 16px; right: 16px; z-index: 35; max-width: 608px; margin: 0 auto; pointer-events: none; }
 .netbar .notice { box-shadow: 0 4px 16px rgb(0 0 0 / 12%); pointer-events: auto; }
+
+/* copilot bar: thumb-reach, above the tabs, on Holding and Research */
+.copilot-bar { position: fixed; left: 16px; right: 16px; bottom: calc(66px + env(safe-area-inset-bottom)); z-index: 31;
+  max-width: 608px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 10px 14px; min-height: 46px;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 14px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 10%); }
+.app { padding-bottom: calc(130px + env(safe-area-inset-bottom)); }
+
+/* evidence strength: a claim backed by two or more sources is drawn stronger */
+.ledger-row.strong { border-left: 3px solid var(--accent); }
+.ledger-row:not(.strong) .small strong { font-weight: 560; }

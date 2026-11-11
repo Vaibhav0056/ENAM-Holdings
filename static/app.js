@@ -167,7 +167,7 @@ function finn() {
     async loadHoldings() { try { this.holdings = (await this.api("/api/v2/holdings")).holdings; } catch (e) {} },
     async loadHolding(sym) {
       this.holding = null; this.editing = false;
-      try { this.holding = await this.api(`/api/v2/holdings/${sym}`); } catch (e) {}
+      try { this.holding = await this.api(`/api/v2/holdings/${sym}`); this.loadJournal(sym); } catch (e) {}
     },
     startEdit() {
       const t = this.holding.thesis || { statement: "", kpis: [], breakers: [] };
@@ -226,6 +226,81 @@ function finn() {
     },
     source(id) { return (this.rq.report?.sources || []).find((s) => s.id === id) || {}; },
     gaugeDash(score) { const c = 2 * Math.PI * 30; return `${(c * (score || 0)) / 100} ${c}`; },
+
+    // ---------- Phase 10: replay, audio brief, journal, feedback ----------
+    rp: { open: false, daysAgo: 14, data: null, loading: false },
+    replayDate() { const d = new Date(Date.now() - this.rp.daysAgo * 86400000); return d.toISOString().slice(0, 10); },
+    async loadReplay() {
+      this.rp.loading = true; this.rp.data = null;
+      try { this.rp.data = await this.api(`/api/v2/replay?as_of=${this.replayDate()}&window=7d`); }
+      catch (e) { this.say(this.net.error); this.net.error = null; }
+      finally { this.rp.loading = false; }
+    },
+    speaking: false,
+    briefText() {
+      if (!this.digest) return "";
+      const lines = [`FINN brief. ${this.digest.window.label}.`];
+      const att = this.digest.attention.filter((c) => !c.reviewed).slice(0, 5);
+      if (!att.length) lines.push("Nothing needs your attention.");
+      att.forEach((c) => lines.push(`${c.company || c.symbol}. ${c.headline}. ${c.why_it_matters || ""}`));
+      if (this.digest.worth_a_look.length) lines.push(`${this.digest.worth_a_look.length} more worth a look.`);
+      let words = 0, out = [];
+      for (const l of lines) { words += l.split(/\s+/).length; if (words > 160) break; out.push(l); }   // ~60 s at 160 wpm
+      return out.join(" ").replace(/₹/g, "rupees ").replace(/cr/g, "crore").replace(/YoY/g, "year on year");
+    },
+    toggleBrief() {
+      if (!("speechSynthesis" in window)) return this.say("This browser can't read aloud.");
+      if (this.speaking) { speechSynthesis.cancel(); this.speaking = false; return; }
+      const u = new SpeechSynthesisUtterance(this.briefText());
+      u.lang = "en-IN"; u.rate = 1.0; u.onend = () => (this.speaking = false);
+      speechSynthesis.speak(u); this.speaking = true;
+    },
+    jr: { action: "Acting on this", reason: "" },
+    async saveJournal(card) {
+      try {
+        await this.api("/api/v2/journal", { method: "POST", body: JSON.stringify({ symbol: card.symbol, filing_id: card.id, action: this.jr.action, reason: this.jr.reason }) });
+        this.jr.reason = ""; this.say("Saved to your journal");
+      } catch (e) { this.say(this.net.error); this.net.error = null; }
+    },
+    journal: [],
+    async loadJournal(sym) { try { this.journal = (await this.api(`/api/v2/journal?symbol=${sym}`)).entries; } catch (e) {} },
+    async sendFeedback(card, signal) {
+      try { const r = await this.api(`/api/v2/cards/${card.id}/feedback`, { method: "POST", body: JSON.stringify({ signal }) });
+            this.say(`Thanks. ${this.type(r.type)} weight now ${r.adjustment >= 0 ? "+" : ""}${r.adjustment} (bounded ±${r.bound})`); }
+      catch (e) { this.say(this.net.error); this.net.error = null; }
+    },
+    strongEvidence(l) { return !!(l.actual || (l.also_said_in && l.also_said_in.length)); },
+
+    // ---------- Copilot ----------
+    cp: { q: "", steps: [], answer: null, busy: false, error: null },
+    copilotSymbol() { return this.route === "holding" ? this.holding?.symbol || this.param : this.route === "research" ? this.param : null; },
+    suggestions() {
+      const s = this.copilotSymbol();
+      return s ? [`What has ${s}'s management promised for this year?`, `What did ${s} say about competition?`,
+                  `How credible has ${s}'s management been?`, `Why is my ${s} thesis on ${this.status(this.holding?.timeline?.[0]?.status || "intact")}?`]
+               : ["Which holdings reported results this month?", "Any governance red flags in my portfolio?"];
+    },
+    openCopilot(q) { this.sheet = "copilot"; if (q) this.askCopilot(q); },
+    askCopilot(q) {
+      q = (q || this.cp.q || "").trim();
+      if (q.length < 3) return;
+      Object.assign(this.cp, { q, steps: [], answer: null, busy: true, error: null });
+      const sym = this.copilotSymbol();
+      const es = new EventSource(`/api/v2/copilot?q=${encodeURIComponent(q)}${sym ? "&symbol=" + sym : ""}`);
+      es.addEventListener("step", (e) => this.cp.steps.push(JSON.parse(e.data)));
+      es.addEventListener("note", (e) => this.cp.steps.push({ note: JSON.parse(e.data).text }));
+      es.addEventListener("answer", (e) => { this.cp.answer = JSON.parse(e.data); this.cp.busy = false; es.close(); });
+      es.addEventListener("error", (e) => { try { this.cp.error = JSON.parse(e.data).error; } catch (_) { this.cp.error = "The assistant didn't answer."; } this.cp.busy = false; es.close(); });
+    },
+    toolLabel(t) { return { search_docs: "Searching documents", get_page: "Reading a page", get_metric: "Looking up figures",
+                            get_filings: "Checking filings", get_thesis: "Reading your thesis", get_ledger: "Reading the promise ledger" }[t] || t; },
+    citeOpen(id) {
+      const e = this.cp.answer?.evidence?.find((x) => x.id === id);
+      if (!e) return;
+      if (e.document_id && e.page) { this.openEvidence(e.document_id, e.page, e.text.replace(/^\[[^\]]*\]\s*/, "").slice(0, 120)); this.sheet = "evidence"; }
+      else if (e.filing_id) this.nav("#card/" + e.filing_id);
+      else if (e.url) window.open(e.url, "_blank", "noopener");
+    },
 
     // ---------- Deep dives ----------
     deep: { recipe: null, data: null, loading: false, error: null },

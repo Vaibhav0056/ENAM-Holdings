@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from evals import guidance_eval, push_eval, results_eval, thesis_eval  # noqa: E402
+from evals import copilot_eval, guidance_eval, push_eval, results_eval, thesis_eval  # noqa: E402
 
 
 def main() -> int:
@@ -39,6 +39,13 @@ def main() -> int:
         rows.append(("guidance (POLYCAB, 4 calls)", "unverified citations shown", str(g["unverified_shown"]), "0", g["unverified_shown"] == 0))
     t = thesis_eval.run(verbose=False)
     rows.append(("thesis (30 cards)", "affects-thesis agreement", f"{t['agreement']:.0%}", "≥ 80%", t["agreement"] >= 0.8))
+    cp = copilot_eval.run(verbose=False)
+    rows.append(("copilot (15 questions)", "cited or 'Not in sources'", cp["cited_or_not_in_sources"], "15/15",
+                 cp["cited_or_not_in_sources"] == "15/15"))
+    rows.append(("copilot (15 questions)", "unsupported-number sentences", str(cp["unsupported_number_sentences"]), "0",
+                 cp["unsupported_number_sentences"] == 0))
+    rows.append(("copilot (15 questions)", "buy/sell/hold language", str(cp["advice_language"]), "0", cp["advice_language"] == 0))
+    rows.append(("copilot (15 questions)", "answered when an answer exists", cp["answered_when_expected"], "report", True))
     w = max(len(r[0]) + len(r[1]) for r in rows) + 3
     for suite, metric, value, target, passed in rows:
         print(f"{(suite + ' · ' + metric):<{w}} {value:>6}   target {target:<7} {'PASS' if passed else 'FAIL'}")

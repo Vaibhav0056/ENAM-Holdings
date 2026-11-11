@@ -163,6 +163,42 @@ def deep_list():
     return {"recipes": [{"id": r, "title": deep.TITLES[r]} for r in deep.RECIPES]}
 
 
+@router.get("/api/v2/copilot")
+async def copilot_stream(q: str, symbol: str | None = None):
+    """Server-sent events: `step` for each tool call, `note`, then one `answer` with cited sentences."""
+    import asyncio
+    import json as _json
+    import threading
+    from fastapi.responses import StreamingResponse
+    from . import copilot
+
+    q = (q or "").strip()
+    if not 3 <= len(q) <= 400:
+        raise HTTPException(400, "ask a question of 3-400 characters")
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def emit(kind, data):
+        loop.call_soon_threadsafe(queue.put_nowait, (kind, data))
+
+    def work():
+        try:
+            copilot.ask(q, symbol.upper() if symbol else None, emit=emit)
+        except Exception as e:  # noqa: BLE001
+            emit("error", {"error": str(e)[:200]})
+        finally:
+            emit("end", {})
+    threading.Thread(target=work, daemon=True).start()
+
+    async def gen():
+        while True:
+            kind, data = await queue.get()
+            if kind == "end":
+                return
+            yield f"event: {kind}\ndata: {_json.dumps(data, default=str)}\n\n"
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
 @router.get("/api/v2/state")
 def state():
     def q(s):

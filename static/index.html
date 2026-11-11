@@ -67,6 +67,10 @@
         <div class="notice">Component gallery: sample cards rendered with the live templates, then every screen state.</div>
       </template>
 
+      <div class="row" x-show="route==='today' && digest" style="margin-bottom:4px">
+        <button class="btn" @click="toggleBrief()" :aria-pressed="speaking" x-text="speaking ? '■ Stop' : '▶ Listen (60 s)'"></button>
+        <button class="btn" @click="sheet='replay'">Replay a past date</button>
+      </div>
       <template x-if="route==='today' && catalysts.length">
         <div>
           <div class="section-h"><h2>Week ahead</h2></div>
@@ -296,6 +300,13 @@
             <template x-for="t in holding.timeline" :key="t.at"><div class="small row" style="align-items:flex-start; margin:4px 0">
               <span class="pill" :class="t.status" x-text="status(t.status)"></span><span class="ink2" x-text="t.reason"></span></div></template></div>
 
+          <div class="block" x-show="journal.length"><h2>Your decision journal</h2>
+            <template x-for="j in journal" :key="j.id"><div style="margin:6px 0">
+              <div class="small"><strong x-text="j.action"></strong> <span class="mute" x-text="'· ' + day(j.at)"></span></div>
+              <div class="small ink2" x-text="j.reason"></div>
+              <div class="xs mute" x-text="j.since.length ? 'Since then: ' + j.since.map(x => x.headline).slice(0,2).join(' · ') : 'Nothing material since.'"></div>
+            </div></template></div>
+
           <div class="section-h"><h2>Recent filings</h2></div>
           <div class="list">
             <template x-for="c in holding.cards" :key="c.id">
@@ -360,7 +371,7 @@
           <div class="section-h"><h2>Promise ledger</h2><span class="xs mute">tap a row for the quote</span></div>
           <div class="list">
             <template x-for="l in rq.report.ledger.slice(0, rq.open.all ? 999 : 12)" :key="l.id">
-              <div class="ledger-row">
+              <div class="ledger-row" :class="strongEvidence(l) && 'strong'" :title="strongEvidence(l) ? 'Backed by two or more sources' : 'One source'">
                 <button style="background:none;border:0;padding:0;width:100%;text-align:left" @click="rq.open[l.id] = !rq.open[l.id]" :aria-expanded="!!rq.open[l.id]">
                   <div class="row"><span class="pill" :class="l.verdict" x-text="verdict(l.verdict)"></span>
                     <span class="xs mute" x-show="l.tracking" x-text="l.tracking"></span><span class="spacer"></span>
@@ -623,6 +634,17 @@
               <template x-for="r in cardDetail.why?.reasons || []" :key="r"><div class="xs ink2" x-text="'• ' + r"></div></template>
               <p class="xs mute" x-text="cardDetail.why?.formula"></p></details>
 
+            <div class="block" x-show="cardDetail.id > 0">
+              <h2>Was this useful?</h2>
+              <div class="row wrap">
+                <button class="chip" @click="sendFeedback(cardDetail, 'useful')">Useful</button>
+                <button class="chip" @click="sendFeedback(cardDetail, 'not_useful')">Not useful</button>
+                <button class="chip" @click="sendFeedback(cardDetail, 'higher')">Should be higher</button>
+              </div>
+              <label class="f" for="jr">Decision journal: acting on this?</label>
+              <div class="row"><input id="jr" type="text" x-model="jr.reason" placeholder="One line: what you're doing and why">
+                <button class="btn" @click="saveJournal(cardDetail)" :disabled="jr.reason.trim().length < 3">Save</button></div>
+            </div>
             <div class="row" style="margin-top:6px">
               <a class="btn" style="flex:1; text-align:center" :href="cardDetail.pdf_url" target="_blank" rel="noopener" x-show="cardDetail.pdf_url">Open filing PDF</a>
               <button class="btn primary" style="flex:1" @click="nav('#research/' + cardDetail.symbol)">Dig deeper →</button>
@@ -650,6 +672,70 @@
             <a class="small" :href="evidence.url" target="_blank" rel="noopener">PDF</a></div>
           <div class="quote" x-text="evidence.quote"></div>
           <div class="page-text" x-html="highlight(evidence.text, evidence.quote)"></div></div></template>
+      </div>
+    </div>
+  </template>
+
+  <!-- ===== time-travel replay ===== -->
+  <template x-if="sheet === 'replay'">
+    <div>
+      <div class="scrim" @click="sheet=null"></div>
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="Replay a past date" @keydown.escape.window="sheet=null">
+        <div class="grab"></div>
+        <h2 style="font-size:17px; margin:4px 0">Replay the feed as of a past date</h2>
+        <p class="small ink2">Shows only what had been filed by that day, then what each surfaced stock did over the next five sessions: a test of the filter.</p>
+        <label class="f" for="rpd" x-text="'As of ' + day(replayDate()) + ' (' + rp.daysAgo + ' days ago)'"></label>
+        <input id="rpd" type="range" min="2" max="88" x-model.number="rp.daysAgo" style="width:100%">
+        <button class="btn primary block" @click="loadReplay()" :disabled="rp.loading" x-text="rp.loading ? 'Replaying…' : 'Replay'"></button>
+        <template x-if="rp.data"><div style="margin-top:10px">
+          <p class="small" x-text="rp.data.counts.attention + ' needed attention, ' + rp.data.counts.worth_a_look + ' worth a look in the 7 days to ' + day(rp.data.as_of)"></p>
+          <div class="block" x-show="rp.data.flagged_before_big_move.length"><h2>Surfaced before a ≥5% move</h2>
+            <template x-for="m in rp.data.flagged_before_big_move" :key="m.symbol"><div style="margin:6px 0">
+              <div class="small"><strong x-text="m.symbol"></strong> <span class="num" :class="cls(m.move_pct)" x-text="pct(m.move_pct)"></span>
+                <span class="mute" x-text="'over ' + m.sessions + ' sessions to ' + day(m.to)"></span></div>
+              <template x-for="c in m.cards" :key="c.id"><button class="cite" style="display:block; text-align:left" @click="nav('#card/' + c.id)" x-text="c.headline"></button></template>
+            </div></template></div>
+          <p class="small ink2" x-show="!rp.data.flagged_before_big_move.length">No surfaced stock moved 5% or more in the next five sessions.</p>
+          <p class="xs mute" x-text="rp.data.note"></p>
+        </div></template>
+      </div>
+    </div>
+  </template>
+
+  <!-- ===== copilot bar + sheet (Holding and Research) ===== -->
+  <button class="copilot-bar" x-show="(route==='holding' && holding) || (route==='research' && param)" @click="openCopilot()"
+          :aria-label="'Ask about ' + copilotSymbol()">
+    <svg class="i s"><use href="#i-search"/></svg><span x-text="'Ask about ' + (copilotSymbol() || 'your portfolio') + '…'"></span>
+  </button>
+  <template x-if="sheet === 'copilot'">
+    <div>
+      <div class="scrim" @click="sheet=null"></div>
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="Ask FINN" @keydown.escape.window="sheet=null">
+        <div class="grab"></div>
+        <form class="row" @submit.prevent="askCopilot()">
+          <label class="sr" for="cpq">Question</label>
+          <input id="cpq" type="text" x-model="cp.q" :placeholder="'Ask about ' + (copilotSymbol() || 'your portfolio')" autocomplete="off">
+          <button class="btn primary" type="submit" :disabled="cp.busy">Ask</button>
+        </form>
+        <div class="row wrap" style="margin:8px 0" x-show="!cp.answer && !cp.busy">
+          <template x-for="s in suggestions()" :key="s"><button class="chip" @click="cp.q = s; askCopilot(s)" x-text="s"></button></template>
+        </div>
+        <ul class="steps" x-show="cp.steps.length">
+          <template x-for="(s, i) in cp.steps" :key="i"><li class="done"><span class="dot"></span>
+            <span x-text="s.note || (toolLabel(s.tool) + (s.args.query ? ': ' + s.args.query : s.args.metric ? ': ' + s.args.metric : ''))"></span></li></template>
+          <li class="now" x-show="cp.busy"><span class="dot"></span>Thinking…</li>
+        </ul>
+        <div class="notice err" x-show="cp.error" x-text="cp.error"></div>
+        <template x-if="cp.answer">
+          <div class="block">
+            <template x-for="(s, i) in cp.answer.answer" :key="i"><p class="small" style="margin:6px 0"><span x-text="s.text"></span>
+              <template x-for="c in s.citations" :key="c"><button class="cite" style="margin-left:4px" @click="citeOpen(c)" x-text="'[' + c + ']'"></button></template></p></template>
+            <details class="small" x-show="cp.answer.evidence.length"><summary class="mute" x-text="'Sources (' + cp.answer.evidence.length + ')'"></summary>
+              <template x-for="e in cp.answer.evidence" :key="e.id"><div class="xs ink2" style="margin:4px 0">
+                <button class="cite" @click="citeOpen(e.id)" x-text="e.id"></button> <span x-text="e.text.slice(0, 220)"></span></div></template></details>
+            <p class="xs mute" x-text="cp.answer.receipt.tool_steps + ' steps · ' + cp.answer.receipt.seconds + ' s · $' + cp.answer.receipt.cost_usd + ' · from your filings, calls and reports only'"></p>
+          </div>
+        </template>
       </div>
     </div>
   </template>

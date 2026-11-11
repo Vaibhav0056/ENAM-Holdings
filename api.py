@@ -16,7 +16,29 @@ from finn import web as web_v2  # noqa: E402  (v2 Postgres routes)
 app.include_router(web_v2.router)
 from finn import web_ui  # noqa: E402  (Phase 7 screen routes)
 app.include_router(web_ui.router)
+from finn import experience  # noqa: E402  (Phase 10: replay, journal, feedback)
+app.include_router(experience.router)
 app.middleware("http")(web_v2.timing_middleware)
+
+
+@app.middleware("http")
+async def _snapshot_fallback(request: Request, call_next):
+    """DEMO_SNAPSHOT: if the database is unreachable (or DEMO_SNAPSHOT=1), main read routes answer from
+    data/demo_snapshot.json instead of failing; see finn/snapshot.py."""
+    from finn import snapshot
+    if request.method == "GET" and snapshot.forced():
+        hit = snapshot.response(request)
+        if hit:
+            return hit
+    try:
+        return await call_next(request)
+    except Exception as e:  # noqa: BLE001
+        from sqlalchemy.exc import DBAPIError, OperationalError
+        if request.method == "GET" and isinstance(e, (OperationalError, DBAPIError)):
+            hit = snapshot.response(request)
+            if hit:
+                return hit
+        raise
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 WINDOWS = {"24h": timedelta(hours=24), "3d": timedelta(days=3), "7d": timedelta(days=7), "30d": timedelta(days=30)}
 TYPE_LABEL = {

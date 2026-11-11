@@ -7,3 +7,7 @@ data/finn.db*
 data/pdfs
 data/*.log
 static/_dev
+node_modules
+.neon
+.claude
+evals/copilot_results.json
