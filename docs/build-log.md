@@ -290,3 +290,13 @@ Lighthouse 12.8.2, mobile, headless Chrome 157, local server. Feed `/digest`: p5
 **Seeding production.** The intended path is a Neon branch: `neon branches create --name production-v2 --parent dev` copies the dev data copy-on-write in seconds; `python tasks.py setup` is the idempotent alternative on an empty branch.
 
 **Checkpoint.** Not met: Docker isn't installed on this machine, so `docker build` couldn't run. The start script path was exercised instead (migrate + seed + serve), and both snapshot modes were tested (forced, and with an unreachable database: holdings served from the snapshot, `/health` still 200). The README lists the deploy steps.
+
+## Phase 12: Docs
+
+**Built.** `README.md` rewritten for v2: what and why, local run via `tasks.py`, architecture diagram, the evaluation table (matches `python -m evals.run`), cost and latency table, decisions, what was left out, next steps (the Wave 2 Research Arm). `docs/WRITEUP.md` drafted from this log.
+
+**Problem found at the end.** Three legacy tests failed on a second run: the new copilot tests import `finn.llm` during collection, which loaded the Step 1-8 SQLite store before `test_core` set its throwaway path, so those tests wrote into the old `data/finn.db` (gitignored, unused by v2). `tests/conftest.py` now sets the path before any import; two consecutive runs pass.
+
+**Checkpoint.** `python -m evals.run`: ALL PASS, every figure in the README table. Tests: 236 passed (twice in a row). ✅
+
+**Open items carried forward.** Cold research < 90 s on the free tier; `docker build`; real-device push; OCR and bank P&L; table-aware annual-report statements; human review of every `claude-provisional` label.

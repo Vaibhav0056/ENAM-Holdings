@@ -1,83 +1,143 @@
 # FINN
 
-FINN is a daily inbox for a portfolio of Indian (NSE/BSE) stocks. It **filters, it doesn't aggregate**.
+**Inbox zero for a long-term investor's portfolio.** FINN answers one question all day: *has anything happened that changes why I own this?*
 
-- **Push: what changed and why should I care.** Corporate announcements from BSE are ranked by how much they matter. Results arrive as a QoQ/YoY table, management changes as person + role + bio, and routine filings are collapsed into a single row. Threshold alerts (volume spikes, big moves, material filing types) land in an Alerts tab and as Web Push notifications.
-- **Pull: on-demand research for any NSE ticker.** The hero view is **Promised vs Delivered**: what management guided on earnings calls, matched to what they later reported. Every row opens to the exact quote, document and page. It is grounded only in primary documents (concall transcripts and the annual report).
-- **Decision support only.** No buy/sell calls, no trading.
+Built for ENAM's style of investing: Buffett-Munger, 8-10 year holds, judged on business quality and management quality. It covers 20 Indian holdings plus 5 research peers, and can research any NSE ticker on demand. Decision support only: FINN never says buy, sell or hold, and never trades.
 
-## Run locally (3 commands)
+## What it does
 
-```bash
-python -m venv .venv && .venv/Scripts/pip install -r requirements.txt   # macOS/Linux: .venv/bin/pip
-cp .env.example .env    # add GEMINI_API_KEY; then: python scripts/gen_vapid.py >> .env
-.venv/Scripts/python -m uvicorn api:app --port 8000                     # open http://localhost:8000
+- **Today: a feed you can finish.** Every BSE filing for the holdings is typed, scored and bucketed into *Needs attention*, *Worth a look* and a collapsed *Routine* row. Each card answers first: results as a QoQ/YoY table in ₹ crore, a management change as who, role, in or out with the filing's own profile, a governance flag with its quote. One tap shows **why it scored that way** (type × magnitude × novelty × thesis), another shows the evidence page. Mark reviewed or swipe right until *You're caught up*. Windows: 24h, 3d, 7d, 30d, since you last checked, or a custom IST range. A week-ahead strip lists results dates and ex-dates.
+- **Thesis Guardian.** Each holding has a thesis drafted from management's own claims (labelled as such, editable): a statement, breakers, and KPIs Python can check on every verified results card. Every card is judged against it (*supports / watch / threatens*), and each holding shows **Intact / Watch / At risk** with the reason and the filing that triggered it. On results day the card compares the quarter with management's own prior guidance ("AUM growth 20-24% guided for FY27 → 26.5% · on track").
+- **Management Credibility Ledger.** For any NSE ticker: up to 8 earnings calls and 2 annual reports are read, every forward-looking promise management made is extracted with its quote and page, matched in Python to what was later reported, and given a verdict: *delivered, partial, missed, pending, unverifiable*. That yields a recency-weighted **credibility score**, the share of promises too vague to check, guidance drift between calls, a business snapshot, bull and bear cases, a devil's advocate, and a receipt (sources, time, cost, unverified claims shown: 0).
+- **Go deeper.** Eight deep dives on one engine: cash quality, balance sheet, language diff between calls, hedge-meter, dodge detector (questions management didn't answer), analyst worry map, fine-print changes, peer compare.
+- **Ask.** A bounded copilot (≤ 6 tool steps, cost-capped) answers questions from FINN's own documents, cites every sentence, and says *Not in sources* when it can't.
+- **Alerts.** Volume vs the 20-session median, price moves fixed or ≥ 3σ beyond the NIFTY for the stock (never on ex-dates), material filing types, new or dropped management promises, peer read-across. Web Push and an Alerts tab. Plus time-travel replay of the feed, a 60-second audio brief, a decision journal and a feedback loop.
+
+## Run it locally (Windows-friendly)
+
+```powershell
+python -m venv .venv; .venv\Scripts\activate; pip install -r requirements.txt
+neon init --org-id <org> --project-id <project>    # or paste DATABASE_URL / DATABASE_URL_UNPOOLED into .env
+python tasks.py setup; python tasks.py ingest; python tasks.py pipeline; python tasks.py serve
 ```
 
-To start empty instead of from the committed seed, delete `data/finn.db` and run the pipeline:
+Then open http://localhost:8000 (Chrome DevTools device mode, or a phone on the same Wi-Fi via the PC's LAN IP). `.env.example` lists every variable: a Gemini key is required, Tavily is optional, `python scripts/gen_vapid.py` makes the Web Push keys.
 
-```bash
-python -m finn.ingest && python -m finn.push && python -m finn.alerts   # or Settings → Refresh data
-python -m finn.pull POLYCAB                                            # pre-run research for a ticker
-python -m pytest -q tests
+| Task | What it does |
+|---|---|
+| `python tasks.py setup` | Alembic migrations on Neon, then the idempotent seed (25 companies, alert rules) |
+| `python tasks.py ingest` | 90 days of prices and BSE filings, BSE snapshot, catalysts, document links, latest transcripts |
+| `python tasks.py pipeline` | classify → score → enrich → thesis impact → alerts → push |
+| `python -m finn.research.engine KEI` | research any NSE ticker from the command line |
+| `python tasks.py test` | 236 unit tests (SQLite fallback, fake model client: no network) |
+| `python -m evals.run` | every evaluation metric below |
+
+## Architecture
+
+```
+Sources: BSE (bse lib) · yfinance · screener.in document links · Gemini · Tavily (bios only)
+   │  finn/sources/*: one adapter per source, polite (1 s/host), idempotent (content hashes, ON CONFLICT)
+   ▼
+Postgres on Neon (Singapore): relational tables + JSONB + tsvector (GIN) + pgvector 768-d (HNSW) + LLM cache
+   ▲                    ▲                        ▲                         ▲
+Push pipeline        Research engine          Deep-dive engine          Copilot
+classify (rules →    fetch → management       retrieve (hybrid,         ≤ 6 tool steps (cheap)
+cheap model) →       turns → specialist       RRF) → extract →          → cited answer (strong)
+score + breakdown →  extractors (parallel) →  compute (Python) →        → verify citations,
+enrich (results,     verify quotes → match    verify                    numbers, advice
+people, flags) →     (Python) → synthesize
+thesis → alerts →    → guard → receipt
+push
+   │
+   ▼
+FastAPI: JSON + SSE (research progress, copilot) + static PWA (Alpine, no build step, service-worker shell)
 ```
 
-`scripts/start.sh` copies `data/seed.db` into place on first boot, so a fresh checkout or deploy opens with real data.
+Every model call goes through `finn/llm/router.py`: versioned prompt files, sha256 cache, Pydantic-validated JSON with one corrective retry, tier pools with quota rotation (cheap never escalates to strong), per-report budget, and a log of tokens, cost and latency per call.
 
-## Deploy (Render)
+**Grounding is enforced, not requested.** Every extracted fact carries document, page and quote; the quote must match its page (rapidfuzz ≥ 90, ±1 page) and its figures must be printed in it, or the fact is dropped. Promises count only from management speakers. Generated prose loses any sentence with a number absent from the evidence, any leaked placeholder, and any buy/sell/hold or price-target phrasing. Python computes every number shown.
 
-1. Push the repo to GitHub and create a **Blueprint** on Render from `render.yaml`. It is one Docker web service with a 1 GB persistent disk at `/var/data`.
-2. Set the secret env vars: `GEMINI_API_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (from `python scripts/gen_vapid.py`), and optionally `TAVILY_API_KEY`.
-3. On first boot the seed DB is copied to the disk. Use **Settings → Refresh data** to pull fresh filings. On the free plan (no disk), remove the `disk` block and `FINN_DB`; the app then re-seeds from `data/seed.db` on every boot.
+## Evaluation (`python -m evals.run`, all pass)
 
-## Notifications: add to Home Screen
+| Suite | Metric | Result | Target |
+|---|---|---|---|
+| Push, 40 labelled filings | classification accuracy | 95 % | ≥ 90 % |
+| | material filings in *Needs attention* | 100 % (4/4) | 100 % |
+| | share of attention that is material | 44 % | report |
+| Push, 20-filing blind holdout | classification accuracy | 100 % | ≥ 90 % |
+| | material filings in *Needs attention* | 100 % (2/2) | 100 % |
+| Results, 10 hand-read statements | exact match (90 cells) | 90 % | ≥ 90 % |
+| | unit errors | 0 | 0 |
+| | scanned PDF shown as "not extracted" | 1/1 | all |
+| Guidance, Polycab × 4 calls (30 promises) | promise recall | 83 % | ≥ 80 % |
+| | verdict agreement | 96 % | ≥ 80 % |
+| | unverified citations shown | 0 | 0 |
+| Thesis, 30 cards | "affects the thesis?" agreement | 90 % | ≥ 80 % |
+| Copilot, 15 questions | cited or "Not in sources" | 15/15 | 15/15 |
+| | sentences with unsupported numbers | 0 | 0 |
+| | buy/sell/hold language (3 advice traps) | 0 | 0 |
+| | answered when an answer exists | 8/10 | report |
 
-- **iPhone / iPad (iOS 16.4+):** Web Push only works for installed web apps. Open FINN in Safari, tap **Share → Add to Home Screen**, open FINN from the home-screen icon, then go to **Settings → Enable notifications**. FINN shows a one-time hint about this on iPhone.
-- **Android / desktop Chrome:** tap **Settings → Enable notifications**. Permission is requested only on that tap.
-- **Send test notification** confirms delivery. Tapping a notification opens the alert's card. The Alerts tab is the source of truth; a push only points to it.
+Labels marked `claude-provisional` in `evals/` were set by the build agent from the source text before tuning, and are meant to be corrected by a person. The push holdout was labelled blind and never tuned on. The guidance, results and thesis sets were tuned on, which flatters them; see `docs/build-log.md`.
 
-## How it works
+## Cost and latency
 
-| Stage | Module | Notes |
-|---|---|---|
-| Ingest | `finn/ingest.py` | yfinance 90d prices (auto-adjusted); `bse` announcements for 30 days per scrip, deduped on a content hash; idempotent |
-| Classify | `finn/push.py` | Ordered keyword rules first; only unmatched filings go to the cheap model, in one batched, enum-constrained call |
-| Score | `finn/push.py` | `type_weight × magnitude × novelty`, capped at 1; attention ≥ 0.7, worth a look ≥ 0.3, else routine (never deleted). Magnitude reads the filing (re-affirmed rating, shell subsidiary, re-appointment are demoted) and the market (×1.5 when the first session able to trade on it was abnormal). Filings from the last 5 days are re-scored every run |
-| Results | `finn/results.py` | Model reads the P&L table with quote + page; Python normalises to ₹ crore, derives EBITDA, computes QoQ/YoY; a deterministic parser cross-checks |
-| Mgmt change | `finn/push.py` | Name, role, in/out, effective date and filing profile (+ Tavily bio when a key is set) |
-| Alerts | `finn/alerts.py`, `finn/notify.py` | Rules editable in Settings. Volume is measured against the 20-day median and a burst re-alerts only if it escalates; a price move fires on the fixed % or when it is ≥ 3σ of the stock's own history in excess of the market. Dedupe per (rule, ticker, date); pywebpush; 404/410 subscriptions pruned |
-| Research | `finn/pull.py` | screener.in Documents → last 4 transcripts + latest annual report → management turns only → guidance/actuals/snapshot → repeated promises collapsed → Python matching (same metric, same period length, same unit) → hit rate → one strong-model synthesis over verified JSON |
+| | Measured locally (India → Neon Singapore, free Gemini tier) |
+|---|---|
+| Today feed `/digest` | p50 3.8 ms, p95 20.2 ms (precomputed windows; target < 300 ms) |
+| Lighthouse mobile | performance 91-95, accessibility 100 on Today, Research, Holdings, Alerts |
+| Cached research report | ~105 ms warm (target < 1 s) |
+| Cold research report | 90 s (HAVELLS) to 127 s (ASTRAL, 22 calls failed on model 503s); target 90 s **not reliably met** |
+| Deep dive, cached reopen | 0.29-0.37 s |
+| Copilot answer | 9-60 s, ≤ 6 steps, ≤ $0.02 |
+| One research report | ~16-20 model calls, ≈ $0.02-0.03 at list price (free tier bills $0) |
+| Everything built so far | 406 model calls, 2.39 M input / 0.38 M output tokens, ≈ $0.41 at list price |
 
-## Design decisions
+## Decisions worth knowing
 
-- **Code does the maths, LLMs do the reading.** QoQ/YoY, unit conversion, EBITDA derivation, 20-day volume averages, thresholds, scoring and guidance-vs-actual verdicts are all plain Python, covered by `tests/test_core.py`.
-- **One LLM gateway.** Every call goes through `llm(task, prompt, schema, tier)` in `finn/llm.py`. It returns Pydantic-validated JSON, caches on sha256(model + prompt + input) in SQLite, and logs tokens per task in `llm_log`. Re-running any stage costs zero model calls.
-- **Grounding is enforced, not requested.** Each extracted fact carries a quote + page. Quotes are fuzzy-matched against that page's text (rapidfuzz `partial_ratio ≥ 85`) but their figures must match exactly, and failures are dropped. A reported figure that is not printed in its own quote (a midpoint or sum the model computed) is dropped too; a target bound that isn't is cleared, so the promise shows as unverifiable. Missing data shows "Not found in sources", never a guess. Synthesis sentences containing a number absent from the evidence JSON are removed, and every bullet must cite known evidence IDs.
-- **Filing text is data.** Document text is sent inside `<document>` tags, and the system instruction tells the model to ignore any instructions it contains.
-- **Failure isolation.** A bad PDF, ticker or model error marks that item "couldn't process" and the run continues. Push failures never block the pipeline.
-- **Novelty groups duplicate filings, not similar ones.** "Financial Results" and "Outcome of Board Meeting" for the same event become one attention card; the twin drops to routine. Outside results, only same-type filings within 12 hours are one event: two order wins or two rating agencies a day apart each keep full weight.
-- **Thresholds are relative to the stock.** 3% is noise for a small-cap and an event for a large bank, so moves are judged against each stock's own robust volatility (MAD) and net of the portfolio's median move that day. The constants sit at the top of `finn/alerts.py` and `finn/push.py`.
-- **Honest verdicts.** Vague targets ("healthy growth") are *unverifiable*. Targets whose horizon hasn't ended are *pending*, but show the latest reported figure and whether it is tracking. That tracking is shown only for ratios like %, bps or days, never for amounts like a quarter of capex against a 5-year plan. A quarter's figure never settles a full-year promise, and the hit rate (partial counts half) is shown only once 3 promises could be checked.
-- **Free-tier friendly.** Gemini's free tier allows about 20 requests per model per day. Classification and one-liners are batched, and each tier rotates through a model pool when a daily quota is hit. Gemini 2.5 models are retired for new keys, and no Pro-class model is available on a free key, so the defaults are `gemini-3.5-flash` (cheap) and `gemini-3.8-flash` (strong). Override them in `.env`.
+- **Neon Postgres, dev branch locally.** Same database as production, no Docker on Windows; pgvector and full-text search in one place. Feed reads use an autocommit connection (one round trip, ~85 ms) and an in-process cache refreshed every 50 s.
+- **Parser first, model second, BSE as referee.** A results table read deterministically and matching BSE's own structured snapshot is verified twice and costs nothing; a figure off BSE's by an exact power of ten (a scanned "533-402" read as 533.402) is rejected, never shown.
+- **Specialist extractors.** One call per transcript let reported results crowd out promises; two focused calls (promises, actuals) lifted recall. Financial statements likewise use two calls.
+- **Structural thesis rules.** Results, senior-management changes, capital raises and governance flags bear on every thesis for an investor who owns businesses for their management, so they are at least *watch*. Only *watch* and *threatens* raise a card's score; confirmation doesn't interrupt.
+- **No Pro model on this key.** Strong-tier work runs on the best Flash available, and when every strong model is out of quota synthesis runs on the cheap tier with the receipt saying so.
+- **Plain CSS tokens instead of the Tailwind CDN**, and Alpine served from FINN itself: the Tailwind play CDN compiles CSS in the browser and blocks rendering.
 
-## Deliberately left out
+## Deploy (prepared, not deployed)
 
-- Buy/sell signals, price targets and any trading or broker integration.
-- NSE's own announcement feed. BSE covers the same filings for dual-listed stocks, and the `bse` library is stable.
-- OCR for scanned PDFs (e.g. Dixon's results). They show "Figures not extracted" instead of a guess.
-- Bank-format P&L parsing (interest earned / operating profit). HDFC Bank's results fall back to a one-liner.
-- User accounts and multi-portfolio support. One portfolio lives in `data/portfolio.csv`.
-- Offline caching in the service worker, since stale financial data is worse than none.
-- Historical guidance beyond the last 4 calls. Older promises would need older transcripts.
+1. In Neon, branch production from dev (`neon branches create --name production-v2 --parent dev`), or run `python tasks.py setup` on an empty branch.
+2. Push the repo to GitHub; on Render create a Blueprint from `render.yaml` (Singapore, free plan, health check `/health`) and set `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `GEMINI_API_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (and optionally `TAVILY_API_KEY`).
+3. In GitHub repository secrets set the same values plus `FINN_URL`; `.github/workflows/daily.yml` refreshes at 18:30 IST and pings `/health` every 10 minutes.
+4. `data/demo_snapshot.json` is served for the main screens if the database is ever unreachable (or with `DEMO_SNAPSHOT=1`).
+
+`docker build` was not run: Docker isn't installed on the build machine.
+
+## Left out, honestly
+
+- OCR for scanned PDFs (Deepak Nitrite's results show "not extracted"), bank-format P&L parsing (HDFC Bank), and Info Edge / Dixon statements whose text layer has no readable table.
+- Table-aware text for annual-report statements: cash-quality inputs whose row is split across PDF cells fail quote verification and show "Not in sources".
+- Debt maturities in the balance-sheet dive; a cold research time reliably under 90 s on the free tier; real-device push (needs a person to enable notifications).
+- Web bios for management changes: wired to Tavily, off until a key is set.
+- NSE's own announcement feed (BSE carries the same filings for dual-listed companies; CDSL, which is NSE-only, was swapped for CAMS).
+
+## Next: the Wave 2 Research Arm
+
+FINN's ledger, theses and deep dives are structured, cited data, which makes them the research arm for an investing "Brain": a portfolio-level layer that asks across holdings ("which managements cut guidance this quarter?", "where is cautious language rising?"), keeps the theses current as new calls land, and feeds a weekly review. The next steps on that path are table-aware statement parsing, NSE filings, scheduled research refreshes after each earnings call, and human-reviewed gold sets for every evaluation.
 
 ## Layout
 
 ```
-api.py               FastAPI app: feed, alerts, rules, push, research jobs, static SPA
-finn/                db, llm, ingest, push, results, alerts, notify, pull, pdfs, grounding
-static/              index.html, app.js, sw.js, manifest.json, icons/
-scripts/             source probes, portfolio validation, VAPID keys, icons, seed export, start.sh
-data/portfolio.csv   16 validated NSE stocks (symbol, BSE code, Yahoo symbol, name, sector)
-docs/build-log.md    what / decision / issue for every build step
-tests/test_core.py   maths, normalisation, scoring, thresholds, grounding, matching
+api.py                 FastAPI app; mounts finn/web.py, web_ui.py, experience.py
+finn/sources/          BSE, prices, screener.in, PDF store, BSE snapshot, calendar
+finn/feed/             classify, score, pipeline, digest
+finn/enrich/           results, management, governance, filing PDFs
+finn/research/         transcripts, ledger maths, engine
+finn/thesis/           KPI maths, guardian
+finn/deep/             deep-dive maths and recipes
+finn/alerting/         alert rules, Web Push
+finn/llm/              router + versioned prompts
+finn/retrieval.py      chunking, embeddings, hybrid search
+finn/copilot.py        bounded agent
+static/                PWA (index.html, app.js, app.css, sw.js, vendor/alpine)
+evals/                 labelled sets and scorers; python -m evals.run
+docs/build-log.md      plan, decisions, problems and checkpoint for every phase
 ```

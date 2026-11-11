@@ -10,6 +10,9 @@ os.environ["DATABASE_URL"] = ""          # load_dotenv never overrides a variabl
 os.environ["FINN_NO_WARMER"] = "1"
 os.environ["DATABASE_URL_UNPOOLED"] = ""
 os.environ["FINN_TEST_DB"] = str(Path(tempfile.mkdtemp()) / "finn_test.sqlite")
+# The Step 1-8 SQLite store (finn.db) reads FINN_DB at import time, and finn.llm imports it during collection,
+# so the throwaway path must be set here, before any test module is imported.
+os.environ["FINN_DB"] = str(Path(tempfile.mkdtemp()) / "legacy_test.db")
 
 import pytest  # noqa: E402
 
