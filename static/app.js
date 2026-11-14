@@ -1,44 +1,58 @@
 /* FINN PWA: one Alpine component. Every number on screen comes from the API (Python computed it); this file only
    formats and arranges. Hash routes: #today #holdings #holding/SYM #research #research/SYM #alerts #settings
-   #card/ID #gallery */
+   #card/ID #gallery. Charts are inline SVG built here from API numbers. */
 
 const TYPE_LABEL = {
-  results: "Results", mgmt_change: "Management", governance: "Governance", m_and_a: "M&A", fundraise: "Fundraise",
+  results: "Results", mgmt_change: "Mgmt change", governance: "Governance", m_and_a: "M&A", fundraise: "Fundraise",
   order_win: "Order", credit_rating: "Rating", insider_pledge: "Insider / pledge", dividend_action: "Dividend",
   litigation_regulatory: "Legal / regulatory", investor_meet: "Investor meet", board_meeting_notice: "Board meeting",
   agm_egm: "AGM / EGM", routine_compliance: "Compliance", other: "Update",
 };
 const STATUS_LABEL = { intact: "Intact", watch: "Watch", at_risk: "At risk" };
+const IMPACT_LABEL = { supports: "Supports thesis", watch: "Watch", threatens: "Threatens thesis" };
 const VERDICT_LABEL = { delivered: "Delivered", partial: "Partial", missed: "Missed", pending: "Pending", unverifiable: "Unverifiable" };
 const KPI_LABEL = { revenue_growth_yoy: "Revenue growth YoY", ebitda_margin: "EBITDA margin", pat_growth_yoy: "PAT growth YoY", pat_margin: "PAT margin" };
-const WINDOWS = [["24h", "24h"], ["3d", "3 days"], ["7d", "7 days"], ["30d", "30 days"], ["since_last", "Since last check"]];
+const WINDOWS = [["since_last", "Since last check"], ["24h", "24h"], ["3d", "3 days"], ["7d", "7 days"], ["30d", "30 days"]];
+const DEEP = [["cash_quality", "Cash quality"], ["balance_sheet", "Balance sheet"], ["language_diff", "Language diff"],
+              ["hedge_meter", "Hedge-meter"], ["dodge_detector", "Dodge detector"], ["worry_map", "Worry map"],
+              ["fine_print", "Fine print"], ["peer_compare", "Peer compare"]];
 const WAKING_MS = 2500;
+const IST = { timeZone: "Asia/Kolkata" };
 
 function store(key, val) {           // per-viewer conveniences only; never required for correctness
   try { if (val === undefined) return JSON.parse(localStorage.getItem(key)); localStorage.setItem(key, JSON.stringify(val)); }
   catch (e) { return null; }
 }
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function finn() {
   return {
-    // route from the URL at construction: starting on "today" and switching after init shifted the whole page
-    route: ((location.hash || "#today").slice(1).split("/")[0]) || "today", param: null, theme: store("finn.theme") || "system",
-    net: { waking: false, error: null, stale: false },
-    win: store("finn.window") || "24h", custom: { from: "", to: "" }, showCustom: false,
-    digest: null, catalysts: [], routineOpen: false,
-    holdings: null, holding: null, editing: false, draft: null,
-    alerts: null, unread: 0, rules: null,
-    rq: { ticker: "", job: null, report: null, stage: null, progress: 0, stages: [], error: null, open: {} },
-    sheet: null, cardDetail: null, evidence: null,
+    route: ((location.hash || "#today").slice(1).split("/")[0]) || "today", param: null,
+    theme: store("finn.theme") || "system",
+    net: { waking: false, error: null, stale: false }, warm: false,
+    win: store("finn.window") || "24h", custom: { from: "", to: "" }, pick: false,
+    digest: null, catalysts: [], catalystsLoaded: false, routineOpen: false, worthAll: false,
+    holdings: null, holding: null, editing: false, draft: null, appState: null,
+    alerts: null, unread: 0, rules: null, alertsAll: false,
+    rq: { ticker: "", job: null, report: null, stage: null, progress: 0, stages: [], error: null, open: {}, st: {}, dur: {}, t0: 0 },
+    rtab: "ledger", recent: store("finn.recent") || [], tick: Date.now(),
+    sheet: null, prevSheet: null, cardDetail: null, evidence: null, whyCard: null, menuCard: null,
+    snoozed: store("finn.snooze") || {},
     push: { supported: "serviceWorker" in navigator && "PushManager" in window, state: "", msg: "" },
     isIOS: /iphone|ipad|ipod/i.test(navigator.userAgent), standalone: matchMedia("(display-mode: standalone)").matches,
-    toast: "", gallery: null,
+    toast: "", toastUndo: null,
+    gal: { digest: null, sw: true, sl: 2.0, tab: "Ledger" },
+    ruleTypes: ["results", "mgmt_change", "governance", "m_and_a", "fundraise", "order_win", "credit_rating", "litigation_regulatory", "insider_pledge"],
+    deepRecipes: DEEP,
 
     init() {
-      this.applyTheme();
+      const q = new URLSearchParams(location.search).get("theme");
+      if (q === "light" || q === "dark") this.theme = q; else this.applyTheme();
       window.addEventListener("hashchange", () => this.go());
       this.go();
       this.loadAlerts(true);
+      setInterval(() => { if (this.rq.job && !this.rq.report) this.tick = Date.now(); }, 1000);
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("/sw.js").catch(() => {});
         navigator.serviceWorker.addEventListener("message", (e) => {
@@ -49,7 +63,7 @@ function finn() {
 
     // ---------- plumbing ----------
     async api(path, opts = {}) {
-      const t = setTimeout(() => (this.net.waking = true), WAKING_MS);
+      const t = setTimeout(() => { if (!this.warm) this.net.waking = true; }, WAKING_MS);   // cold start only
       try {
         const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
         if (!r.ok) {
@@ -57,108 +71,241 @@ function finn() {
           try { msg = (await r.json()).detail || msg; } catch (e) {}
           throw new Error(msg);
         }
-        this.net.error = null; this.net.stale = false;
+        this.net.error = null; this.net.stale = false; this.warm = true;
         return await r.json();
       } catch (e) {
         this.net.error = e.message || "Network error";
         throw e;
       } finally { clearTimeout(t); this.net.waking = false; }
     },
-    say(msg) { this.toast = msg; clearTimeout(this._t); this._t = setTimeout(() => (this.toast = ""), 2600); },
+    say(msg, undo = null) {
+      this.toast = msg; this.toastUndo = undo;
+      clearTimeout(this._t); this._t = setTimeout(() => { this.toast = ""; this.toastUndo = null; }, undo ? 4000 : 2600);
+    },
+    runUndo() { const u = this.toastUndo; this.toast = ""; this.toastUndo = null; if (u) u(); },
+    retry() { this.net.error = null; this.go(); },
 
     go() {
       const h = (location.hash || "#today").slice(1);
       const [name, ...rest] = h.split("/");
       const param = rest.join("/") || null;
-      this.sheet = null;
-      if (name === "card" && param) { this.openCard(+param); if (!this.digest) this.route = "today", this.loadDigest(); return; }
+      this.sheet = null; this.pick = false;
+      if (name === "card" && param) {
+        if (!["today", "gallery", "holding"].includes(this.route)) this.route = "today";
+        if (!this.digest) this.loadToday();
+        this.openCard(+param); return;
+      }
       this.route = ["today", "holdings", "holding", "research", "alerts", "settings", "gallery"].includes(name) ? name : "today";
       this.param = param;
       window.scrollTo(0, 0);
-      if (this.route === "today") { this.loadDigest(); this.loadCatalysts(); }
+      if (this.route === "today") this.loadToday();
       if (this.route === "holdings") this.loadHoldings();
       if (this.route === "holding" && param) this.loadHolding(param);
-      if (this.route === "research" && param) this.openResearch(param);
-      if (this.route === "alerts") this.loadAlerts();
-      if (this.route === "settings") { this.loadRules(); this.loadSched(); }
-      if (this.route === "gallery") this.gallery = galleryData();
+      if (this.route === "research") { if (!this.holdings) this.loadHoldings(); if (param) this.openResearch(param); else this.rq.report = null; }
+      if (this.route === "alerts") { this.loadAlerts(); if (!this.rules) this.loadRules(); }
+      if (this.route === "settings") { this.loadRules(); this.loadSched(); this.loadHoldings(); this.loadState(); }
+      if (this.route === "gallery") this.loadGallery();
     },
     nav(hash) { location.hash = hash; },
+    back() { if (history.length > 1) history.back(); else this.nav("#today"); },
+    backable() { return ["holding", "settings", "gallery"].includes(this.route) || (this.route === "research" && this.param); },
+    title() {
+      return { holdings: "Holdings", holding: this.holding?.symbol || this.param, alerts: "Alerts", settings: "Settings", gallery: "Gallery",
+               research: this.param ? (this.rq.report?.symbol || this.param) : "Research" }[this.route] || "";
+    },
+    eyebrow() {
+      if (this.route === "holding" && this.holding) return this.holding.name + (this.holding.sector ? " · " + this.holding.sector : "");
+      if (this.route === "research" && this.param) return this.rq.report?.name || "Research";
+      if (this.route === "gallery") return "QA";
+      return "";
+    },
+    jump(id) { this.$nextTick(() => document.getElementById(id)?.scrollIntoView({ behavior: reduced() ? "auto" : "smooth", block: "start" })); },
 
     applyTheme() {
-      const t = this.theme;
-      if (t === "system") document.documentElement.removeAttribute("data-theme");
-      else document.documentElement.setAttribute("data-theme", t);
-      store("finn.theme", t);
+      if (this.theme === "system") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", this.theme);
+      store("finn.theme", this.theme);
     },
 
     // ---------- Today ----------
+    loadToday() { this.loadDigest(); this.loadCatalysts(); this.loadHoldings(); this.loadState(); },
     async loadDigest() {
       const qs = this.win === "custom" ? `from=${this.custom.from}&to=${this.custom.to}` : `window=${this.win}`;
       try { this.digest = await this.api(`/digest?${qs}`); }
       catch (e) { if (this.digest) this.net.stale = true; }
     },
+    async loadState() { try { this.appState = await this.api("/api/v2/state"); } catch (e) { this.net.error = null; } },
+    windows() { return WINDOWS; },
+    winLabel() {
+      if (this.win === "custom") return this.custom.from && this.custom.to ? `${this.day(this.custom.from)} – ${this.day(this.custom.to)}` : "Custom";
+      return (WINDOWS.find(([w]) => w === this.win) || [0, "24h"])[1];
+    },
     setWindow(w) {
-      if (w === "custom") { this.showCustom = true; return; }
-      this.win = w; store("finn.window", w); this.digest = null; this.loadDigest();
+      if (w === "custom") { this.sheet = "range"; return; }
+      this.win = w; store("finn.window", w); this.digest = null; this.worthAll = false; this.loadDigest();
     },
+    today() { return new Date().toLocaleDateString("en-CA", IST); },
     applyCustom() {
-      if (!this.custom.from || !this.custom.to) return this.say("Pick both dates");
-      this.win = "custom"; this.showCustom = false; this.digest = null; this.loadDigest();
+      const { from, to } = this.custom;
+      if (!from || !to) return this.say("Pick both dates");
+      if (from > to) return this.say("The start date is after the end date");
+      if ((new Date(to) - new Date(from)) / 864e5 > 90) return this.say("Pick a range of 90 days or less");
+      this.win = "custom"; this.sheet = null; this.digest = null; this.loadDigest();
     },
-    async loadCatalysts() { try { this.catalysts = (await this.api("/api/v2/catalysts?days=7")).events; } catch (e) {} },
-    async markChecked() { await this.api("/api/state/checked", { method: "POST" }); this.say("Marked as checked"); },
+    async loadCatalysts() {
+      try { this.catalysts = (await this.api("/api/v2/catalysts?days=7")).events; } catch (e) { this.net.error = null; }
+      this.catalystsLoaded = true;
+    },
+    async markChecked() { await this.api("/api/state/checked", { method: "POST" }); this.say("Marked as your last check"); this.loadState(); },
+    dateEyebrow() { return new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", ...IST }); },
+    staleLabel() {
+      const t = this.appState?.latest_filing_at;
+      if (!t) return "";
+      const h = (Date.now() - new Date(t)) / 36e5;
+      return h < 18 ? "" : h < 48 ? `Last filing ${Math.round(h)}h ago` : `Last filing ${Math.round(h / 24)}d ago`;
+    },
+    pulseAsOf() { return this.appState?.latest_price_date ? "Day change · close " + this.day(this.appState.latest_price_date) : "Day change"; },
+    statusCount(s) { return (this.holdings || []).filter((h) => h.status === s).length; },
+    isSnoozed(c) { const u = this.snoozed[c.id]; return !!u && new Date(u) > new Date(); },
+    snoozedCount() { return this.digest ? [...this.digest.attention, ...this.digest.worth_a_look].filter((c) => this.isSnoozed(c)).length : 0; },
+    clearSnooze() { this.snoozed = {}; store("finn.snooze", {}); },
+    snooze(c) {
+      const t = new Date(); t.setHours(24, 0, 0, 0);
+      if (this.route === "gallery") return this.say("Gallery: snooze not saved");
+      this.snoozed = { ...this.snoozed, [c.id]: t.toISOString() }; store("finn.snooze", this.snoozed);
+      this.say("Snoozed until tomorrow", () => { const s = { ...this.snoozed }; delete s[c.id]; this.snoozed = s; store("finn.snooze", s); });
+    },
+    feedAttention() {
+      if (this.route === "gallery") return this.galleryPicks().attention;
+      return this.digest ? this.digest.attention.filter((c) => !this.isSnoozed(c)) : [];
+    },
+    feedWorth() {
+      if (this.route === "gallery") return this.galleryPicks().worth;
+      return this.digest ? this.digest.worth_a_look.filter((c) => !this.isSnoozed(c)) : [];
+    },
+    caughtUp() {
+      if (!this.digest) return false;
+      const all = [...this.digest.attention, ...this.digest.worth_a_look];
+      return all.length > 0 && all.every((c) => c.reviewed || this.isSnoozed(c));
+    },
+    nextEvent() {
+      const c = this.catalysts[0];
+      return c ? `Next: ${c.symbol} ${c.title.toLowerCase()} · ${this.day(c.date)}` : "No dated events in sources for the next 7 days.";
+    },
     async review(card, undo = false) {
+      if (this.route === "gallery") { card.reviewed = !undo; return this.say("Gallery: not saved"); }
       card.reviewed = !undo;
       try { await this.api(`/api/v2/cards/${card.id}/review${undo ? "?undo=true" : ""}`, { method: "POST" }); }
       catch (e) { card.reviewed = undo; return; }
-      if (!undo) this.say("Reviewed");
-      if (this.digest) {
-        const all = [...this.digest.attention, ...this.digest.worth_a_look];
-        this.digest.caught_up = all.every((c) => c.reviewed);
-      }
+      if (!undo) this.say("Reviewed", () => this.review(card, true));
+      if (this.digest) this.digest.caught_up = this.caughtUp();
     },
-    swipe(el, card) {      // swipe right on a card = mark reviewed
-      let x0 = null, dx = 0;
-      el.addEventListener("pointerdown", (e) => { x0 = e.clientX; dx = 0; });
+    // Swipe right = reviewed (teal reveal), swipe left = snooze (slate reveal), long-press = context menu.
+    gesture(el, card) {
+      const body = el.querySelector(".card"), rr = el.querySelector(".reveal.r"), rl = el.querySelector(".reveal.l");
+      let x0 = null, y0 = 0, dx = 0, horiz = null, moved = false, timer = null;
+      const reset = () => { body.style.transform = ""; rr.style.opacity = 0; rl.style.opacity = 0; el.classList.remove("dragging"); };
+      el.addEventListener("pointerdown", (e) => {
+        if (e.button > 0) return;
+        x0 = e.clientX; y0 = e.clientY; dx = 0; horiz = null; moved = false;
+        timer = setTimeout(() => { if (!moved) { moved = true; x0 = null; this.openMenu(card); } }, 550);
+      });
       el.addEventListener("pointermove", (e) => {
-        if (x0 === null) return; dx = e.clientX - x0;
-        if (dx > 0) el.style.transform = `translateX(${Math.min(dx, 120)}px)`;
+        if (x0 === null) return;
+        dx = e.clientX - x0; const dy = e.clientY - y0;
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) { moved = true; clearTimeout(timer); }
+        if (horiz === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) horiz = Math.abs(dx) > Math.abs(dy);
+        if (!horiz) return;
+        el.classList.add("dragging");
+        const x = Math.max(-140, Math.min(140, dx));
+        body.style.transform = `translateX(${x}px)`;
+        rr.style.opacity = x > 0 ? Math.min(1, x / 90) : 0; rl.style.opacity = x < 0 ? Math.min(1, -x / 90) : 0;
       });
       const end = () => {
-        if (x0 !== null && dx > 90 && !card.reviewed) this.review(card);
-        el.style.transform = ""; x0 = null;
+        clearTimeout(timer);
+        if (x0 !== null && horiz) {
+          if (dx > 90) this.review(card, card.reviewed);
+          else if (dx < -90) this.snooze(card);
+        }
+        x0 = null; reset();
       };
       el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end); el.addEventListener("pointerleave", end);
+      el.addEventListener("click", (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; } }, true);
     },
-    unreviewedCount() {
-      if (!this.digest) return 0;
-      return [...this.digest.attention, ...this.digest.worth_a_look].filter((c) => !c.reviewed).length;
+    openMenu(c) { if (c) { this.menuCard = c; this.prevSheet = null; this.sheet = "menu"; } },
+    openWhy(c) {
+      if (!c) return;
+      this.prevSheet = this.sheet === "card" ? "card" : null; this.whyCard = c; this.sheet = "why";
     },
+    whyFactors() {
+      const w = this.whyCard?.why || {};
+      return [["Type weight", w.type_weight], ["Magnitude", w.magnitude], ["Novelty", w.novelty], ["Thesis multiplier", w.thesis_multiplier]]
+        .filter((f) => f[1] != null);
+    },
+    bucketName(b) { return { attention: "Needs attention (≥ 0.70)", worth_a_look: "Worth a look (≥ 0.30)" }[b] || "Routine (< 0.30)"; },
 
-    // ---------- card sheet ----------
+    // ---------- card helpers ----------
+    type(t) { return TYPE_LABEL[t] || t; },
+    impact(c) { return IMPACT_LABEL[c?.thesis_impact] || ""; },
+    flags(c) { return (c?.payload?.flags || c?.payload?.governance_flags || []).slice().sort((a, b) => (b.severity === "high") - (a.severity === "high")); },
+    isGov(c) { return c.type === "governance" || (c.type !== "mgmt_change" && this.flags(c).some((f) => f.severity === "high")); },
+    lowConf(c) { return !!(c.payload?.ok && ((c.payload.notes || []).length || c.payload.confidence === "low")); },
+    firstCmp(c) { return c.payload?.results_day?.comparisons?.[0] || null; },
+    cmpCls(v) { return /on track|deliver|beat|ahead|met/i.test(v || "") ? "delivered" : /miss|below|behind/i.test(v || "") ? "missed" : "partial"; },
+    resultRows(c) { return (c.payload?.table || []).filter((r) => r.found); },
+    resultsNote(c) {
+      const b = c.payload.basis ? c.payload.basis[0].toUpperCase() + c.payload.basis.slice(1) : "Basis not stated";
+      return `${b} · ₹ crore · computed in code` + (this.resultRows(c).some((r) => r.derived) ? " · *derived" : "");
+    },
+    isIn(p) { return /appoint|join|induct|elevat|promot|designat|inducted/i.test(p.direction || ""); },
+    initials(n) {
+      return (n || "").replace(/^(dr|mr|mrs|ms|shri|smt|prof)\.?\s+/i, "").split(/\s+/).filter((w) => /[a-z]/i.test(w))
+        .map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+    },
+    // Lead with what happened: structured cards keep FINN's computed headline; others use the filing's extracted
+    // one-liner instead of the raw exchange subject line, unless that one-liner is boilerplate.
+    boiler(t) { return /^the (company|exchange|board)\b.*\b(submitted|informed|intimated|regulation|in accordance)/i.test(t || ""); },
+    headline(c) {
+      const structured = ["results", "mgmt_change"].includes(c.type) || c.payload?.people?.length;
+      return !structured && c.one_liner && !this.boiler(c.one_liner) ? c.one_liner : c.headline;
+    },
+    showOneLiner(c) {
+      if (!c.one_liner || this.headline(c) === c.one_liner || this.boiler(c.one_liner) || c.type === "results") return false;
+      return !(c.payload?.people?.length) && !this.flags(c).length;
+    },
+    clip(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s; },
+
+    // ---------- card sheet + evidence ----------
+    openCardSheet(c) {
+      if (c.id > 0) return this.openCard(c.id);
+      this.cardDetail = c; this.sheet = "card";
+    },
     async openCard(id) {
       this.sheet = "card"; this.cardDetail = null; this.evidence = null;
-      try { this.cardDetail = await this.api(`/api/v2/cards/${id}`); } catch (e) { this.sheet = null; this.say("Card not found"); }
+      try { this.cardDetail = await this.api(`/api/v2/cards/${id}`); } catch (e) { this.sheet = null; this.net.error = null; this.say("Card not found"); }
     },
     closeSheet() {
       this.sheet = null; this.evidence = null;
       if (location.hash.startsWith("#card/")) history.replaceState(null, "", "#today");
     },
     async openEvidence(docId, page, quote) {
-      if (!docId || !page) return;
-      this.evidence = { loading: true, quote };
+      if (!docId || !page) return this.say("That page isn't stored for this source.");
+      if (this.sheet && this.sheet !== "evidence") this.prevSheet = this.sheet;
+      this.sheet = "evidence"; this.evidence = { loading: true, quote };
       try { this.evidence = { ...(await this.api(`/api/v2/documents/${docId}/pages/${page}`)), quote }; }
-      catch (e) { this.evidence = { error: "That page isn't stored yet. Open the PDF instead." }; }
+      catch (e) { this.net.error = null; this.evidence = { error: "That page isn't stored yet. Open the PDF instead." }; }
+    },
+    norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9%.]+/g, " ").trim(); },
+    quoteOnPage() {
+      const q = this.norm(this.evidence?.quote).slice(0, 60);
+      return !!q && this.norm(this.evidence?.text).includes(q);
     },
     highlight(text, quote) {
-      const esc = (s) => (s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-      if (!quote) return esc(text);
-      const words = quote.split(/\s+/).filter((w) => w.length > 3).slice(0, 6).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
       let out = esc(text);
-      if (words.length) {
-        const first = words[0];
-        out = out.replace(new RegExp(`(${first})`, "i"), "<mark>$1</mark>");
+      const words = String(quote || "").split(/\s+/).filter(Boolean).slice(0, 10).map((w) => esc(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      for (let n = words.length; n >= 3; n--) {          // longest run of the quote's opening words found on the page
+        const re = new RegExp(words.slice(0, n).join("\\s+"), "i");
+        if (re.test(out)) return out.replace(re, (m) => `<mark>${m}</mark>`);
       }
       return out;
     },
@@ -168,6 +315,31 @@ function finn() {
     async loadHolding(sym) {
       this.holding = null; this.editing = false;
       try { this.holding = await this.api(`/api/v2/holdings/${sym}`); this.loadJournal(sym); } catch (e) {}
+    },
+    holdingStatus() { return this.holding?.timeline?.[0]?.status || "intact"; },
+    lastPrice() { return this.holding?.prices?.at(-1)?.close ?? null; },
+    holdingDay() {
+      const p = this.holding?.prices || [];
+      return p.length > 1 && p.at(-2).close ? +(100 * (p.at(-1).close / p.at(-2).close - 1)).toFixed(2) : null;
+    },
+    priceRange() {
+      const p = this.holding?.prices || [];
+      return p.length ? `${this.dm(p[0].date)} – ${this.dm(p.at(-1).date)}` : "";
+    },
+    spark() {
+      const p = this.holding.prices, v = p.map((x) => x.close), lo = Math.min(...v), hi = Math.max(...v), W = 320, top = 16, bot = 62;
+      const X = (i) => (i / (v.length - 1)) * W, Y = (x) => bot - ((x - lo) / (hi - lo || 1)) * (bot - top);
+      const d = v.map((x, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(x).toFixed(1)}`).join(" ");
+      const hiI = v.indexOf(hi);
+      return { d, ex: X(v.length - 1), ey: Y(v.at(-1)), yMid: (top + bot) / 2, hx: X(hiI), hy: Y(hi),
+               hi: this.rupee(hi), firstLabel: this.dm(p[0].date), lastLabel: this.rupee(v.at(-1)) };
+    },
+    kpi(m) { return KPI_LABEL[m] || m; },
+    kpiRow(k) { return (this.holding?.kpi_check?.rows || []).find((r) => r.metric === k.metric && r.op === k.op && r.threshold === Number(k.threshold)) || null; },
+    kpiBar(k) {
+      const r = this.kpiRow(k); if (!r) return { v: 0, t: 0 };
+      const max = Math.max(Math.abs(r.value), Math.abs(r.threshold), 1) * 1.25;
+      return { v: Math.max(0, Math.min(100, (r.value / max) * 100)), t: Math.max(0, Math.min(100, (r.threshold / max) * 100)) };
     },
     startEdit() {
       const t = this.holding.thesis || { statement: "", kpis: [], breakers: [] };
@@ -182,7 +354,7 @@ function finn() {
       try {
         await this.api(`/api/v2/holdings/${this.holding.symbol}/thesis`, { method: "PUT", body: JSON.stringify(body) });
         this.say("Thesis saved"); this.loadHolding(this.holding.symbol);
-      } catch (e) { this.say(this.net.error); }
+      } catch (e) { this.say(this.net.error); this.net.error = null; }
     },
 
     // ---------- Research ----------
@@ -192,21 +364,31 @@ function finn() {
       this.nav(`#research/${t}`);
     },
     async openResearch(sym, force = false) {
-      Object.assign(this.rq, { ticker: sym, job: null, report: null, stage: null, progress: 0, error: null, open: {} });
+      Object.assign(this.rq, { ticker: sym, job: null, report: null, stage: null, progress: 0, stages: [], error: null, open: {}, st: {}, dur: {}, t0: Date.now() });
+      this.rtab = "ledger"; Object.assign(this.deep, { recipe: null, data: null, error: null });
+      this.recent = [sym, ...this.recent.filter((s) => s !== sym)].slice(0, 5); store("finn.recent", this.recent);
       try {
         const r = await this.api(`/api/v2/research/${sym}${force ? "?force=true" : ""}`, { method: "POST" });
         if (r.cached) { this.rq.report = r.report; return; }
         this.rq.job = r.job_id; this.follow(r.job_id);
-      } catch (e) { this.rq.error = this.net.error; }
+      } catch (e) { this.rq.error = this.net.error; this.net.error = null; }
+    },
+    onStage(d) {
+      const now = Date.now();
+      if (d.stage && d.stage !== this.rq.stage) {
+        if (this.rq.stage && this.rq.st[this.rq.stage]) this.rq.dur[this.rq.stage] = (now - this.rq.st[this.rq.stage]) / 1000;
+        this.rq.st[d.stage] = now;
+      }
+      Object.assign(this.rq, { stage: d.stage, progress: d.progress, stages: d.stages || this.rq.stages });
     },
     follow(jobId) {
       const done = async () => {
         try { const j = await this.api(`/api/v2/research/job/${jobId}`); if (j.report) this.rq.report = j.report; else this.rq.error = j.error; }
-        catch (e) { this.rq.error = this.net.error; }
+        catch (e) { this.rq.error = this.net.error; this.net.error = null; }
       };
       if (!window.EventSource) return this.poll(jobId);
       const es = new EventSource(`/api/v2/research/job/${jobId}/events`);
-      es.addEventListener("stage", (e) => { const d = JSON.parse(e.data); Object.assign(this.rq, { stage: d.stage, progress: d.progress, stages: d.stages }); });
+      es.addEventListener("stage", (e) => this.onStage(JSON.parse(e.data)));
       es.addEventListener("done", () => { es.close(); done(); });
       es.addEventListener("failed", (e) => { es.close(); this.rq.error = JSON.parse(e.data).error || "Research failed"; });
       es.onerror = () => { es.close(); this.poll(jobId); };
@@ -214,7 +396,7 @@ function finn() {
     async poll(jobId) {
       for (let i = 0; i < 400; i++) {
         let j; try { j = await this.api(`/api/v2/research/job/${jobId}`); } catch (e) { return; }
-        Object.assign(this.rq, { stage: j.stage, progress: j.progress, stages: j.stages });
+        this.onStage(j);
         if (j.status === "done") { this.rq.report = j.report; return; }
         if (j.status === "failed") { this.rq.error = j.error; return; }
         await new Promise((r) => setTimeout(r, 1500));
@@ -222,14 +404,126 @@ function finn() {
     },
     stageState(s) {
       const i = this.rq.stages.indexOf(s), cur = this.rq.stages.indexOf(this.rq.stage);
+      if (!this.rq.stages.length) return "now";
       return i < cur ? "done" : i === cur ? "now" : "";
     },
+    stageTime(s) {
+      if (this.rq.dur[s] != null) return this.rq.dur[s].toFixed(1) + " s";
+      if (s === this.rq.stage && this.rq.st[s]) return Math.max(0, Math.round((this.tick - this.rq.st[s]) / 1000)) + " s";
+      return "";
+    },
+    rqElapsed() { return this.rq.t0 ? Math.max(0, Math.round((this.tick - this.rq.t0) / 1000)) + " s" : ""; },
     source(id) { return (this.rq.report?.sources || []).find((s) => s.id === id) || {}; },
-    gaugeDash(score) { const c = 2 * Math.PI * 30; return `${(c * (score || 0)) / 100} ${c}`; },
+    verdict(v) { return VERDICT_LABEL[v] || v; },
+    verdictCounts() { return Object.entries(this.rq.report?.credibility?.counts || {}).filter(([, n]) => n > 0); },
+    credLine() {
+      const c = this.rq.report.credibility, vg = c.vagueness_pct != null ? ` · vagueness ${c.vagueness_pct}%` : "";
+      return c.score != null
+        ? `credibility out of 100<br><span style="color:var(--text)">measured ${c.measured} of ${c.total}</span>${vg}`
+        : `not scored: fewer than ${c.min_measured} promises have matured<br><span style="color:var(--text)">measured ${c.measured} of ${c.total}</span>${vg}`;
+    },
+    strongEvidence(l) { return !!(l.actual || (l.also_said_in && l.also_said_in.length)); },
+    actualLine(l) {
+      const u = (x) => (x.unit && x.unit !== "%" ? " " + x.unit : x.unit === "%" ? "%" : "");
+      if (l.actual) return `Actual ${l.actual.value}${u(l.actual)} (${l.actual.period})`;
+      if (l.latest) return `Latest ${l.latest.value}${u(l.latest)} (${l.latest.period})`;
+      if (l.verdict === "unverifiable") return "Too vague to check";
+      return l.horizon ? `Not yet due: ${l.horizon}` : "Not in sources";
+    },
+    // generic inline-SVG line: values → path + labelled points on a 320-wide canvas
+    series(vals, o = {}) {
+      const v = vals.map(Number), W = 320, pad = 14, top = o.top ?? 14, bot = o.bot ?? 46;
+      const lo = o.min ?? Math.min(...v), hi = o.max ?? Math.max(...v);
+      const X = (i) => (v.length === 1 ? W / 2 : pad + (i / (v.length - 1)) * (W - 2 * pad));
+      const Y = (x) => bot - ((x - lo) / (hi - lo || 1)) * (bot - top);
+      const pts = v.map((x, i) => ({ x: X(i), y: Y(x), v: o.fmt ? o.fmt(x) : x,
+                                     anchor: v.length > 1 && i === 0 ? "start" : v.length > 1 && i === v.length - 1 ? "end" : "middle" }));
+      pts.forEach((p) => { if (p.anchor === "start") p.x = Math.max(p.x, 2); });
+      const d = o.step
+        ? pts.map((p, i) => (i ? `H${p.x.toFixed(1)} V${p.y.toFixed(1)}` : `M${p.x.toFixed(1)} ${p.y.toFixed(1)}`)).join(" ")
+        : pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+      return { d, pts };
+    },
+    marks(pts, ly) {   // points + direct value labels + axis labels as SVG markup (Alpine can't x-for inside <svg>)
+      return pts.map((p) => `<circle cx="${p.x}" cy="${p.y}" r="2.5" fill="var(--accent)"/>` +
+        `<text x="${p.x}" y="${(p.y - 6).toFixed(1)}" text-anchor="${p.anchor}">${esc(p.v)}</text>` +
+        (p.label ? `<text x="${p.x}" y="${ly}" text-anchor="${p.anchor}">${esc(p.label)}</text>` : "")).join("");
+    },
+    hedge() {
+      const c = this.deep.data.calls, s = this.series(c.map((x) => x.per_1000_words), { top: 16, bot: 50 });
+      s.pts.forEach((p, i) => (p.label = i % 2 === 0 || i === c.length - 1 ? c[i].call.replace(" FY", "·") : ""));
+      return s;
+    },
+    trend() {
+      const t = this.rq.report.credibility.trend, s = this.series(t.map((x) => x.score), { min: 0, max: 100, top: 18, bot: 40 });
+      s.pts.forEach((p, i) => { p.v = t[i].score; p.label = t[i].said_in.replace(" FY", "·"); });
+      return s;
+    },
+    driftChart() {
+      const d = (this.rq.report?.drift || []).find((x) => x.steps.length && x.steps.every((s) => s.before_mid != null && s.after_mid != null));
+      if (!d) return null;
+      const vals = [d.steps[0].before_mid, ...d.steps.map((s) => s.after_mid)];
+      const labels = [d.steps[0].from, ...d.steps.map((s) => s.to)];
+      const unit = d.mid_unit === "₹ crore" ? " cr" : d.mid_unit === "%" ? "%" : "";
+      const s = this.series(vals, { step: true, top: 16, bot: 50, fmt: (x) => Number(x).toLocaleString("en-IN", { maximumFractionDigits: 1 }) + unit });
+      s.pts.forEach((p, i) => (p.label = (labels[i] || "").replace(" FY", "·")));
+      return { ...s, metric: d.metric };
+    },
+    segs() { return (this.rq.report?.snapshot?.segments || []).filter((s) => s.share_pct > 0).sort((a, b) => b.share_pct - a.share_pct); },
+    refOpen(id) {
+      const r = this.rq.report || {};
+      const x = [...(r.ledger || []), ...(Array.isArray(r.actuals) ? r.actuals : []), ...(r.snapshot?.segments || []), ...(r.snapshot?.risks || [])]
+        .find((i) => i.id === id);
+      if (!x) return this.say("That source isn't in this report.");
+      this.openEvidence(this.source(x.doc).document_id || x.doc_id, x.page, x.quote);
+    },
+    receiptLine() {
+      const r = this.rq.report.receipt;
+      return `Receipt · ${r.sources_read} sources · ${r.seconds} s · $${r.cost_usd} · ${r.unverified_claims_shown} unverified claims · ${this.when(r.generated_at)}`;
+    },
 
-    // ---------- Phase 10: replay, audio brief, journal, feedback ----------
-    rp: { open: false, daysAgo: 14, data: null, loading: false },
-    replayDate() { const d = new Date(Date.now() - this.rp.daysAgo * 86400000); return d.toISOString().slice(0, 10); },
+    // ---------- deep dives ----------
+    deep: { recipe: null, data: null, loading: false, error: null },
+    async openDeep(recipe) {
+      Object.assign(this.deep, { recipe, data: null, loading: true, error: null });
+      try { this.deep.data = await this.api(`/api/v2/deep/${this.param}/${recipe}`); }
+      catch (e) { this.deep.error = this.net.error; this.net.error = null; }
+      finally { this.deep.loading = false; }
+    },
+    deepName(r) { return (DEEP.find(([k]) => k === r) || [0, r])[1]; },
+    deepFinding() {
+      const d = this.deep.data, c = d.current || {};
+      switch (d.recipe) {
+        case "cash_quality": return `Free cash flow ${this.cr(c.fcf)}` + (c.ocf_to_pat != null ? ` · OCF/PAT ${c.ocf_to_pat}` : "") + ` (${d.report})`;
+        case "balance_sheet": return c.net_debt == null ? "Net debt: not in sources" : (c.net_debt < 0 ? `Net cash ${this.cr(-c.net_debt)}` : `Net debt ${this.cr(c.net_debt)}`) + (c.interest_cover != null ? ` · interest cover ${c.interest_cover}×` : "");
+        case "hedge_meter": return d.latest_vs_earlier_pct == null ? "Not enough calls to compare" : `Cautious language ${this.pct(d.latest_vs_earlier_pct)} on the latest call vs the earlier average`;
+        case "dodge_detector": { const l = d.calls?.[0]; return l ? `${l.call}: ${l.deflected} of ${l.judged} answers deflected (${l.deflection_rate_pct}%)` : "No question-answer pairs found"; }
+        case "worry_map": return d.rising?.length ? `Rising on the latest call: ${d.rising.join(", ")}` : `${d.questions} analyst questions; no topic rising`;
+        case "language_diff": return `${d.new.length} new statements, ${d.dropped.length} dropped (${d.older} → ${d.newer})`;
+        case "fine_print": { const x = d.contingent_liabilities_cr; return x?.change_pct != null ? `Contingent liabilities ${this.pct(x.change_pct)} year on year` : "Contingent liabilities: change not in sources"; }
+        case "peer_compare": return `Promise ledgers side by side with ${d.peer || "the research peer"}`;
+      }
+      return "";
+    },
+    deepRows(obj) { return Object.entries(obj || {}).filter(([, v]) => typeof v === "number" || v === null); },
+    pairBars() {
+      const d = this.deep.data, cur = d.current || {}, prev = d.previous || {};
+      const keys = Object.keys(cur).filter((k) => typeof cur[k] === "number" && !/_to_|days|cover|cycle|ratio|pct/.test(k));
+      const max = Math.max(1, ...keys.flatMap((k) => [Math.abs(cur[k]), Math.abs(prev[k] ?? 0)]));
+      return keys.slice(0, 5).map((k) => ({ k, cur: cur[k], prev: prev[k] ?? null, w: (Math.abs(cur[k]) / max) * 100,
+                                           pw: typeof prev[k] === "number" ? (Math.abs(prev[k]) / max) * 100 : null }));
+    },
+    heat(n) {
+      if (!n) return "";
+      const all = Object.values(this.deep.data.counts || {}).flatMap((o) => Object.values(o)), max = Math.max(1, ...all);
+      return `background: color-mix(in srgb, var(--accent) ${Math.round(8 + (n / max) * 50)}%, transparent)`;
+    },
+    label(k) { return k.replace(/_/g, " ").replace(/\bocf\b/i, "OCF").replace(/\bfcf\b/i, "FCF").replace(/\bpat\b/i, "PAT").replace(/\bebitda\b/i, "EBITDA"); },
+    fmt(v) { return v == null ? "Not in sources" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 2 }); },
+
+    // ---------- replay, audio brief, journal, feedback ----------
+    rp: { daysAgo: 14, data: null, loading: false },
+    replayDate() { return new Date(Date.now() - this.rp.daysAgo * 864e5).toISOString().slice(0, 10); },
     async loadReplay() {
       this.rp.loading = true; this.rp.data = null;
       try { this.rp.data = await this.api(`/api/v2/replay?as_of=${this.replayDate()}&window=7d`); }
@@ -244,13 +538,14 @@ function finn() {
       if (!att.length) lines.push("Nothing needs your attention.");
       att.forEach((c) => lines.push(`${c.company || c.symbol}. ${c.headline}. ${c.why_it_matters || ""}`));
       if (this.digest.worth_a_look.length) lines.push(`${this.digest.worth_a_look.length} more worth a look.`);
-      let words = 0, out = [];
+      let words = 0; const out = [];
       for (const l of lines) { words += l.split(/\s+/).length; if (words > 160) break; out.push(l); }   // ~60 s at 160 wpm
-      return out.join(" ").replace(/₹/g, "rupees ").replace(/cr/g, "crore").replace(/YoY/g, "year on year");
+      return out.join(" ").replace(/₹/g, "rupees ").replace(/\bcr\b/g, "crore").replace(/\bYoY\b/g, "year on year").replace(/\bQoQ\b/g, "quarter on quarter");
     },
     toggleBrief() {
       if (!("speechSynthesis" in window)) return this.say("This browser can't read aloud.");
       if (this.speaking) { speechSynthesis.cancel(); this.speaking = false; return; }
+      if (!this.digest) return this.say("The feed is still loading.");
       const u = new SpeechSynthesisUtterance(this.briefText());
       u.lang = "en-IN"; u.rate = 1.0; u.onend = () => (this.speaking = false);
       speechSynthesis.speak(u); this.speaking = true;
@@ -265,74 +560,105 @@ function finn() {
     journal: [],
     async loadJournal(sym) { try { this.journal = (await this.api(`/api/v2/journal?symbol=${sym}`)).entries; } catch (e) {} },
     async sendFeedback(card, signal) {
-      try { const r = await this.api(`/api/v2/cards/${card.id}/feedback`, { method: "POST", body: JSON.stringify({ signal }) });
-            this.say(`Thanks. ${this.type(r.type)} weight now ${r.adjustment >= 0 ? "+" : ""}${r.adjustment} (bounded ±${r.bound})`); }
-      catch (e) { this.say(this.net.error); this.net.error = null; }
+      if (this.route === "gallery") return this.say("Gallery: feedback not saved");
+      try {
+        const r = await this.api(`/api/v2/cards/${card.id}/feedback`, { method: "POST", body: JSON.stringify({ signal }) });
+        this.say(`Thanks. ${this.type(r.type)} weight now ${r.adjustment >= 0 ? "+" : ""}${r.adjustment} (bounded ±${r.bound})`);
+      } catch (e) { this.say(this.net.error); this.net.error = null; }
     },
-    strongEvidence(l) { return !!(l.actual || (l.also_said_in && l.also_said_in.length)); },
 
-    // ---------- Copilot ----------
+    // ---------- copilot ----------
     cp: { q: "", steps: [], answer: null, busy: false, error: null },
     copilotSymbol() { return this.route === "holding" ? this.holding?.symbol || this.param : this.route === "research" ? this.param : null; },
+    copilotContext() {
+      const s = this.copilotSymbol();
+      return s ? `${s} · ${this.route === "holding" ? "holding" : "research report"}` : "Your portfolio";
+    },
     suggestions() {
       const s = this.copilotSymbol();
-      return s ? [`What has ${s}'s management promised for this year?`, `What did ${s} say about competition?`,
-                  `How credible has ${s}'s management been?`, `Why is my ${s} thesis on ${this.status(this.holding?.timeline?.[0]?.status || "intact")}?`]
-               : ["Which holdings reported results this month?", "Any governance red flags in my portfolio?"];
+      return s ? [`Why did ${s}'s margins move?`, `What did ${s} promise on capex?`, `Has ${s}'s CFO changed before?`, `How credible has ${s}'s management been?`]
+               : ["Which holdings are At risk and why?", "Which holdings reported results this month?", "Any governance red flags in my portfolio?"];
     },
-    openCopilot(q) { this.sheet = "copilot"; if (q) this.askCopilot(q); },
+    openCopilot(q) {
+      Object.assign(this.cp, { steps: [], answer: null, error: null });
+      this.sheet = "copilot"; if (q) this.askCopilot(q);
+    },
     askCopilot(q) {
       q = (q || this.cp.q || "").trim();
-      if (q.length < 3) return;
+      if (q.length < 3 || this.cp.busy) return;
       Object.assign(this.cp, { q, steps: [], answer: null, busy: true, error: null });
       const sym = this.copilotSymbol();
       const es = new EventSource(`/api/v2/copilot?q=${encodeURIComponent(q)}${sym ? "&symbol=" + sym : ""}`);
       es.addEventListener("step", (e) => this.cp.steps.push(JSON.parse(e.data)));
       es.addEventListener("note", (e) => this.cp.steps.push({ note: JSON.parse(e.data).text }));
       es.addEventListener("answer", (e) => { this.cp.answer = JSON.parse(e.data); this.cp.busy = false; es.close(); });
-      es.addEventListener("error", (e) => { try { this.cp.error = JSON.parse(e.data).error; } catch (_) { this.cp.error = "The assistant didn't answer."; } this.cp.busy = false; es.close(); });
+      es.addEventListener("error", (e) => {
+        try { this.cp.error = JSON.parse(e.data).error; } catch (_) { this.cp.error = "The assistant didn't answer. Try again."; }
+        this.cp.busy = false; es.close();
+      });
     },
-    toolLabel(t) { return { search_docs: "Searching documents", get_page: "Reading a page", get_metric: "Looking up figures",
-                            get_filings: "Checking filings", get_thesis: "Reading your thesis", get_ledger: "Reading the promise ledger" }[t] || t; },
+    toolLabel(t) {
+      return { search_docs: "Searching documents", get_page: "Reading a page", get_metric: "Looking up figures",
+               get_filings: "Checking filings", get_thesis: "Reading your thesis", get_ledger: "Reading the promise ledger" }[t] || t;
+    },
     citeOpen(id) {
       const e = this.cp.answer?.evidence?.find((x) => x.id === id);
       if (!e) return;
-      if (e.document_id && e.page) { this.openEvidence(e.document_id, e.page, e.text.replace(/^\[[^\]]*\]\s*/, "").slice(0, 120)); this.sheet = "evidence"; }
-      else if (e.filing_id) this.nav("#card/" + e.filing_id);
+      if (e.document_id && e.page) this.openEvidence(e.document_id, e.page, e.text.replace(/^\[[^\]]*\]\s*/, "").slice(0, 160));
+      else if (e.filing_id) this.openCard(e.filing_id);
       else if (e.url) window.open(e.url, "_blank", "noopener");
     },
 
-    // ---------- Deep dives ----------
-    deep: { recipe: null, data: null, loading: false, error: null },
-    deepRecipes: [["cash_quality", "Cash quality"], ["balance_sheet", "Balance sheet"], ["language_diff", "Language diff"],
-                  ["hedge_meter", "Hedge-meter"], ["dodge_detector", "Dodge detector"], ["worry_map", "Worry map"],
-                  ["fine_print", "Fine print"], ["peer_compare", "Peer compare"]],
-    async openDeep(recipe) {
-      Object.assign(this.deep, { recipe, data: null, loading: true, error: null });
-      try { this.deep.data = await this.api(`/api/v2/deep/${this.param}/${recipe}`); }
-      catch (e) { this.deep.error = this.net.error; this.net.error = null; }
-      finally { this.deep.loading = false; }
-    },
-    deepRows(obj) { return Object.entries(obj || {}).filter(([k, v]) => typeof v === "number" || v === null); },
-    label(k) { return k.replace(/_/g, " ").replace(/\bocf\b/i, "OCF").replace(/\bfcf\b/i, "FCF").replace(/\bpat\b/i, "PAT").replace(/\bebitda\b/i, "EBITDA"); },
-    fmt(v) { return v == null ? "Not in sources" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 2 }); },
-
-    // ---------- Alerts ----------
+    // ---------- alerts ----------
     async loadAlerts(quiet = false) {
       try { const r = await this.api("/api/v2/alerts"); this.alerts = r.alerts; this.unread = r.unread; }
       catch (e) { if (quiet) this.net.error = null; }
     },
+    alertGroups() {
+      const g = [];
+      for (const a of (this.alerts || []).slice(0, this.alertsAll ? 9999 : 30)) {
+        let grp = g.find((x) => x.day === a.date);
+        if (!grp) g.push((grp = { day: a.date, label: this.dayLabel(a.date), items: [] }));
+        grp.items.push(a);
+      }
+      return g;
+    },
+    alertIcon(k) { return { volume_spike: "#i-vol", price_move: "#i-trend", announcement_type: "#i-file", new_promise: "#i-list", peer_read_across: "#i-users" }[k] || "#i-bell"; },
     async openAlert(a) {
       if (!a.read) { a.read = true; this.unread = Math.max(0, this.unread - 1); this.api(`/api/v2/alerts/${a.id}/read`, { method: "POST" }).catch(() => {}); }
       if (a.link) location.hash = a.link.replace(/^\/?#?/, "#");
     },
-    async readAll() { await this.api("/api/v2/alerts/read_all", { method: "POST" }); this.alerts.forEach((a) => (a.read = true)); this.unread = 0; },
+    async readAll() { await this.api("/api/v2/alerts/read_all", { method: "POST" }); (this.alerts || []).forEach((a) => (a.read = true)); this.unread = 0; },
+    ruleChip(r) {
+      const p = r.params, off = r.enabled ? "" : " · off";
+      if (p.multiple !== undefined) return `Volume ≥ ${Number(p.multiple).toFixed(1)}×` + off;
+      if (p.pct !== undefined) return `Price ±${Number(p.pct).toFixed(1)}%` + off;
+      if (r.kind === "announcement_type") return `Types: ${p.types.slice(0, 3).map((t) => this.type(t)).join(", ")}${p.types.length > 3 ? " +" + (p.types.length - 3) : ""}` + off;
+      if (r.kind === "new_promise") return "New or dropped promises" + off;
+      if (r.kind === "peer_read_across") return "Peer filings" + off;
+      return r.label + off;
+    },
+    rulesLine() {
+      const v = this.rules?.find((r) => r.kind === "volume_spike"), p = this.rules?.find((r) => r.kind === "price_move");
+      return v && p ? `Your thresholds: volume ${Number(v.params.multiple).toFixed(1)}× the 20-day median, price ±${Number(p.params.pct).toFixed(1)}%. Change them in Settings.`
+                    : "Set thresholds in Settings.";
+    },
+    pushBanner() {
+      if (this.push.state === "on") return false;
+      if (this.isIOS && !this.standalone) return true;
+      return this.push.supported && typeof Notification !== "undefined" && Notification.permission !== "granted";
+    },
 
-    // ---------- Settings ----------
+    // ---------- settings ----------
     async loadRules() { try { this.rules = (await this.api("/api/v2/rules")).rules; } catch (e) {} },
     async saveRule(r) {
       try { await this.api(`/api/v2/rules/${r.kind}`, { method: "PUT", body: JSON.stringify({ params: r.params, enabled: r.enabled }) }); this.say("Rule saved"); }
-      catch (e) { this.say(this.net.error); this.loadRules(); }
+      catch (e) { this.say(this.net.error); this.net.error = null; this.loadRules(); }
+    },
+    toggleType(r, t) {
+      const i = r.params.types.indexOf(t);
+      if (i >= 0) r.params.types.splice(i, 1); else r.params.types.push(t);
+      this.saveRule(r);
     },
     async enablePush() {
       if (!this.push.supported) return (this.push.msg = "This browser can't receive web push.");
@@ -344,41 +670,82 @@ function finn() {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
       await this.api("/api/v2/push/subscribe", { method: "POST", body: JSON.stringify(sub.toJSON()) });
-      this.push.state = "on"; this.push.msg = "Notifications are on.";
+      this.push.state = "on"; this.push.msg = "Notifications are on."; this.say("Notifications are on");
     },
     async testPush() {
-      const r = await this.api("/api/v2/push/test", { method: "POST" });
-      this.push.msg = r.sent ? `Sent to ${r.sent} device${r.sent > 1 ? "s" : ""}.` : (r.skipped || "No subscribed device yet.");
+      try { const r = await this.api("/api/v2/push/test", { method: "POST" });
+            this.push.msg = r.sent ? `Sent to ${r.sent} device${r.sent > 1 ? "s" : ""}.` : (r.skipped || "No subscribed device yet."); }
+      catch (e) { this.push.msg = this.net.error; this.net.error = null; }
     },
     sched: null,
     async loadSched() { try { this.sched = await this.api("/api/v2/scheduler"); } catch (e) {} },
     async refreshNow() {
       const r = await this.api("/api/v2/refresh", { method: "POST" });
       this.say(r.started ? "Refreshing filings, prices and alerts…" : r.reason);
+      await this.loadSched();
       const t = setInterval(async () => {
         await this.loadSched();
-        if (this.sched && !this.sched.running) { clearInterval(t); this.say("Refresh done"); this.loadAlerts(); if (this.route === "today") { this.digest = null; this.loadDigest(); } }
+        if (this.sched && !this.sched.running) {
+          clearInterval(t); this.say("Refresh done"); this.loadAlerts(); this.loadState();
+          if (this.route === "today") { this.digest = null; this.loadDigest(); }
+        }
       }, 4000);
     },
-    async runPipeline() { this.say("Checking for new alerts…"); const r = await this.api("/api/v2/alerts/evaluate", { method: "POST" }); this.loadAlerts(); this.say(`Done: ${JSON.stringify(r).length ? "alerts updated" : ""}`); },
+    async runPipeline() {
+      this.say("Checking for new alerts…");
+      try { await this.api("/api/v2/alerts/evaluate", { method: "POST" }); await this.loadAlerts(); this.say(`Alerts checked · ${this.unread} unread`); }
+      catch (e) { this.say(this.net.error); this.net.error = null; }
+    },
+
+    // ---------- gallery: real cards, one per variant ----------
+    async loadGallery() {
+      this.loadCatalysts(); if (!this.rules) this.loadRules();
+      if (!this.gal.digest) { try { this.gal.digest = await this.api("/digest?window=30d"); } catch (e) {} }
+    },
+    galleryPicks() {
+      const d = this.gal.digest;
+      if (!d) return { attention: [], worth: [] };
+      if (this._picks && this._picksFrom === d) return this._picks;
+      const all = [...d.attention, ...d.worth_a_look], used = new Set(), pick = (f) => { const c = all.find((x) => !used.has(x.id) && f(x)); if (c) used.add(c.id); return c; };
+      const attention = [
+        pick((c) => c.type === "results" && c.payload?.ok && c.payload.results_day?.comparisons?.length),
+        pick((c) => c.type === "results" && c.payload?.ok && !(c.payload.notes || []).length),
+        pick((c) => c.type === "results" && c.payload?.ok && (c.payload.notes || []).length),
+        pick((c) => c.type === "results" && c.payload?.ok === false),
+        pick((c) => c.type === "mgmt_change" && c.payload?.people?.length > 1),
+        pick((c) => c.type === "mgmt_change" && c.payload?.people?.length),
+        pick((c) => this.isGov(c)),
+        pick((c) => c.payload?.kind === "order"),
+        pick((c) => !c.payload && c.one_liner),
+      ].filter(Boolean);
+      const worth = d.worth_a_look.filter((c) => !used.has(c.id)).slice(0, 3);
+      this._picksFrom = d; this._picks = { attention, worth };
+      return this._picks;
+    },
 
     // ---------- formatting ----------
-    type(t) { return TYPE_LABEL[t] || t; },
     status(s) { return STATUS_LABEL[s] || s; },
-    verdict(v) { return VERDICT_LABEL[v] || v; },
-    kpi(m) { return KPI_LABEL[m] || m; },
-    windows() { return WINDOWS; },
-    cr(n) { return n == null ? "–" : "₹" + Number(n).toLocaleString("en-IN", { maximumFractionDigits: n >= 100 ? 0 : 1 }) + " cr"; },
+    cr(n) { return n == null ? "Not in sources" : "₹" + Number(n).toLocaleString("en-IN", { maximumFractionDigits: Math.abs(n) >= 100 ? 0 : 1 }) + " cr"; },
+    rupee(n) { return n == null ? "–" : "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: n < 10000 ? 2 : 0, maximumFractionDigits: n < 10000 ? 2 : 0 }); },
+    whole(n) { return n == null ? "–" : Math.round(n).toLocaleString("en-IN"); },
     pct(n) { return n == null ? "–" : (n > 0 ? "+" : "") + Number(n).toFixed(1) + "%"; },
-    cls(n) { return n == null ? "mute" : n > 0 ? "up" : n < 0 ? "down" : "mute"; },
+    arrow(n) { return n == null ? "–" : (n > 0 ? "▲ " : n < 0 ? "▼ " : "") + Math.abs(n).toFixed(1); },
+    cls(n) { return n == null ? "t2" : n > 0 ? "up" : n < 0 ? "down" : "t2"; },
     when(iso) {
       if (!iso) return "";
-      const d = new Date(iso), now = new Date(), mins = (now - d) / 60000;
+      const d = new Date(iso), mins = (Date.now() - d) / 60000;
       if (mins < 60) return `${Math.max(1, Math.round(mins))}m ago`;
       if (mins < 60 * 24) return `${Math.round(mins / 60)}h ago`;
-      return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+      if (mins < 60 * 24 * 7) return `${Math.round(mins / 1440)}d ago`;
+      return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", ...IST });
     },
-    day(iso) { return iso ? new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) : ""; },
+    day(iso) { return iso ? new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", ...IST }) : ""; },
+    weekday(iso) { return this.day(iso); },
+    dm(iso) { return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", ...IST }); },
+    dayLabel(iso) {
+      const t = this.today(), y = new Date(Date.now() - 864e5).toLocaleDateString("en-CA", IST);
+      return iso === t ? "Today" : iso === y ? "Yesterday" : this.day(iso);
+    },
     metricName(m) { return { revenue: "Revenue", ebitda: "EBITDA", pbt: "PBT", pat: "PAT" }[m] || m; },
   };
 }
@@ -386,31 +753,4 @@ function finn() {
 function b64ToBytes(b64) {
   const s = atob(b64.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b64.length + 3) % 4));
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
-}
-
-// Sample data for #gallery: every card kind and every state, rendered with the real templates.
-function galleryData() {
-  const base = { symbol: "TCS", company: "Tata Consultancy Services Ltd", filed_at: new Date().toISOString(), reviewed: false,
-                 why: { reasons: [], score: 0.8, type_weight: 1, magnitude: 1, novelty: 1, thesis_multiplier: 1 } };
-  return {
-    results: { ...base, id: -1, type: "results", bucket: "attention", headline: "Q2 FY27 results: Revenue ₹73,188 cr (+11.2% YoY), PAT ₹13,934 cr (+14.9% YoY)",
-      symbol: "SAMPLECO", company: "Sample Company Ltd (fictional)",
-      payload: { ok: true, basis: "consolidated", confidence: "high", period: "Q2 FY27", table: [
-        { metric: "revenue", found: true, current: 73188, qoq: 1.3, yoy: 11.2 }, { metric: "ebitda", found: true, current: 19882, qoq: 2.0, yoy: 9.8 },
-        { metric: "pbt", found: true, current: 18638, qoq: 3.9, yoy: 16.0 }, { metric: "pat", found: true, current: 13934, qoq: 3.8, yoy: 14.9 }],
-        results_day: { comparisons: [{ metric: "EBITDA margin", promised: "26-28%", delivered: 27.2, verdict: "on track" }] } },
-      thesis_impact: "watch", why_it_matters: "Quarterly results: check them against the thesis." },
-    lowconf: { ...base, id: -2, symbol: "SAMPLECO", type: "results", bucket: "attention", headline: "Un-Audited Financial Results For The Quarter Ended 30 September 2026",
-      payload: { ok: false, reason: "figures are 100× off BSE's own numbers (unit or digit misread); not shown" } },
-    mgmt: { ...base, id: -3, symbol: "SAMPLECO", type: "mgmt_change", bucket: "attention", headline: "A. Sample, Managing Director and Chief Executive Officer: resigns",
-      payload: { people: [{ name: "A. Sample", role: "Managing Director and Chief Executive Officer", direction: "resigned", senior: true,
-        profile_quote: "A fictional profile quote.", quote: "A. Sample will step down as MD & CEO", page: 1 }],
-        governance_flags: [{ kind: "senior_exit", severity: "high", summary: "A. Sample (MD & CEO) resigned" }] }, thesis_impact: "watch",
-      why_it_matters: "Senior leadership change: management quality is part of every thesis." },
-    governance: { ...base, id: -4, symbol: "SAMPLECO", type: "governance", bucket: "attention", headline: "Resignation of Statutory Auditor (fictional example)",
-      payload: { kind: "governance", ok: true, flags: [{ kind: "auditor_resignation", severity: "high", summary: "The statutory auditor resigned before completing its term." }] },
-      thesis_impact: "threatens", why_it_matters: "An auditor resigning mid-term is a classic integrity red flag." },
-    worth: { ...base, id: -5, symbol: "SAMPLECO", type: "order_win", bucket: "worth_a_look", headline: "Sample Company wins orders (Large*) (fictional example)",
-      one_liner: "A fictional order win, to show the compact row.", thesis_impact: "supports", why_it_matters: null },
-  };
 }

@@ -5,758 +5,1149 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FINN</title>
 <meta name="description" content="FINN: has anything happened that changes why I own this?">
-<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B0E13" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F7F8FA" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/static/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<script>/* theme before first paint: ?theme= (QA) or the saved choice */
+  (function () { try { var q = new URLSearchParams(location.search).get("theme"), t = q || JSON.parse(localStorage.getItem("finn.theme"));
+    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {} })();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="/static/app.css">
 <script defer src="/static/app.js"></script>
 <script defer src="/static/vendor/alpine-3.14.8.min.js"></script>
 </head>
 <body>
+<!-- Lucide-style icons (ISC), 24px grid, stroked by .i -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-today" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 9h16M8 3v4M16 3v4"/></symbol>
-  <symbol id="i-hold" viewBox="0 0 24 24"><path d="M3 20h18M6 16V9m6 7V5m6 11v-4"/></symbol>
-  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
-  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
-  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
-  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
-  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
-  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></symbol>
-  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-today" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-hold" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16v-5M12 16V7M17 16v-8"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 13h4M10 17h4"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="m7 4 13 8-13 8z"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></symbol>
+  <symbol id="i-dn" viewBox="0 0 24 24"><path d="M17 14V2M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></symbol>
+  <symbol id="i-raise" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M8 16H3v5"/></symbol>
+  <symbol id="i-replay" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/><path d="M12 7v5l3 2"/></symbol>
 </svg>
 
-<div class="app" x-data="finn()" x-init="init()">
+<div class="app" x-data="finn()" x-init="init()" :class="((route==='holding' && holding) || (route==='research' && param)) && 'has-cp'">
 
-  <!-- ===== header ===== -->
+  <!-- ===================== header ===================== -->
   <header class="top">
-    <div class="top-row">
-      <template x-if="['holding'].includes(route) || (route==='research' && param)">
-        <button class="avatar" @click="history.back()" aria-label="Back"><svg class="i s"><use href="#i-back"/></svg></button>
-      </template>
-      <span class="brand" x-show="route==='today' || route==='gallery'">FINN</span>
-      <h1 x-show="route==='holdings'">Holdings</h1>
-      <h1 x-show="route==='holding'" x-text="holding?.symbol || param"></h1>
-      <h1 x-show="route==='research'" x-text="param ? (rq.report?.name || param) : 'Research'"></h1>
-      <h1 x-show="route==='alerts'">Alerts</h1>
-      <h1 x-show="route==='settings'">Settings</h1>
-      <span class="spacer"></span>
-      <span class="xs mute" x-show="route==='today' && digest" x-text="digest?.window.label"></span>
-      <button class="avatar" @click="nav('#settings')" aria-label="Settings"><svg class="i s"><use href="#i-user"/></svg></button>
-    </div>
-    <div class="chips" x-show="route==='today'" role="group" aria-label="Time window">
-      <template x-for="[w, label] in windows()" :key="w">
-        <button class="chip" :aria-pressed="win===w" @click="setWindow(w)" x-text="label"></button>
-      </template>
-      <button class="chip" :aria-pressed="win==='custom'" @click="setWindow('custom')">Custom…</button>
-    </div>
+    <template x-if="route==='today'">
+      <div>
+        <div class="row">
+          <span class="eyebrow grow" x-text="dateEyebrow()"></span>
+          <template x-if="staleLabel()"><span class="badge watch" x-text="staleLabel()"></span></template>
+          <a class="ibtn" href="#settings" aria-label="Settings"><svg class="i"><use href="#i-gear"/></svg></a>
+        </div>
+        <div class="row" style="margin-top:2px">
+          <h1 class="grow">Today</h1>
+          <button class="pillbtn" @click="toggleBrief()" :aria-pressed="speaking" :aria-label="speaking ? 'Stop the audio brief' : 'Play a 60-second audio brief'">
+            <svg class="i s"><use :href="speaking ? '#i-stop' : '#i-play'"/></svg><span x-text="speaking ? 'Stop' : 'Brief'"></span></button>
+          <div class="dd" @click.outside="pick=false" @keydown.escape="pick=false">
+            <button class="pillbtn fill" @click="pick=!pick" :aria-expanded="pick" aria-haspopup="menu" aria-label="Time window">
+              <span x-text="winLabel()"></span><svg class="i s t2"><use href="#i-down"/></svg></button>
+            <div class="dd-menu" x-show="pick" x-cloak role="menu">
+              <template x-for="[w, label] in windows()" :key="w">
+                <button role="menuitemradio" :aria-checked="win===w" @click="pick=false; setWindow(w)"><span x-text="label"></span>
+                  <svg class="i s acc" x-show="win===w"><use href="#i-check"/></svg></button>
+              </template>
+              <button role="menuitemradio" :aria-checked="win==='custom'" @click="pick=false; setWindow('custom')"><span>Custom range…</span>
+                <svg class="i s acc" x-show="win==='custom'"><use href="#i-check"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="summary" x-show="digest">
+          <button @click="jump('attention')"><b x-text="(digest?.unreviewed.attention ?? 0) + ' need attention'"></b></button> ·
+          <button @click="nav('#alerts')" x-text="unread + (unread === 1 ? ' alert' : ' alerts')"></button> ·
+          <button @click="routineOpen = true; jump('routine')" x-text="(digest?.routine.length ?? 0) + ' routine hidden'"></button>
+        </div>
+      </div>
+    </template>
+    <template x-if="route!=='today'">
+      <div class="row">
+        <template x-if="backable()"><button class="ibtn" @click="back()" aria-label="Back"><svg class="i"><use href="#i-back"/></svg></button></template>
+        <div class="grow">
+          <div class="eyebrow trunc" x-show="eyebrow()" x-text="eyebrow()"></div>
+          <h1 class="trunc" :class="route==='holding' || (route==='research' && param) ? 'sub' : ''" x-text="title()"></h1>
+        </div>
+        <template x-if="route==='alerts' && unread"><button class="btn quiet" @click="readAll()">Mark all read</button></template>
+        <template x-if="['holdings','research','alerts'].includes(route)"><a class="ibtn" href="#settings" aria-label="Settings"><svg class="i"><use href="#i-gear"/></svg></a></template>
+      </div>
+    </template>
   </header>
 
   <main>
-    <!-- network states -->
-    <div class="netbar">
-      <div class="notice" x-show="net.waking" role="status">Waking the server… the first request after a quiet spell takes a few seconds.</div>
-      <div class="notice warn" x-show="net.stale" role="status">Showing the last copy: the server didn't answer just now.</div>
-      <div class="notice err" x-show="net.error && !net.stale && !net.waking" role="alert" x-text="'Couldn\'t load: ' + net.error"></div>
+    <!-- ===== network states ===== -->
+    <div class="mt12" x-show="net.waking || net.error" x-cloak>
+      <div class="notice" x-show="net.waking" role="status"><div class="row"><span class="spin"></span><span>Waking FINN up… the first request after a quiet spell takes up to 30 s.</span></div></div>
+      <div class="notice err" x-show="net.error && !net.waking" role="alert"><div class="row"><svg class="i s down"><use href="#i-alert"/></svg>
+        <span class="grow" x-text="'Couldn\'t load: ' + net.error"></span><button class="btn quiet" @click="retry()">Retry</button></div></div>
     </div>
+    <div class="notice warn mt12" x-show="net.stale" x-cloak role="status">Showing the last copy: the server didn't answer just now.</div>
 
-    <!-- ===== Today (also renders the #gallery sample feed) ===== -->
+    <!-- ===================== Today + Gallery feed ===================== -->
     <section x-show="route==='today' || route==='gallery'">
       <template x-if="route==='gallery'">
-        <div class="notice">Component gallery: sample cards rendered with the live templates, then every screen state.</div>
+        <div class="mt16">
+          <p class="small t2">Every component, card variant and state, rendered with the live templates. Cards below are real filings from the last 30 days, one per variant.</p>
+          <div class="eyebrow mt16">Card variants (live data)</div>
+        </div>
       </template>
 
-      <div class="row" x-show="route==='today' && digest" style="margin-bottom:4px">
-        <button class="btn" @click="toggleBrief()" :aria-pressed="speaking" x-text="speaking ? '■ Stop' : '▶ Listen (60 s)'"></button>
-        <button class="btn" @click="sheet='replay'">Replay a past date</button>
-      </div>
-      <template x-if="route==='today' && catalysts.length">
+      <!-- pulse grid -->
+      <template x-if="route==='today'">
         <div>
-          <div class="section-h"><h2>Week ahead</h2></div>
-          <div class="strip">
-            <template x-for="c in catalysts" :key="c.date + c.symbol + c.title">
-              <button class="cat" style="text-align:left" @click="nav('#holding/' + c.symbol)">
-                <div class="d" x-text="day(c.date)"></div>
-                <div><strong x-text="c.symbol"></strong> <span class="small ink2" x-text="c.title"></span></div>
-              </button>
+          <div class="section-h"><span class="eyebrow">Portfolio pulse</span><span class="xs t2" x-show="holdings" x-text="pulseAsOf()"></span></div>
+          <div class="pulse" x-show="!holdings">
+            <template x-for="n in 8" :key="n"><div class="sk tile-sk"></div></template>
+          </div>
+          <div class="pulse" x-show="holdings">
+            <template x-for="h in (holdings || [])" :key="h.symbol">
+              <a class="tile" :class="h.status" :href="'#holding/' + h.symbol"
+                 :aria-label="h.symbol + ', ' + status(h.status) + ', ' + (h.day_pct == null ? 'no price' : pct(h.day_pct) + ' today') + (h.unreviewed_attention_7d ? ', ' + h.unreviewed_attention_7d + ' to review' : '')">
+                <span class="s" x-text="h.symbol"></span>
+                <span class="p num" :class="cls(h.day_pct)" x-text="h.day_pct == null ? '–' : pct(h.day_pct)"></span>
+                <span class="dot" x-show="h.unreviewed_attention_7d"></span>
+              </a>
             </template>
+          </div>
+          <div class="legend" x-show="holdings">
+            <span x-text="statusCount('intact') + ' intact'"></span><span class="watch" x-text="statusCount('watch') + ' watch'"></span>
+            <span class="at_risk" x-text="statusCount('at_risk') + ' at risk'"></span>
+          </div>
+          <!-- week-ahead strip -->
+          <div class="strip" aria-label="Week ahead">
+            <template x-for="c in catalysts" :key="c.date + c.symbol + c.title">
+              <a class="chip" :href="'#holding/' + c.symbol"><b x-text="c.symbol"></b><span class="trunc" style="max-width:180px" x-text="c.title"></span><span x-text="'· ' + weekday(c.date)"></span></a>
+            </template>
+            <span class="chip" x-show="catalystsLoaded && !catalysts.length">No dated events in sources for the next 7 days</span>
           </div>
         </div>
       </template>
 
+      <!-- skeleton -->
       <template x-if="route==='today' && !digest && !net.error">
-        <div><div class="skel" style="width:40%"></div><div class="card"><div class="card-main"><div class="skel"></div><div class="skel" style="width:70%"></div></div></div>
-          <div class="card"><div class="card-main"><div class="skel"></div><div class="skel" style="width:60%"></div></div></div></div>
+        <div class="mt24">
+          <div class="sk" style="width:30%; height:11px"></div>
+          <template x-for="n in 2" :key="n"><div class="card mt12"><div class="sk" style="width:45%"></div><div class="sk h"></div><div class="sk h" style="width:70%"></div><div class="sk mt12" style="height:72px"></div></div></template>
+        </div>
       </template>
 
       <template x-if="(route==='today' && digest) || route==='gallery'">
         <div>
-          <!-- caught up -->
-          <template x-if="route==='today' && digest.caught_up && (digest.attention.length + digest.worth_a_look.length)">
-            <div class="empty"><div class="big">You're caught up</div><div>Everything in this window is reviewed.</div></div>
+          <!-- caught up / nothing material -->
+          <template x-if="route==='today' && caughtUp()">
+            <div class="card empty mt24"><div class="mark"><svg class="i"><use href="#i-check"/></svg></div>
+              <h3>You're caught up</h3><p x-text="nextEvent()"></p></div>
           </template>
           <template x-if="route==='today' && !(digest.attention.length + digest.worth_a_look.length)">
-            <div class="empty"><div class="big">Nothing material in this window</div>
-              <div class="small" x-text="digest.routine.length ? digest.routine.length + ' routine filings, collapsed below.' : 'No filings at all.'"></div>
-              <button class="btn ghost" @click="setWindow('7d')">Look at the last 7 days</button></div>
+            <div class="card empty mt24"><div class="mark n"><svg class="i"><use href="#i-file"/></svg></div>
+              <h3>Nothing material in this window</h3>
+              <p x-text="digest.routine.length ? digest.routine.length + ' routine filings, collapsed below.' : 'No filings at all in ' + winLabel().toLowerCase() + '.'"></p>
+              <button class="btn mt12" @click="setWindow('7d')" x-show="win !== '7d' && win !== '30d'">Look at the last 7 days</button></div>
           </template>
 
           <!-- Needs attention -->
-          <template x-if="(route==='gallery' ? Object.values(gallery||{}).filter(c=>c.bucket==='attention') : digest.attention).length">
-            <div>
-              <div class="section-h"><h2>Needs attention</h2>
-                <span class="xs mute" x-show="route==='today'" x-text="digest?.unreviewed.attention + ' to review'"></span></div>
-              <template x-for="c in (route==='gallery' ? Object.values(gallery).filter(c=>c.bucket==='attention') : digest.attention)" :key="c.id">
-                <article class="card" :class="c.reviewed && 'reviewed'" x-init="swipe($el, c)">
-                  <button class="card-main" @click="c.id > 0 ? nav('#card/' + c.id) : (cardDetail = c, sheet = 'card')">
-                    <div class="card-meta">
-                      <span class="sym" x-text="c.symbol"></span><span>·</span><span x-text="type(c.type)"></span><span>·</span><span x-text="when(c.filed_at)"></span>
-                      <span class="spacer"></span>
-                      <span class="pill neutral" x-show="c.revised">Revised</span>
-                      <span class="pill watch" x-show="c.payload && c.payload.ok === false">Not extracted</span>
+          <template x-if="feedAttention().length">
+            <div id="attention">
+              <div class="section-h"><span class="eyebrow">Needs attention</span>
+                <span class="xs t2" x-show="route==='today'">Swipe right: reviewed · left: snooze</span></div>
+              <template x-for="c in feedAttention()" :key="c.id">
+                <div class="swipe" x-init="gesture($el, c)">
+                  <div class="reveal r"><span class="row"><svg class="i s"><use href="#i-check"/></svg>Reviewed</span></div>
+                  <div class="reveal l"><span class="row">Snooze until tomorrow<svg class="i s"><use href="#i-clock"/></svg></span></div>
+                  <article class="card" :class="c.reviewed && 'reviewed'" @contextmenu.prevent="openMenu(c)">
+                    <div class="meta">
+                      <span class="sym" x-text="c.symbol"></span>
+                      <span class="badge gov" x-show="isGov(c)">GOVERNANCE</span>
+                      <span class="badge" x-show="!isGov(c)" x-text="type(c.type)"></span>
+                      <span class="badge" :class="c.thesis_impact" x-show="impact(c)" x-text="impact(c)"></span>
+                      <span class="badge verify" x-show="lowConf(c)"><svg class="i"><use href="#i-alert"/></svg>Verify</span>
+                      <span class="when"><span x-text="when(c.filed_at)"></span>
+                        <button class="ibtn" @click.stop="openWhy(c)" aria-label="Why am I seeing this?"><svg class="i s"><use href="#i-info"/></svg></button></span>
                     </div>
-                    <div class="card-h" x-text="c.headline"></div>
-                    <!-- results mini table -->
-                    <template x-if="c.payload?.kind === 'results' && c.payload?.ok || (c.payload?.table && c.payload?.ok)">
-                      <table class="mini num">
-                        <thead><tr><th>₹ crore</th><th>Current</th><th>QoQ</th><th>YoY</th></tr></thead>
-                        <tbody>
-                          <template x-for="r in c.payload.table.filter(r=>r.found)" :key="r.metric">
-                            <tr><td x-text="metricName(r.metric) + (r.derived ? '*' : '')"></td><td x-text="Number(r.current).toLocaleString('en-IN',{maximumFractionDigits:0})"></td>
-                              <td :class="cls(r.qoq)" x-text="pct(r.qoq)"></td><td :class="cls(r.yoy)" x-text="pct(r.yoy)"></td></tr>
-                          </template>
-                        </tbody>
-                      </table>
+                    <h3 class="headline clamp2" x-text="headline(c)"></h3>
+
+                    <!-- results: verdict line + 4×3 table -->
+                    <template x-if="c.payload?.ok && c.payload?.table">
+                      <div>
+                        <template x-if="firstCmp(c)">
+                          <div class="verdict-line inset">
+                            <span class="t2">Promised</span> <span x-text="firstCmp(c).metric + ' ' + firstCmp(c).promised"></span>
+                            <span class="t2">→ delivered</span> <span class="num" x-text="firstCmp(c).delivered + (firstCmp(c).delivered_unit || '%')"></span>
+                            <span class="badge" :class="cmpCls(firstCmp(c).verdict)" x-text="firstCmp(c).verdict"></span>
+                          </div>
+                        </template>
+                        <table class="tbl">
+                          <thead><tr><th>₹ cr</th><th x-text="c.payload.period || 'Latest'"></th><th>QoQ</th><th>YoY</th></tr></thead>
+                          <tbody>
+                            <template x-for="r in resultRows(c)" :key="r.metric">
+                              <tr><td x-text="metricName(r.metric) + (r.derived ? '*' : '')"></td><td x-text="whole(r.current)"></td>
+                                <td :class="cls(r.qoq)" x-text="arrow(r.qoq)"></td><td :class="cls(r.yoy)" x-text="arrow(r.yoy)"></td></tr>
+                            </template>
+                          </tbody>
+                        </table>
+                        <div class="tbl-note" x-text="resultsNote(c)"></div>
+                      </div>
                     </template>
-                    <template x-if="c.payload?.results_day?.comparisons?.length">
-                      <div class="card-sub small"><template x-for="x in c.payload.results_day.comparisons.slice(0,2)" :key="x.metric + x.promised">
-                        <div>Promised <strong x-text="x.metric + ' ' + x.promised"></strong> → <span x-text="x.delivered + '%'"></span> · <span x-text="x.verdict"></span></div>
-                      </template></div>
+                    <!-- results not extracted -->
+                    <template x-if="c.payload && c.payload.ok === false && c.type === 'results'">
+                      <div class="inset mt8 small"><span class="watch">Figures not shown.</span> <span class="t2" x-text="c.payload.reason"></span></div>
                     </template>
-                    <template x-if="c.payload && c.payload.ok === false">
-                      <div class="card-sub small" x-text="c.payload.reason"></div>
-                    </template>
+                    <!-- management change: IN / OUT -->
                     <template x-if="c.payload?.people?.length">
-                      <div class="card-sub small"><template x-for="p in c.payload.people.slice(0,2)" :key="p.name">
-                        <div><span x-text="p.direction === 'appointed' ? 'IN' : 'OUT'" class="pill" :class="p.direction === 'appointed' ? 'intact' : 'watch'"></span>
-                          <span x-text="' ' + p.name + ' · ' + (p.role || '')"></span></div></template></div>
+                      <div>
+                        <template x-for="p in c.payload.people.slice(0, 2)" :key="p.name">
+                          <div class="person">
+                            <span class="dir" :class="isIn(p) ? 'in' : 'out'" x-text="isIn(p) ? 'IN' : 'OUT'"></span>
+                            <span class="avatar" aria-hidden="true" x-text="initials(p.name)"></span>
+                            <div class="grow"><div class="small trunc" style="font-weight:600" x-text="p.name"></div>
+                              <div class="xs t2 trunc" x-text="(p.role || 'Role not in filing') + (p.effective_date ? ' · effective ' + p.effective_date : '')"></div></div>
+                          </div>
+                        </template>
+                      </div>
                     </template>
-                    <template x-if="(c.payload?.flags || c.payload?.governance_flags || []).filter(f=>f.severity==='high').length">
-                      <div class="row wrap" style="margin-top:6px"><template x-for="f in (c.payload.flags || c.payload.governance_flags).filter(f=>f.severity==='high')" :key="f.kind">
-                        <span class="pill at_risk" x-text="f.kind.replace(/_/g,' ')"></span></template></div>
+                    <!-- governance flags -->
+                    <template x-if="!c.payload?.people?.length && flags(c).length">
+                      <div class="mt8">
+                        <template x-for="f in flags(c).slice(0, 2)" :key="f.kind + f.summary">
+                          <div class="small"><span x-text="f.summary || f.kind.replace(/_/g, ' ')"></span>
+                            <span class="t2" x-show="f.quote" x-text="' “' + clip(f.quote, 110) + '” · filing p.' + f.page"></span></div>
+                        </template>
+                      </div>
                     </template>
-                    <div class="card-sub" x-show="!c.payload?.ok && !c.payload?.people && c.one_liner" x-text="c.one_liner"></div>
-                    <div class="card-why" :class="c.thesis_impact" x-show="c.why_it_matters" x-text="c.why_it_matters"></div>
-                  </button>
-                  <div class="card-actions">
-                    <button class="btn" @click="review(c, c.reviewed)" x-text="c.reviewed ? 'Undo' : 'Mark reviewed'"></button>
-                    <button class="btn" @click="nav('#research/' + c.symbol)">Dig deeper →</button>
-                  </div>
-                </article>
+                    <!-- order -->
+                    <template x-if="c.payload?.kind === 'order'">
+                      <div class="inset mt8 small num" x-text="c.payload.value_cr != null ? cr(c.payload.value_cr) + (c.payload.share_of_revenue != null ? ' · ' + c.payload.share_of_revenue + '% of trailing revenue' : '') : 'Order value: not in filing'"></div>
+                    </template>
+                    <!-- generic -->
+                    <p class="oneliner clamp2" x-show="showOneLiner(c)" x-text="c.one_liner"></p>
+
+                    <div class="foot">
+                      <button class="lnk" @click="openCardSheet(c)">Evidence</button>
+                      <a class="mut" :href="c.pdf_url" target="_blank" rel="noopener" x-show="c.pdf_url">Filing<svg class="i s"><use href="#i-ext"/></svg></a>
+                      <button class="mut" @click="openMenu(c)" aria-label="More actions"><svg class="i"><use href="#i-more"/></svg></button>
+                      <button class="go" @click="nav('#research/' + c.symbol)">Dig deeper →</button>
+                    </div>
+                  </article>
+                </div>
               </template>
             </div>
           </template>
 
           <!-- Worth a look -->
-          <template x-if="(route==='gallery' ? Object.values(gallery||{}).filter(c=>c.bucket==='worth_a_look') : digest.worth_a_look).length">
+          <template x-if="feedWorth().length">
             <div>
-              <div class="section-h"><h2>Worth a look</h2></div>
+              <div class="section-h"><span class="eyebrow">Worth a look</span><span class="xs t2" x-text="feedWorth().length"></span></div>
               <div class="list">
-                <template x-for="c in (route==='gallery' ? Object.values(gallery).filter(c=>c.bucket==='worth_a_look') : digest.worth_a_look)" :key="c.id">
-                  <button class="compact" :class="c.reviewed && 'reviewed'" @click="c.id > 0 ? nav('#card/' + c.id) : (cardDetail = c, sheet = 'card')" :style="c.reviewed ? 'opacity:.55' : ''">
-                    <div style="flex:1">
-                      <div class="card-meta"><span class="sym" x-text="c.symbol"></span><span>·</span><span x-text="type(c.type)"></span><span>·</span><span x-text="when(c.filed_at)"></span></div>
-                      <div class="small" style="font-weight:560" x-text="c.headline"></div>
-                      <div class="xs ink2" x-show="c.one_liner && c.one_liner !== c.headline" x-text="c.one_liner"></div>
+                <template x-for="c in feedWorth().slice(0, worthAll ? 999 : 8)" :key="c.id">
+                  <button class="li" @click="openCardSheet(c)" @contextmenu.prevent="openMenu(c)" :style="c.reviewed ? 'opacity:.55' : ''">
+                    <div class="grow">
+                      <div class="meta"><span class="sym" x-text="c.symbol"></span><span x-text="type(c.type)"></span>
+                        <span class="badge" :class="c.thesis_impact" x-show="impact(c)" x-text="impact(c)"></span>
+                        <span class="when" x-text="when(c.filed_at)"></span></div>
+                      <div class="small mt4 clamp2" style="font-weight:500" x-text="headline(c)"></div>
                     </div>
-                    <svg class="i s mute" x-show="c.reviewed"><use href="#i-check"/></svg>
+                    <svg class="i s acc" x-show="c.reviewed" aria-label="Reviewed"><use href="#i-check"/></svg>
                   </button>
                 </template>
+                <button class="li small acc" x-show="feedWorth().length > 8 && !worthAll" @click="worthAll = true" x-text="'Show all ' + feedWorth().length"></button>
               </div>
             </div>
           </template>
 
-          <!-- Routine (collapsed) -->
+          <!-- Routine, collapsed -->
           <template x-if="route==='today' && digest.routine.length">
-            <div>
-              <button class="block row" style="width:100%; margin-top:14px" @click="routineOpen = !routineOpen" :aria-expanded="routineOpen">
-                <span class="small"><strong x-text="digest.routine.length"></strong> routine filings (board notices, compliance, AGM papers)</span>
-                <span class="spacer"></span><span class="xs mute" x-text="routineOpen ? 'Hide' : 'Show'"></span>
-              </button>
-              <div class="list" x-show="routineOpen">
-                <template x-for="r in digest.routine" :key="r.id">
-                  <a class="compact" :href="r.pdf_url || '#'" target="_blank" rel="noopener">
-                    <div style="flex:1"><div class="card-meta"><span class="sym" x-text="r.symbol"></span><span>·</span><span x-text="type(r.type)"></span></div>
-                      <div class="xs ink2" x-text="r.headline"></div></div>
-                  </a>
-                </template>
-              </div>
+            <div class="list mt16" id="routine">
+              <button class="routine-h" @click="routineOpen = !routineOpen" :aria-expanded="routineOpen">
+                <span><b x-text="digest.routine.length"></b> <span class="t2">routine filings</span></span>
+                <svg class="i s t2" :style="routineOpen ? 'transform:rotate(180deg)' : ''"><use href="#i-down"/></svg></button>
+              <template x-for="r in (routineOpen ? digest.routine.slice(0, 60) : [])" :key="r.id">
+                <a class="li" :href="r.pdf_url || '#'" target="_blank" rel="noopener">
+                  <b class="small" style="width:92px; flex:none" x-text="r.symbol"></b>
+                  <span class="grow small t2 trunc" x-text="r.headline"></span><span class="xs t2" x-text="when(r.filed_at)"></span></a>
+              </template>
             </div>
           </template>
-          <div class="row" x-show="route==='today' && digest" style="justify-content:center; margin-top:14px">
-            <button class="btn ghost small" @click="markChecked()">Mark this as my last check</button>
-          </div>
 
-          <!-- gallery: states -->
+          <template x-if="route==='today'">
+            <div class="row wrap mt16" style="justify-content:center">
+              <button class="btn quiet small" x-show="snoozedCount()" @click="clearSnooze()" x-text="snoozedCount() + ' snoozed until tomorrow · show'"></button>
+              <button class="btn quiet small" @click="sheet='replay'"><svg class="i s"><use href="#i-replay"/></svg>Replay a past date</button>
+              <button class="btn quiet small" @click="markChecked()">Mark as my last check</button>
+            </div>
+          </template>
+
+          <!-- ===== gallery: components and states ===== -->
           <template x-if="route==='gallery'">
             <div>
-              <div class="section-h"><h2>States</h2></div>
-              <div class="block"><h2>Loading</h2><div class="skel"></div><div class="skel" style="width:60%"></div></div>
-              <div class="notice">Waking the server… the first request after a quiet spell takes a few seconds.</div>
+              <div class="eyebrow gal-h">Chips and badges</div>
+              <div class="row wrap">
+                <span class="badge delivered"><svg class="i"><use href="#i-check"/></svg>Delivered</span><span class="badge partial">Partial</span>
+                <span class="badge missed">Missed</span><span class="badge pending">Pending</span><span class="badge unverifiable">Unverifiable</span>
+                <span class="badge supports">Supports thesis</span><span class="badge watch">Watch</span><span class="badge threatens">Threatens thesis</span>
+                <span class="badge gov">GOVERNANCE</span><span class="badge verify"><svg class="i"><use href="#i-alert"/></svg>Verify</span><span class="badge outline">1 source</span>
+              </div>
+              <div class="row wrap mt12"><button class="chip" aria-pressed="true">Selected</button><button class="chip">Filter</button>
+                <button class="pillbtn"><svg class="i s"><use href="#i-play"/></svg>Brief</button><button class="pillbtn fill">Last 7 days<svg class="i s t2"><use href="#i-down"/></svg></button></div>
+              <div class="row wrap mt12"><button class="btn primary">Primary</button><button class="btn">Secondary</button><button class="btn quiet">Quiet</button></div>
+
+              <div class="eyebrow gal-h">Switch, slider, tabs</div>
+              <div class="card">
+                <div class="setting"><span class="grow small">Push notifications</span>
+                  <button class="switch" role="switch" :aria-checked="gal.sw" @click="gal.sw = !gal.sw" aria-label="Example switch"></button></div>
+                <div class="rule"><div class="row small"><span class="grow">Volume spike</span><span class="num" x-text="gal.sl.toFixed(1) + '× median'"></span></div>
+                  <input type="range" min="1" max="5" step="0.1" x-model.number="gal.sl" aria-label="Example slider"></div>
+                <div class="tabs-seg" role="tablist"><template x-for="t in ['Ledger','Bull | Bear','Go deeper']" :key="t">
+                  <button role="tab" :aria-selected="gal.tab===t" @click="gal.tab=t" x-text="t"></button></template></div>
+              </div>
+
+              <div class="eyebrow gal-h">Stepper and timeline</div>
+              <div class="card"><ul class="steps">
+                <li class="done"><span class="n">✓</span>Finding documents<span class="el">2.6 s</span></li>
+                <li class="done"><span class="n">✓</span>Reading transcripts<span class="el">0.8 s</span></li>
+                <li class="now"><span class="n"><span class="spin"></span></span>Extracting promises and facts<span class="el">3 s</span></li>
+                <li><span class="n">4</span>Writing the verdict</li></ul></div>
+              <div class="card mt12"><ul class="tl">
+                <li><span class="node at_risk"></span><div class="small"><b>At risk</b> <span class="t2">· breaker event</span></div><div class="xs t2">Example status change</div></li>
+                <li><span class="node watch"></span><div class="small"><b>Watch</b></div><div class="xs t2">Example status change</div></li>
+                <li><span class="node"></span><div class="small"><b>Intact</b></div><div class="xs t2">Thesis saved</div></li></ul></div>
+
+              <div class="eyebrow gal-h">Loading skeleton</div>
+              <div class="card"><div class="sk" style="width:45%"></div><div class="sk h"></div><div class="sk h" style="width:70%"></div><div class="sk mt12" style="height:72px"></div></div>
+
+              <div class="eyebrow gal-h">Empty, caught up, error, stale, waking</div>
+              <div class="card empty"><div class="mark"><svg class="i"><use href="#i-check"/></svg></div><h3>You're caught up</h3><p x-text="nextEvent()"></p></div>
+              <div class="card empty mt12"><div class="mark n"><svg class="i"><use href="#i-bell"/></svg></div><h3>No alerts in this window</h3><p x-text="rulesLine()"></p></div>
+              <div class="notice mt12"><div class="row"><span class="spin"></span><span>Waking FINN up… the first request after a quiet spell takes up to 30 s.</span></div></div>
+              <div class="notice err"><div class="row"><svg class="i s down"><use href="#i-alert"/></svg><span class="grow">Couldn't load: 503</span><button class="btn quiet">Retry</button></div></div>
               <div class="notice warn">Showing the last copy: the server didn't answer just now.</div>
-              <div class="notice err">Couldn't load: 503</div>
-              <div class="block"><div class="empty"><div class="big">You're caught up</div><div>Everything in this window is reviewed.</div></div></div>
-              <div class="block"><div class="empty"><div class="big">Nothing material in this window</div><div class="small">3 routine filings, collapsed below.</div></div></div>
-              <div class="block"><h2>Low confidence</h2><span class="pill watch">Low confidence</span> <span class="small ink2">Figures differ from BSE's snapshot; shown with this label, never silently.</span></div>
-              <div class="block"><h2>Research progress</h2><ul class="steps">
-                <li class="done"><span class="dot"></span>Finding documents</li><li class="done"><span class="dot"></span>Fetching documents</li>
-                <li class="now"><span class="dot"></span>Extracting promises and facts</li><li><span class="dot"></span>Writing the verdict</li></ul></div>
+              <div class="row mt12"><span class="badge watch">Filings 5d old</span><span class="xs t2">stale-data pill in the Today header</span></div>
+
+              <div class="eyebrow gal-h">Sheets and toast</div>
+              <div class="row wrap">
+                <button class="btn" @click="openWhy(feedAttention()[0])" :disabled="!feedAttention().length">Why sheet</button>
+                <button class="btn" @click="openMenu(feedAttention()[0])" :disabled="!feedAttention().length">Context menu</button>
+                <button class="btn" @click="say('Reviewed', () => {})">Toast</button>
+              </div>
             </div>
           </template>
         </div>
       </template>
     </section>
 
-    <!-- ===== Holdings ===== -->
-    <section x-show="route==='holdings'">
-      <template x-if="!holdings"><div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div></template>
+    <!-- ===================== Holdings ===================== -->
+    <section x-show="route==='holdings'" x-cloak>
+      <template x-if="!holdings"><div class="list mt16"><template x-for="n in 6" :key="n"><div class="li"><div class="grow"><div class="sk" style="width:40%"></div><div class="sk" style="width:70%"></div></div></div></template></div></template>
       <template x-if="holdings">
-        <div class="list">
-          <template x-for="h in holdings" :key="h.symbol">
-            <button class="compact" @click="nav('#holding/' + h.symbol)">
-              <div style="flex:1; min-width:0">
-                <div class="row"><strong x-text="h.symbol"></strong><span class="pill" :class="h.status" x-text="status(h.status)"></span>
-                  <span class="badge" x-show="h.unreviewed_attention_7d" x-text="h.unreviewed_attention_7d" :aria-label="h.unreviewed_attention_7d + ' unreviewed'"></span></div>
-                <div class="xs mute" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis" x-text="h.status !== 'intact' && h.reason ? h.reason : h.name"></div>
-              </div>
-              <div style="text-align:right" class="num"><div class="small" x-text="h.close ? '₹' + Number(h.close).toLocaleString('en-IN',{maximumFractionDigits:0}) : ''"></div>
-                <div class="xs" :class="cls(h.day_pct)" x-text="pct(h.day_pct)"></div></div>
-            </button>
-          </template>
+        <div>
+          <div class="legend mt16"><span x-text="statusCount('intact') + ' intact'"></span><span class="watch" x-text="statusCount('watch') + ' watch'"></span>
+            <span class="at_risk" x-text="statusCount('at_risk') + ' at risk'"></span></div>
+          <div class="list mt12">
+            <template x-for="h in holdings" :key="h.symbol">
+              <a class="li" :href="'#holding/' + h.symbol">
+                <div class="grow">
+                  <div class="row"><b x-text="h.symbol"></b><span class="badge" :class="h.status" x-text="status(h.status)"></span>
+                    <span class="count" x-show="h.unreviewed_attention_7d" x-text="h.unreviewed_attention_7d" :aria-label="h.unreviewed_attention_7d + ' to review'"></span></div>
+                  <div class="xs t2 trunc mt4" x-text="h.status !== 'intact' && h.reason ? h.reason : h.name"></div>
+                </div>
+                <div class="num" style="text-align:right"><div class="small" x-text="h.close ? rupee(h.close) : 'No price'"></div>
+                  <div class="xs" :class="cls(h.day_pct)" x-text="h.day_pct == null ? '' : arrow(h.day_pct) + '%'"></div></div>
+              </a>
+            </template>
+          </div>
         </div>
       </template>
     </section>
 
-    <!-- ===== Holding page ===== -->
-    <section x-show="route==='holding'">
-      <template x-if="!holding"><div><div class="skel"></div><div class="skel"></div></div></template>
+    <!-- ===================== Holding ===================== -->
+    <section x-show="route==='holding'" x-cloak>
+      <template x-if="!holding"><div class="mt16"><div class="sk h" style="width:40%"></div><div class="sk mt12" style="height:64px"></div><div class="card mt16"><div class="sk"></div><div class="sk" style="width:70%"></div></div></div></template>
       <template x-if="holding">
         <div>
-          <div class="row" style="margin:4px 0 10px"><span class="ink2 small" x-text="holding.name + ' · ' + (holding.sector || '')"></span></div>
-          <div class="block">
-            <div class="row"><h2 style="margin:0">Thesis</h2><span class="spacer"></span>
-              <span class="pill" :class="holding.timeline[0]?.status || 'intact'" x-text="status(holding.timeline[0]?.status || 'intact')"></span></div>
-            <p class="xs mute" x-show="holding.timeline[0]" x-text="holding.timeline[0]?.reason"></p>
+          <!-- price + sparkline -->
+          <div class="mt16">
+            <div class="row" style="align-items:baseline">
+              <span class="price num" x-text="lastPrice() ? rupee(lastPrice()) : 'No price'"></span>
+              <span class="small num" :class="cls(holdingDay())" x-text="holdingDay() == null ? '' : arrow(holdingDay()) + '%'"></span>
+              <span class="grow"></span><span class="xs t2" style="white-space:nowrap" x-text="priceRange()"></span>
+            </div>
+            <template x-if="holding.prices.length > 1">
+              <svg class="spark chart" viewBox="0 0 320 76" role="img" :aria-label="'Price over ' + priceRange()">
+                <line class="grid" x1="0" x2="320" :y1="spark().yMid" :y2="spark().yMid" stroke-dasharray="2 4"/>
+                <path class="line" :d="spark().d"/>
+                <circle :cx="spark().ex" :cy="spark().ey" r="2.5" fill="var(--accent)"/>
+                <text x="0" y="74" x-text="spark().firstLabel"></text>
+                <text x="320" y="74" text-anchor="end" x-text="spark().lastLabel"></text>
+                <text :x="spark().hx" y="9" :text-anchor="spark().hx > 260 ? 'end' : spark().hx < 60 ? 'start' : 'middle'" x-text="'High ' + spark().hi"></text>
+              </svg>
+            </template>
+          </div>
+
+          <!-- thesis -->
+          <div class="card mt16">
+            <div class="row"><span class="eyebrow grow">Thesis</span>
+              <span class="badge" :class="holdingStatus()"><svg class="i" x-show="holdingStatus()==='intact'"><use href="#i-check"/></svg>
+                <svg class="i" x-show="holdingStatus()!=='intact'"><use href="#i-alert"/></svg><span x-text="status(holdingStatus())"></span></span></div>
+            <p class="xs t2 mt4" x-show="holding.timeline[0]?.reason" x-text="holding.timeline[0]?.reason"></p>
             <template x-if="!editing && holding.thesis">
               <div>
-                <span class="pill accent" x-show="holding.thesis.source === 'draft'">Draft from management's claims</span>
-                <span class="pill neutral" x-show="holding.thesis.source === 'user'">Your thesis</span>
-                <p x-text="holding.thesis.statement"></p>
-                <div class="small ink2" x-show="holding.thesis.kpis.length"><strong>KPIs</strong>
-                  <template x-for="k in holding.thesis.kpis" :key="k.metric"><div x-text="kpi(k.metric) + ' ' + k.op + ' ' + k.threshold + '%'"></div></template></div>
-                <div class="small ink2" x-show="!holding.thesis.kpis.length">No checkable KPIs yet: management gave no company-wide numeric targets. Add your own below.</div>
-                <div class="small ink2" style="margin-top:6px"><strong>What would break it</strong>
-                  <template x-for="b in holding.thesis.breakers" :key="b.text"><div x-text="'• ' + b.text"></div></template></div>
-                <details class="small" style="margin-top:6px" x-show="holding.thesis.citations?.items?.length"><summary class="mute">Evidence behind the draft</summary>
-                  <template x-for="it in holding.thesis.citations.items" :key="it.id"><div class="quote" x-text="it.quote || it.text"></div></template></details>
-                <button class="btn block" style="margin-top:10px" @click="startEdit()">Edit thesis</button>
+                <p class="mt8" x-text="holding.thesis.statement"></p>
+                <div class="row wrap mt8"><span class="badge acc" x-show="holding.thesis.source === 'draft'">Draft from management's own claims</span>
+                  <span class="badge outline" x-show="holding.thesis.source === 'user'">Your thesis</span></div>
+                <div class="eyebrow mt16">Numbers to watch</div>
+                <template x-if="holding.thesis.kpis.length">
+                  <div class="mt8">
+                    <template x-for="k in holding.thesis.kpis" :key="k.metric + k.op + k.threshold">
+                      <div class="kpi">
+                        <div class="row small"><span class="grow" x-text="kpi(k.metric) + ' ' + (k.op === '>=' ? '≥' : '≤') + ' ' + k.threshold + '%'"></span>
+                          <span class="num" :class="kpiRow(k)?.breached ? 'down' : kpiRow(k) ? 'up' : 't2'" x-text="kpiRow(k) ? kpiRow(k).value.toFixed(1) + '%' : 'Not in sources'"></span>
+                          <span class="badge" :class="kpiRow(k).breached ? 'missed' : 'delivered'" x-show="kpiRow(k)" x-text="kpiRow(k)?.breached ? 'Breached' : 'Clears'"></span></div>
+                        <div class="bar" x-show="kpiRow(k)"><span :class="kpiRow(k)?.breached && 'breach'" :style="'width:' + kpiBar(k).v + '%'"></span><i :style="'left:' + kpiBar(k).t + '%'"></i></div>
+                      </div>
+                    </template>
+                    <p class="xs t2 mt8" x-text="holding.kpi_check ? 'Checked against ' + (holding.kpi_check.period || 'the latest') + ' results, computed in code' : 'No verified results card in the last 90 days to check against.'"></p>
+                  </div>
+                </template>
+                <p class="small t2 mt8" x-show="!holding.thesis.kpis.length">No checkable numbers yet: management gave no company-wide numeric targets. Add your own with Edit.</p>
+                <div class="eyebrow mt16">What would break it</div>
+                <template x-for="b in holding.thesis.breakers" :key="b.text"><p class="small mt4" x-text="'• ' + b.text"></p></template>
+                <p class="small t2 mt4" x-show="!holding.thesis.breakers.length">Not set.</p>
+                <button class="btn block mt12" @click="startEdit()"><svg class="i s"><use href="#i-pen"/></svg>Edit thesis</button>
               </div>
+            </template>
+            <template x-if="!editing && !holding.thesis">
+              <div><p class="small t2 mt8">No thesis yet for this holding.</p><button class="btn block mt12" @click="startEdit()">Write a thesis</button></div>
             </template>
             <template x-if="editing">
               <div>
                 <label class="f" for="t-st">Statement</label><textarea id="t-st" x-model="draft.statement"></textarea>
                 <label class="f" for="t-br">What would break it (one per line)</label><textarea id="t-br" x-model="draft.breakers"></textarea>
-                <label class="f">KPIs (checked on every verified results card)</label>
+                <label class="f">Numbers to watch (checked on every verified results card)</label>
                 <template x-for="(k, i) in draft.kpis" :key="i">
-                  <div class="row" style="margin-bottom:6px">
-                    <select x-model="k.metric" aria-label="KPI metric"><option value="revenue_growth_yoy">Revenue growth YoY</option><option value="ebitda_margin">EBITDA margin</option>
+                  <div class="row mt8">
+                    <select x-model="k.metric" aria-label="KPI metric" class="grow"><option value="revenue_growth_yoy">Revenue growth YoY</option><option value="ebitda_margin">EBITDA margin</option>
                       <option value="pat_growth_yoy">PAT growth YoY</option><option value="pat_margin">PAT margin</option></select>
-                    <select x-model="k.op" style="width:80px" aria-label="Comparison"><option value=">=">≥</option><option value="<=">≤</option></select>
-                    <input type="number" x-model="k.threshold" style="width:90px" aria-label="Threshold %">
-                    <button class="btn ghost" @click="draft.kpis.splice(i,1)" aria-label="Remove KPI">✕</button>
+                    <select x-model="k.op" style="width:64px" aria-label="Comparison"><option value=">=">≥</option><option value="<=">≤</option></select>
+                    <input type="number" x-model="k.threshold" style="width:76px" aria-label="Threshold in percent">
+                    <button class="ibtn" @click="draft.kpis.splice(i, 1)" aria-label="Remove KPI"><svg class="i s"><use href="#i-x"/></svg></button>
                   </div>
                 </template>
-                <button class="btn ghost" @click="addKpi()">+ Add KPI</button>
-                <div class="row" style="margin-top:10px"><button class="btn" @click="editing=false">Cancel</button><button class="btn primary" style="flex:1" @click="saveThesis()">Save</button></div>
+                <button class="btn quiet mt8" @click="addKpi()">+ Add a number</button>
+                <div class="row mt12"><button class="btn" @click="editing=false">Cancel</button><button class="btn primary grow" @click="saveThesis()">Save</button></div>
               </div>
             </template>
           </div>
 
-          <div class="block" x-show="holding.research">
-            <div class="row"><h2 style="margin:0">Management credibility</h2><span class="spacer"></span>
-              <button class="btn ghost small" @click="nav('#research/' + holding.symbol)">Open ledger →</button></div>
+          <!-- credibility semicircle -->
+          <a class="card mt12" style="display:block" :href="'#research/' + holding.symbol">
+            <div class="eyebrow">Management credibility</div>
             <template x-if="holding.research">
-              <p class="small" x-text="holding.research.credibility.score != null ? holding.research.credibility.score + '/100 on ' + holding.research.credibility.measured + ' promises that could be checked' : 'Not enough matured promises for a score (' + holding.research.credibility.measured + ' measured, ' + holding.research.credibility.total + ' tracked)'"></p>
+              <div class="gauge mt8">
+                <svg viewBox="0 0 112 64" role="img" :aria-label="'Credibility ' + (holding.research.credibility.score ?? 'not scored')">
+                  <path d="M8 58 A48 48 0 0 1 104 58" fill="none" stroke="var(--surface-2)" stroke-width="8" stroke-linecap="round"/>
+                  <path d="M8 58 A48 48 0 0 1 104 58" fill="none" stroke="var(--accent)" stroke-width="8" stroke-linecap="round" pathLength="100"
+                        :stroke-dasharray="(holding.research.credibility.score || 0) + ' 100'" x-show="holding.research.credibility.score != null"/>
+                  <text x="56" y="56" text-anchor="middle" style="font: 600 18px var(--mono); fill: var(--text)" x-text="holding.research.credibility.score ?? '–'"></text>
+                </svg>
+                <div class="grow small">
+                  <div x-text="holding.research.credibility.score != null ? 'Delivered ' + (holding.research.credibility.counts?.delivered ?? 0) + ' of ' + holding.research.credibility.measured + ' measured promises' : 'Not scored: ' + holding.research.credibility.measured + ' of ' + holding.research.credibility.total + ' promises have matured'"></div>
+                  <div class="xs t2 mt4" x-text="holding.research.sources_read + ' sources · ' + when(holding.research.generated_at)"></div>
+                  <div class="xs acc mt4">Open the promise ledger →</div>
+                </div>
+              </div>
             </template>
+            <p class="small t2 mt8" x-show="!holding.research">No promise ledger yet. Run research to build one from the last 8 calls and 2 annual reports.</p>
+          </a>
+
+          <!-- coming up -->
+          <div class="card mt12" x-show="holding.catalysts.length">
+            <div class="eyebrow">Coming up</div>
+            <template x-for="e in holding.catalysts" :key="e.date + e.title"><div class="row small mt8"><span class="num t2" style="width:84px" x-text="day(e.date)"></span><span class="grow" x-text="e.title"></span></div></template>
           </div>
-          <div class="block" x-show="!holding.research"><h2>Management credibility</h2>
-            <p class="small ink2">No ledger yet.</p><button class="btn" @click="nav('#research/' + holding.symbol)">Build the promise ledger</button></div>
 
-          <div class="block" x-show="holding.catalysts.length"><h2>Coming up</h2>
-            <template x-for="e in holding.catalysts" :key="e.date + e.title"><div class="small"><span class="mute" x-text="day(e.date) + ' · '"></span><span x-text="e.title"></span></div></template></div>
+          <!-- status timeline -->
+          <div class="card mt12" x-show="holding.timeline.length">
+            <div class="eyebrow">Status timeline</div>
+            <ul class="tl mt12">
+              <template x-for="t in holding.timeline.slice(0, 6)" :key="t.at">
+                <li><span class="node" :class="t.status"></span>
+                  <div class="small"><b x-text="status(t.status)"></b> <span class="t2" x-text="'· ' + day(t.at)"></span></div>
+                  <div class="xs t2 clamp2" x-text="t.reason"></div></li>
+              </template>
+            </ul>
+          </div>
 
-          <div class="block" x-show="holding.timeline.length > 1"><h2>Status timeline</h2>
-            <template x-for="t in holding.timeline" :key="t.at"><div class="small row" style="align-items:flex-start; margin:4px 0">
-              <span class="pill" :class="t.status" x-text="status(t.status)"></span><span class="ink2" x-text="t.reason"></span></div></template></div>
-
-          <div class="block" x-show="journal.length"><h2>Your decision journal</h2>
-            <template x-for="j in journal" :key="j.id"><div style="margin:6px 0">
-              <div class="small"><strong x-text="j.action"></strong> <span class="mute" x-text="'· ' + day(j.at)"></span></div>
-              <div class="small ink2" x-text="j.reason"></div>
-              <div class="xs mute" x-text="j.since.length ? 'Since then: ' + j.since.map(x => x.headline).slice(0,2).join(' · ') : 'Nothing material since.'"></div>
-            </div></template></div>
-
-          <div class="section-h"><h2>Recent filings</h2></div>
-          <div class="list">
-            <template x-for="c in holding.cards" :key="c.id">
-              <button class="compact" @click="nav('#card/' + c.id)">
-                <div style="flex:1"><div class="card-meta"><span x-text="type(c.type)"></span><span>·</span><span x-text="when(c.filed_at)"></span>
-                  <span class="pill" :class="c.bucket === 'attention' ? 'accent' : 'neutral'" x-text="c.bucket === 'attention' ? 'Attention' : 'Worth a look'"></span></div>
-                  <div class="small" x-text="c.headline"></div></div>
+          <!-- recent triggers -->
+          <div class="section-h"><span class="eyebrow">Recent triggers</span><span class="xs t2">90 days</span></div>
+          <div class="list" x-show="holding.cards.length">
+            <template x-for="c in holding.cards.slice(0, 5)" :key="c.id">
+              <button class="li" @click="openCardSheet(c)">
+                <div class="grow"><div class="meta"><span x-text="type(c.type)"></span><span class="badge" :class="c.bucket === 'attention' ? 'acc' : 'outline'" x-text="c.bucket === 'attention' ? 'Attention' : 'Worth a look'"></span>
+                  <span class="when" x-text="when(c.filed_at)"></span></div>
+                  <div class="small mt4 clamp2" x-text="c.headline"></div></div>
               </button>
             </template>
           </div>
+          <div class="card empty" x-show="!holding.cards.length"><div class="mark"><svg class="i"><use href="#i-check"/></svg></div><h3>Nothing material in 90 days</h3><p>Only routine filings.</p></div>
+
+          <!-- journal -->
+          <div class="card mt12" x-show="journal.length">
+            <div class="eyebrow">Your decision journal</div>
+            <template x-for="j in journal" :key="j.id"><div class="mt8">
+              <div class="small"><b x-text="j.action"></b> <span class="t2" x-text="'· ' + day(j.at)"></span></div>
+              <div class="small t2" x-text="j.reason"></div>
+              <div class="xs t2" x-text="j.since.length ? 'Since then: ' + j.since.map(x => x.headline).slice(0, 2).join(' · ') : 'Nothing material since.'"></div></div></template>
+          </div>
+
+          <a class="btn primary block mt16" :href="'#research/' + holding.symbol"><svg class="i s"><use href="#i-search"/></svg>Run research</a>
         </div>
       </template>
     </section>
 
-    <!-- ===== Research ===== -->
-    <section x-show="route==='research'" style="min-height:70dvh">
-      <form class="row" @submit.prevent="startResearch()" style="margin-bottom:10px">
+    <!-- ===================== Research ===================== -->
+    <section x-show="route==='research'" x-cloak style="min-height:70dvh">
+      <form class="search mt16" @submit.prevent="startResearch()" role="search">
         <label class="sr" for="tk">NSE symbol</label>
-        <input id="tk" type="text" x-model="rq.ticker" placeholder="Any NSE symbol, e.g. KEI" autocapitalize="characters" autocomplete="off">
+        <input id="tk" type="search" x-model="rq.ticker" placeholder="Any NSE ticker, e.g. KEI" autocapitalize="characters" autocomplete="off" enterkeyhint="go">
         <button class="btn primary" type="submit">Research</button>
       </form>
-      <p class="small ink2" x-show="!param">Builds a promise ledger from the last 8 earnings calls and 2 annual reports: what management promised, what it delivered, every line with its quote and page. Primary documents only.</p>
-
-      <template x-if="param && !rq.report && !rq.error">
-        <div class="block"><h2 x-text="'Reading ' + param"></h2>
-          <ul class="steps"><template x-for="s in rq.stages.length ? rq.stages : ['Finding documents']" :key="s">
-            <li :class="stageState(s)"><span class="dot"></span><span x-text="s"></span></li></template></ul>
-          <p class="xs mute">A first report takes one to two minutes. Reopening it later is instant.</p></div>
+      <div class="strip" x-show="recent.length || holdings">
+        <template x-for="s in recent" :key="'r' + s"><a class="chip" :href="'#research/' + s"><svg class="i s"><use href="#i-clock"/></svg><span x-text="s"></span></a></template>
+        <template x-for="h in (param ? [] : (holdings || []).filter(h => !recent.includes(h.symbol)).slice(0, 8))" :key="'h' + h.symbol"><a class="chip" :href="'#research/' + h.symbol" x-text="h.symbol"></a></template>
+      </div>
+      <template x-if="!param">
+        <div class="card mt16">
+          <div class="eyebrow">What research builds</div>
+          <p class="small mt8">A promise ledger from the last 8 earnings calls and 2 annual reports: what management promised, what it delivered, each line with its quote and page. Primary documents only.</p>
+          <p class="xs t2 mt8">A first report takes one to two minutes. Reopening it later is instant.</p>
+        </div>
       </template>
-      <div class="notice err" x-show="rq.error" x-text="rq.error"></div>
+
+      <!-- running: stepper -->
+      <template x-if="param && !rq.report && !rq.error">
+        <div class="card mt16">
+          <div class="row"><span class="eyebrow grow" x-text="'Reading ' + param"></span><span class="xs t2 num" x-text="rqElapsed()"></span></div>
+          <ul class="steps mt8">
+            <template x-for="(s, i) in (rq.stages.length ? rq.stages : ['Finding documents'])" :key="s">
+              <li :class="stageState(s)"><span class="n"><template x-if="stageState(s)==='done'"><span>✓</span></template>
+                <template x-if="stageState(s)==='now'"><span class="spin"></span></template><template x-if="!stageState(s)"><span x-text="i + 1"></span></template></span>
+                <span x-text="s"></span><span class="el" x-text="stageTime(s)"></span></li>
+            </template>
+          </ul>
+        </div>
+      </template>
+      <template x-if="rq.error">
+        <div class="card empty mt16"><div class="mark n"><svg class="i"><use href="#i-alert"/></svg></div><h3>Research didn't finish</h3><p x-text="rq.error"></p>
+          <button class="btn mt12" @click="openResearch(param, true)">Retry</button></div>
+      </template>
 
       <template x-if="rq.report">
         <div>
-          <div class="block">
-            <div class="gauge">
-              <svg viewBox="0 0 76 76" role="img" :aria-label="'Credibility ' + (rq.report.credibility.score ?? 'not scored')">
-                <circle cx="38" cy="38" r="30" fill="none" stroke="var(--line)" stroke-width="8"/>
-                <circle cx="38" cy="38" r="30" fill="none" stroke="var(--accent)" stroke-width="8" stroke-linecap="round"
-                        :stroke-dasharray="gaugeDash(rq.report.credibility.score)" transform="rotate(-90 38 38)"/>
+          <!-- credibility block -->
+          <div class="card mt16">
+            <div class="eyebrow">Management credibility</div>
+            <div class="row mt8" style="align-items:flex-end; gap:12px">
+              <div class="score" x-show="rq.report.credibility.score != null" x-text="rq.report.credibility.score"></div>
+              <div class="score" style="font-size:22px; white-space:nowrap" x-show="rq.report.credibility.score == null">Not scored</div>
+              <div class="small t2" style="padding-bottom:4px" x-html="credLine()"></div>
+            </div>
+            <template x-if="rq.report.credibility.trend.length">
+              <svg class="chart mt12" viewBox="0 0 320 56" style="width:100%; display:block" role="img" aria-label="Credibility by quarter the promise was made">
+                <line class="grid" x1="0" x2="320" y1="18" y2="18" stroke-dasharray="2 4"/><line class="grid" x1="0" x2="320" y1="40" y2="40"/>
+                <path class="line" :d="trend().d" x-show="rq.report.credibility.trend.length > 1"/>
+                <g x-html="marks(trend().pts, 54)"></g>
               </svg>
-              <div>
-                <div class="big num" x-text="rq.report.credibility.score != null ? rq.report.credibility.score + '/100' : 'Not scored'"></div>
-                <div class="small ink2" x-text="rq.report.credibility.score != null ? 'credibility on ' + rq.report.credibility.measured + ' promises whose deadline has passed' : 'fewer than ' + rq.report.credibility.min_measured + ' promises have matured (' + rq.report.credibility.measured + ' so far)'"></div>
-                <div class="xs mute" x-text="rq.report.credibility.total + ' promises tracked · ' + rq.report.credibility.vagueness_pct + '% too vague to check'"></div>
-              </div>
-            </div>
-            <div class="row wrap" style="margin-top:8px"><template x-for="[v, n] in Object.entries(rq.report.credibility.counts)" :key="v">
-              <span class="pill" :class="v" x-text="verdict(v) + ' ' + n"></span></template></div>
-            <template x-for="n in rq.report.notes" :key="n"><div class="notice warn small" x-text="n"></div></template>
+            </template>
+            <div class="row wrap mt12"><template x-for="[v, n] in verdictCounts()" :key="v"><span class="badge" :class="v" x-text="verdict(v) + ' ' + n"></span></template></div>
+            <template x-for="n in rq.report.notes" :key="n"><div class="notice warn mt8" x-text="n"></div></template>
+            <template x-if="rq.report.synthesis.credibility.length"><p class="small mt12" x-text="rq.report.synthesis.credibility[0].text"></p></template>
           </div>
 
-          <div class="block" x-show="rq.report.synthesis.credibility.length || rq.report.synthesis.bull.length">
-            <h2>Credibility read</h2><template x-for="b in rq.report.synthesis.credibility" :key="b.text"><p class="small" x-text="b.text"></p></template>
-            <div class="row" style="align-items:flex-start; gap:12px">
-              <div style="flex:1"><h2>Bull</h2><template x-for="b in rq.report.synthesis.bull" :key="b.text"><p class="small" x-text="b.text"></p></template></div>
-              <div style="flex:1"><h2>Bear</h2><template x-for="b in rq.report.synthesis.bear" :key="b.text"><p class="small" x-text="b.text"></p></template></div>
-            </div>
-            <template x-if="rq.report.synthesis.devils_advocate.length"><div><h2>Devil's advocate</h2>
-              <template x-for="b in rq.report.synthesis.devils_advocate" :key="b.text"><p class="small" x-text="b.text"></p></template></div></template>
+          <!-- tabs: Ledger / Bull | Bear / Go deeper -->
+          <div class="tabs-seg mt16" role="tablist" aria-label="Report sections">
+            <button role="tab" :aria-selected="rtab==='ledger'" @click="rtab='ledger'">Ledger</button>
+            <button role="tab" :aria-selected="rtab==='bull'" @click="rtab='bull'">Bull | Bear</button>
+            <button role="tab" :aria-selected="rtab==='deep'" @click="rtab='deep'">Go deeper</button>
           </div>
 
-          <div class="section-h"><h2>Promise ledger</h2><span class="xs mute">tap a row for the quote</span></div>
-          <div class="list">
-            <template x-for="l in rq.report.ledger.slice(0, rq.open.all ? 999 : 12)" :key="l.id">
-              <div class="ledger-row" :class="strongEvidence(l) && 'strong'" :title="strongEvidence(l) ? 'Backed by two or more sources' : 'One source'">
-                <button style="background:none;border:0;padding:0;width:100%;text-align:left" @click="rq.open[l.id] = !rq.open[l.id]" :aria-expanded="!!rq.open[l.id]">
-                  <div class="row"><span class="pill" :class="l.verdict" x-text="verdict(l.verdict)"></span>
-                    <span class="xs mute" x-show="l.tracking" x-text="l.tracking"></span><span class="spacer"></span>
-                    <span class="xs mute" x-text="'said ' + (l.said_in || '')"></span></div>
-                  <div class="small" style="margin-top:4px"><strong x-text="l.metric"></strong> <span x-text="l.target_text"></span>
-                    <span class="mute" x-text="'· ' + (l.horizon || '')"></span></div>
-                  <div class="xs ink2" x-show="l.actual" x-text="'Delivered ' + l.actual?.value + ' ' + (l.actual?.unit || '') + ' (' + l.actual?.period + ')'"></div>
-                  <div class="xs ink2" x-show="!l.actual && l.latest" x-text="'Latest ' + l.latest?.value + ' ' + (l.latest?.unit || '') + ' (' + l.latest?.period + ')'"></div>
-                </button>
-                <template x-if="rq.open[l.id]">
-                  <div>
-                    <div class="quote" x-text="l.quote"></div>
-                    <button class="cite" @click="openEvidence(source(l.doc).document_id, l.page, l.quote); sheet='evidence'"
-                            x-text="(source(l.doc).title || l.doc) + ', page ' + l.page + (l.speaker ? ' · ' + l.speaker : '')"></button>
-                    <template x-if="l.actual"><div><div class="quote" x-text="l.actual.quote"></div>
-                      <button class="cite" @click="openEvidence(source(l.actual.doc).document_id, l.actual.page, l.actual.quote); sheet='evidence'"
-                              x-text="(source(l.actual.doc).title || l.actual.doc) + ', page ' + l.actual.page"></button></div></template>
-                  </div>
+          <!-- ledger -->
+          <div x-show="rtab==='ledger'" role="tabpanel">
+            <div class="list mt12">
+              <template x-for="l in rq.report.ledger.slice(0, rq.open.all ? 999 : 12)" :key="l.id">
+                <div>
+                  <button class="ledger-row" @click="rq.open[l.id] = !rq.open[l.id]" :aria-expanded="!!rq.open[l.id]">
+                    <div class="ln1"><span x-text="(l.said_in || '') + (l.speaker ? ' · ' + l.speaker : '')" class="trunc"></span>
+                      <span class="badge outline" x-show="!strongEvidence(l)">1 source</span>
+                      <span class="badge" :class="l.verdict" x-text="verdict(l.verdict)"></span></div>
+                    <div class="ln2"><b x-text="l.metric"></b> <span x-text="l.target_text"></span> <span class="t2" x-show="l.horizon" x-text="'· ' + l.horizon"></span></div>
+                    <div class="ln3 num" x-text="actualLine(l)"></div>
+                  </button>
+                  <template x-if="rq.open[l.id]">
+                    <div style="padding:0 12px 12px">
+                      <div class="quote" x-text="'“' + l.quote + '”'"></div>
+                      <button class="cite" @click="openEvidence(source(l.doc).document_id, l.page, l.quote)" x-text="(source(l.doc).title || l.doc) + ', page ' + l.page + ' →'"></button>
+                      <template x-if="l.actual"><div><div class="quote" x-text="'“' + l.actual.quote + '”'"></div>
+                        <button class="cite" @click="openEvidence(source(l.actual.doc).document_id, l.actual.page, l.actual.quote)" x-text="(source(l.actual.doc).title || l.actual.doc) + ', page ' + l.actual.page + ' →'"></button></div></template>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <button class="li small acc" x-show="rq.report.ledger.length > 12 && !rq.open.all" @click="rq.open.all = true" x-text="'Show all ' + rq.report.ledger.length + ' promises'"></button>
+            </div>
+
+            <!-- guidance drift -->
+            <template x-if="rq.report.drift.length">
+              <div class="card mt12">
+                <div class="eyebrow">Guidance drift</div>
+                <template x-if="driftChart()">
+                  <svg class="chart mt8" viewBox="0 0 320 70" style="width:100%; display:block" role="img" :aria-label="'How ' + driftChart().metric + ' guidance moved'">
+                    <line class="grid" x1="0" x2="320" y1="12" y2="12" stroke-dasharray="2 4"/><line class="grid" x1="0" x2="320" y1="50" y2="50"/>
+                    <path class="line" :d="driftChart().d"/>
+                    <g x-html="marks(driftChart().pts, 66)"></g>
+                  </svg>
+                </template>
+                <template x-for="d in rq.report.drift.slice(0, 5)" :key="d.id">
+                  <div class="small mt8"><b x-text="d.metric"></b> <span class="t2" x-text="d.horizon ? '(' + d.horizon + ')' : ''"></span>
+                    <template x-for="s in d.steps" :key="s.from + s.to"><div class="xs t2"><span class="badge" :class="s.change === 'raised' ? 'up' : s.change === 'cut' ? 'down' : 'outline'" x-text="s.change"></span>
+                      <span x-text="' ' + s.before + ' → ' + s.after + ' (' + s.from + ' → ' + s.to + ')'"></span></div></template>
+                    <span class="badge watch" x-show="d.dropped">No longer repeated</span></div>
                 </template>
               </div>
             </template>
+
+            <!-- business snapshot -->
+            <template x-if="rq.report.snapshot.what_it_does || rq.report.snapshot.segments?.length">
+              <div class="card mt12">
+                <div class="eyebrow">Business snapshot</div>
+                <p class="small mt8" x-show="rq.report.snapshot.what_it_does" x-text="rq.report.snapshot.what_it_does?.text"></p>
+                <template x-if="segs().length">
+                  <div><div class="segbar" role="img" :aria-label="segs().map(s => s.name + ' ' + s.share_pct + '%').join(', ')">
+                    <template x-for="s in segs()" :key="s.name"><span :style="'flex:' + s.share_pct"></span></template></div>
+                    <template x-for="s in segs()" :key="'l' + s.name"><div class="row xs mt4"><span class="grow trunc" x-text="s.name"></span><span class="num t2" x-text="s.share_pct + '%'"></span>
+                      <button class="cite" style="min-height:24px" @click="openEvidence(s.doc_id, s.page, s.quote)" x-text="'p.' + s.page"></button></div></template></div>
+                </template>
+                <template x-if="rq.report.snapshot.risks?.length"><div class="mt12"><div class="eyebrow">Risks they name</div>
+                  <template x-for="r in rq.report.snapshot.risks.slice(0, 3)" :key="r.text"><p class="small t2 mt4" x-text="'• ' + r.text"></p></template></div></template>
+              </div>
+            </template>
           </div>
-          <button class="btn ghost" x-show="rq.report.ledger.length > 12 && !rq.open.all" @click="rq.open.all = true" x-text="'Show all ' + rq.report.ledger.length"></button>
 
-          <div class="block" x-show="rq.report.drift.length" style="margin-top:10px"><h2>Guidance drift</h2>
-            <template x-for="d in rq.report.drift" :key="d.id"><div class="small" style="margin:4px 0">
-              <strong x-text="d.metric"></strong> <span class="mute" x-text="'(' + (d.horizon || '') + ')'"></span>
-              <template x-for="s in d.steps" :key="s.from + s.to"><span class="ink2" x-text="' · ' + s.change + ' ' + s.before + ' → ' + s.after + ' (' + s.to + ')'"></span></template>
-              <span class="pill watch" x-show="d.dropped">No longer repeated</span></div></template></div>
-
-          <div class="block" x-show="rq.report.snapshot.what_it_does"><h2>Business snapshot</h2>
-            <p class="small" x-text="rq.report.snapshot.what_it_does?.text"></p>
-            <template x-for="s in rq.report.snapshot.segments" :key="s.name"><div class="small"><strong x-text="s.name"></strong> <span class="ink2" x-text="s.description"></span>
-              <span class="mute" x-show="s.share_pct" x-text="'· ' + s.share_pct + '%'"></span></div></template>
-            <template x-if="rq.report.snapshot.risks.length"><div class="small" style="margin-top:6px"><strong>Risks they name</strong>
-              <template x-for="r in rq.report.snapshot.risks.slice(0,4)" :key="r.text"><div class="ink2" x-text="'• ' + r.text"></div></template></div></template>
+          <!-- bull | bear -->
+          <div x-show="rtab==='bull'" role="tabpanel">
+            <div class="cols2 mt12">
+              <div class="card"><div class="eyebrow up">Bull</div>
+                <template x-for="(b, i) in rq.report.synthesis.bull" :key="'b' + i"><p class="mt8"><span x-text="b.text"></span>
+                  <template x-for="e in (b.evidence || []).slice(0, 3)" :key="e"><sup class="ref" role="button" tabindex="0" @click="refOpen(e)" @keydown.enter="refOpen(e)" x-text="e"></sup></template></p></template>
+                <p class="small t2 mt8" x-show="!rq.report.synthesis.bull.length">Not in sources.</p></div>
+              <div class="card"><div class="eyebrow down">Bear</div>
+                <template x-for="(b, i) in rq.report.synthesis.bear" :key="'r' + i"><p class="mt8"><span x-text="b.text"></span>
+                  <template x-for="e in (b.evidence || []).slice(0, 3)" :key="e"><sup class="ref" role="button" tabindex="0" @click="refOpen(e)" @keydown.enter="refOpen(e)" x-text="e"></sup></template></p></template>
+                <p class="small t2 mt8" x-show="!rq.report.synthesis.bear.length">Not in sources.</p></div>
+            </div>
+            <template x-if="rq.report.synthesis.devils_advocate.length">
+              <div class="card mt12"><div class="eyebrow">Strongest counter-argument</div>
+                <template x-for="(b, i) in rq.report.synthesis.devils_advocate" :key="'d' + i"><p class="small mt8"><span x-text="b.text"></span>
+                  <template x-for="e in (b.evidence || []).slice(0, 3)" :key="e"><sup class="ref" role="button" tabindex="0" @click="refOpen(e)" @keydown.enter="refOpen(e)" x-text="e"></sup></template></p></template></div>
+            </template>
           </div>
 
-          <div class="block">
-            <h2>Go deeper</h2>
-            <div class="row wrap"><template x-for="[id, name] in deepRecipes" :key="id">
-              <button class="chip" :aria-pressed="deep.recipe === id" @click="openDeep(id)" x-text="name"></button></template></div>
-            <template x-if="deep.loading"><div><div class="skel"></div><div class="skel" style="width:60%"></div>
-              <p class="xs mute">Reading the documents; a first run takes up to a minute.</p></div></template>
-            <div class="notice warn small" x-show="deep.error" x-text="deep.error"></div>
+          <!-- go deeper -->
+          <div x-show="rtab==='deep'" role="tabpanel">
+            <div class="deeps mt12">
+              <template x-for="[id, name] in deepRecipes" :key="id">
+                <button :aria-pressed="deep.recipe === id" @click="openDeep(id)">Go deeper ▸<b x-text="name"></b></button>
+              </template>
+            </div>
+            <template x-if="deep.loading">
+              <div class="card mt12"><div class="row"><span class="spin"></span><span class="small t2">Reading the documents; a first run takes up to a minute, then it's cached.</span></div>
+                <div class="sk mt12"></div><div class="sk" style="width:60%"></div></div>
+            </template>
+            <div class="notice warn mt12" x-show="deep.error" x-text="deep.error"></div>
             <template x-if="deep.data">
-              <div style="margin-top:8px">
-                <!-- cash quality / balance sheet -->
-                <template x-if="['cash_quality','balance_sheet'].includes(deep.data.recipe)">
+              <div class="card mt12">
+                <div class="eyebrow" x-text="deepName(deep.data.recipe)"></div>
+                <p class="mt8" style="font-weight:600" x-text="deepFinding()"></p>
+                <!-- two-period bars: cash quality / balance sheet -->
+                <template x-if="['cash_quality', 'balance_sheet'].includes(deep.data.recipe)">
                   <div>
-                    <p class="xs mute" x-text="deep.data.report + ' · ' + deep.data.basis + ' · ₹ crore · ' + deep.data.verified"></p>
-                    <dl class="kv small num"><template x-for="[k, v] in deepRows(deep.data.current)" :key="k">
-                      <div style="display:contents"><dt x-text="label(k)"></dt><dd :class="v == null && 'mute'" x-text="fmt(v)"></dd></div></template></dl>
-                    <template x-for="c in deep.data.current.checks || []" :key="c"><div class="notice warn xs" x-text="c"></div></template>
-                    <details class="small" style="margin-top:6px"><summary class="mute">Inputs and their quotes</summary>
-                      <template x-for="[k, e] in Object.entries(deep.data.evidence.current || {})" :key="k">
-                        <div><span class="ink2" x-text="label(k) + ': ' + e.as_printed"></span>
-                          <button class="cite" @click="openEvidence(deep.data.document_id, e.page, e.quote); sheet='evidence'" x-text="'page ' + e.page"></button></div></template></details>
-                    <p class="xs mute" x-text="deep.data.note"></p>
+                    <p class="xs t2 mt4" x-text="deep.data.report + ' · ' + deep.data.basis + ' · ₹ crore'"></p>
+                    <template x-for="b in pairBars()" :key="b.k">
+                      <div class="mt12"><div class="row xs"><span class="grow" x-text="label(b.k)"></span>
+                        <span class="num t2" x-text="b.prev == null ? '' : 'prev ' + fmt(b.prev)"></span><span class="num" x-text="fmt(b.cur)"></span></div>
+                        <div class="bar"><span :style="'width:' + b.w + '%; background:var(--accent)'"></span><i x-show="b.pw != null" :style="'left:' + b.pw + '%'"></i></div></div>
+                    </template>
+                    <dl class="kv mt12"><template x-for="[k, v] in deepRows(deep.data.current).filter(([k]) => !pairBars().some(b => b.k === k))" :key="k">
+                      <div style="display:contents"><dt x-text="label(k)"></dt><dd :class="v == null && 't2'" x-text="fmt(v)"></dd></div></template></dl>
+                    <template x-for="c in deep.data.current.checks || []" :key="c"><div class="notice warn mt8" x-text="c"></div></template>
+                    <div class="eyebrow mt12">Evidence</div>
+                    <template x-for="[k, e] in Object.entries(deep.data.evidence?.current || {}).slice(0, 6)" :key="k">
+                      <div class="row xs mt4"><span class="grow t2 trunc" x-text="label(k) + ': ' + e.as_printed"></span>
+                        <button class="cite" @click="openEvidence(deep.data.document_id, e.page, e.quote)" x-text="'p.' + e.page"></button></div></template>
                   </div>
                 </template>
-                <!-- hedge-meter -->
+                <!-- hedge-meter: line per call -->
                 <template x-if="deep.data.recipe === 'hedge_meter'">
                   <div>
-                    <template x-for="c in deep.data.calls" :key="c.call"><div class="row small num" style="margin:3px 0">
-                      <span style="width:70px" x-text="c.call"></span>
-                      <span style="flex:1; height:8px; background:var(--surface-2); border-radius:4px; position:relative">
-                        <span style="position:absolute; left:0; top:0; bottom:0; background:var(--watch); border-radius:4px" :style="'width:' + Math.min(100, (c.per_1000_words || 0) * 12) + '%'"></span></span>
-                      <span style="width:44px; text-align:right" x-text="c.per_1000_words"></span></div></template>
-                    <p class="xs ink2" x-show="deep.data.latest_vs_earlier_pct != null" x-text="'Latest call vs earlier average: ' + pct(deep.data.latest_vs_earlier_pct) + ' cautious language'"></p>
-                    <p class="xs mute" x-text="deep.data.method"></p>
-                  </div>
-                </template>
-                <!-- language diff -->
-                <template x-if="deep.data.recipe === 'language_diff'">
-                  <div>
-                    <p class="xs mute" x-text="deep.data.older + ' → ' + deep.data.newer"></p>
-                    <h2 style="margin-top:6px">Said now, not before</h2>
-                    <template x-for="x in deep.data.new.slice(0,4)" :key="x.text"><div><div class="quote small" x-text="x.text"></div>
-                      <button class="cite" @click="openEvidence(x.document_id, x.page, x.text); sheet='evidence'" x-text="x.call + ', page ' + x.page + ' · ' + (x.speaker || '')"></button></div></template>
-                    <h2 style="margin-top:6px">Said before, not now</h2>
-                    <template x-for="x in deep.data.dropped.slice(0,4)" :key="x.text"><div><div class="quote small" x-text="x.text"></div>
-                      <button class="cite" @click="openEvidence(x.document_id, x.page, x.text); sheet='evidence'" x-text="x.call + ', page ' + x.page"></button></div></template>
+                    <svg class="chart mt8" viewBox="0 0 320 70" style="width:100%; display:block" role="img" aria-label="Cautious phrases per 1,000 words, by call">
+                      <line class="grid" x1="0" x2="320" y1="16" y2="16" stroke-dasharray="2 4"/><line class="grid" x1="0" x2="320" y1="50" y2="50"/>
+                      <path class="line" :d="hedge().d"/>
+                      <g x-html="marks(hedge().pts, 66)"></g>
+                    </svg>
+                    <p class="xs t2 mt8" x-text="'Per 1,000 words of management remarks. Top phrases on the latest call: ' + (deep.data.calls.at(-1)?.top || []).slice(0, 3).map(t => t[0] + ' ×' + t[1]).join(', ')"></p>
                   </div>
                 </template>
                 <!-- dodge detector -->
                 <template x-if="deep.data.recipe === 'dodge_detector'">
                   <div>
-                    <template x-for="c in deep.data.calls" :key="c.call"><div class="small" x-text="c.call + ': ' + c.answered + ' answered, ' + c.partial + ' partial, ' + c.deflected + ' deflected of ' + c.judged"></div></template>
-                    <template x-for="x in deep.data.flagged.slice(0,5)" :key="x.question"><div style="margin-top:8px">
-                      <div class="small"><span class="pill" :class="x.label === 'deflected' ? 'missed' : 'partial'" x-text="x.label"></span> <span class="ink2" x-text="x.analyst + ' asked: ' + x.question"></span></div>
-                      <div class="quote small" x-text="x.evidence"></div>
-                      <button class="cite" @click="openEvidence(x.document_id, x.page, x.evidence); sheet='evidence'" x-text="x.answered_by + ', ' + x.call + ', page ' + x.page"></button></div></template>
+                    <template x-for="c in deep.data.calls" :key="c.call"><div class="mt8"><div class="row xs"><span class="grow" x-text="c.call"></span>
+                      <span class="num t2" x-text="c.answered + ' answered · ' + c.partial + ' partial · ' + c.deflected + ' deflected'"></span></div>
+                      <div class="segbar" style="height:6px"><span :style="'flex:' + c.answered + '; background:var(--up)'"></span><span :style="'flex:' + c.partial + '; background:var(--watch)'"></span>
+                        <span :style="'flex:' + c.deflected + '; background:var(--down)'"></span></div></div></template>
+                    <div class="eyebrow mt12">Evidence</div>
+                    <template x-for="x in deep.data.flagged.slice(0, 4)" :key="x.question"><div class="mt8">
+                      <div class="xs"><span class="badge" :class="x.label === 'deflected' ? 'missed' : 'partial'" x-text="x.label"></span> <span class="t2" x-text="x.analyst + ' asked: ' + clip(x.question, 140)"></span></div>
+                      <div class="quote" x-text="'“' + x.evidence + '”'"></div>
+                      <button class="cite" @click="openEvidence(x.document_id, x.page, x.evidence)" x-text="(x.answered_by || 'Management') + ', ' + x.call + ', page ' + x.page + ' →'"></button></div></template>
                   </div>
                 </template>
-                <!-- worry map -->
+                <!-- language diff -->
+                <template x-if="deep.data.recipe === 'language_diff'">
+                  <div>
+                    <p class="xs t2 mt4" x-text="deep.data.older + ' → ' + deep.data.newer"></p>
+                    <div class="eyebrow mt12 up">Said now, not before</div>
+                    <template x-for="x in deep.data.new.slice(0, 3)" :key="x.text"><div><div class="diff-new" x-text="clip(x.text, 220)"></div>
+                      <button class="cite" @click="openEvidence(x.document_id, x.page, x.text)" x-text="x.call + ', page ' + x.page + ' →'"></button></div></template>
+                    <div class="eyebrow mt12 down">Said before, not now</div>
+                    <template x-for="x in deep.data.dropped.slice(0, 3)" :key="x.text"><div><div class="diff-old" x-text="clip(x.text, 220)"></div>
+                      <button class="cite" @click="openEvidence(x.document_id, x.page, x.text)" x-text="x.call + ', page ' + x.page + ' →'"></button></div></template>
+                  </div>
+                </template>
+                <!-- worry map: heat grid -->
                 <template x-if="deep.data.recipe === 'worry_map'">
-                  <div style="overflow-x:auto">
-                    <table class="mini num"><thead><tr><th>Topic</th><template x-for="q in deep.data.quarters" :key="q"><th x-text="q.replace(' FY', ' ')"></th></template></tr></thead>
-                      <tbody><template x-for="t in deep.data.topics.slice(0,8)" :key="t"><tr>
-                        <td x-text="t" :style="deep.data.rising.includes(t) ? 'color:var(--watch); font-weight:600' : ''"></td>
-                        <template x-for="q in deep.data.quarters" :key="t+q"><td x-text="deep.data.counts[t][q] || ''"></td></template></tr></template></tbody></table>
-                    <p class="xs ink2" x-show="deep.data.rising.length" x-text="'Rising on the latest call: ' + deep.data.rising.join(', ')"></p>
+                  <div class="scroll-x">
+                    <table class="tbl heat"><thead><tr><th>Topic</th><template x-for="q in deep.data.quarters" :key="q"><th x-text="q.replace(' FY', '·')"></th></template></tr></thead>
+                      <tbody><template x-for="t in deep.data.topics.slice(0, 8)" :key="t"><tr>
+                        <td x-text="t" :class="deep.data.rising.includes(t) && 'watch'"></td>
+                        <template x-for="q in deep.data.quarters" :key="t + q"><td><span :style="heat(deep.data.counts[t]?.[q])" x-text="deep.data.counts[t]?.[q] || ''"></span></td></template></tr></template></tbody></table>
                   </div>
                 </template>
                 <!-- fine print -->
                 <template x-if="deep.data.recipe === 'fine_print'">
                   <div>
-                    <div class="small" x-text="'Contingent liabilities: ' + cr(deep.data.contingent_liabilities_cr.latest) + ' vs ' + cr(deep.data.contingent_liabilities_cr.previous) + (deep.data.contingent_liabilities_cr.change_pct != null ? ' (' + pct(deep.data.contingent_liabilities_cr.change_pct) + ')' : '')"></div>
-                    <div class="small" x-text="'New key audit matters: ' + (deep.data.new_key_audit_matters.map(i=>i.title).join(', ') || 'none')"></div>
-                    <div class="small" x-text="'Qualifications or emphasis of matter: ' + (deep.data.qualifications_or_emphasis.map(i=>i.title).join(', ') || 'none')"></div>
-                    <template x-for="y in deep.data.years" :key="y.period"><details class="small"><summary class="mute" x-text="y.report + ': ' + y.items.length + ' items'"></summary>
-                      <template x-for="i in y.items" :key="i.kind + i.title + i.page"><div><span class="ink2" x-text="i.kind.replace(/_/g,' ') + ': ' + i.title"></span>
-                        <button class="cite" @click="openEvidence(i.document_id, i.page, i.quote); sheet='evidence'" x-text="'page ' + i.page"></button></div></template></details></template>
+                    <dl class="kv mt8">
+                      <dt>Contingent liabilities</dt><dd x-text="cr(deep.data.contingent_liabilities_cr.latest)"></dd>
+                      <dt>Previous year</dt><dd x-text="cr(deep.data.contingent_liabilities_cr.previous)"></dd>
+                      <dt>New key audit matters</dt><dd x-text="deep.data.new_key_audit_matters.length"></dd>
+                      <dt>Qualifications / emphasis</dt><dd x-text="deep.data.qualifications_or_emphasis.length"></dd></dl>
+                    <template x-for="y in deep.data.years" :key="y.period"><details class="mt8 small"><summary class="t2" x-text="y.report + ': ' + y.items.length + ' items'"></summary>
+                      <template x-for="i in y.items" :key="i.kind + i.title + i.page"><div class="row xs mt4"><span class="grow t2" x-text="i.kind.replace(/_/g, ' ') + ': ' + i.title"></span>
+                        <button class="cite" @click="openEvidence(i.document_id, i.page, i.quote)" x-text="'p.' + i.page"></button></div></template></details></template>
                   </div>
                 </template>
                 <!-- peer compare -->
                 <template x-if="deep.data.recipe === 'peer_compare'">
-                  <table class="mini num"><thead><tr><th></th><template x-for="r in deep.data.rows" :key="r.symbol"><th x-text="r.symbol"></th></template></tr></thead>
-                    <tbody>
-                      <tr><td>Credibility</td><template x-for="r in deep.data.rows" :key="'s'+r.symbol"><td x-text="r.score ?? 'n/a'"></td></template></tr>
-                      <tr><td>Measured / tracked</td><template x-for="r in deep.data.rows" :key="'m'+r.symbol"><td x-text="r.measured + ' / ' + r.total"></td></template></tr>
-                      <tr><td>Too vague</td><template x-for="r in deep.data.rows" :key="'v'+r.symbol"><td x-text="r.vagueness_pct + '%'"></td></template></tr>
-                      <tr><td>Delivered / missed</td><template x-for="r in deep.data.rows" :key="'d'+r.symbol"><td x-text="r.counts.delivered + ' / ' + r.counts.missed"></td></template></tr>
-                      <tr><td>Guidance no longer repeated</td><template x-for="r in deep.data.rows" :key="'g'+r.symbol"><td x-text="r.dropped_guidance"></td></template></tr>
-                    </tbody></table>
+                  <div class="scroll-x">
+                    <table class="tbl"><thead><tr><th></th><template x-for="r in deep.data.rows" :key="r.symbol"><th x-text="r.symbol"></th></template></tr></thead>
+                      <tbody>
+                        <tr><td>Credibility</td><template x-for="r in deep.data.rows" :key="'s' + r.symbol"><td x-text="r.score ?? 'n/a'"></td></template></tr>
+                        <tr><td>Measured / tracked</td><template x-for="r in deep.data.rows" :key="'m' + r.symbol"><td x-text="r.measured + ' / ' + r.total"></td></template></tr>
+                        <tr><td>Too vague</td><template x-for="r in deep.data.rows" :key="'v' + r.symbol"><td x-text="r.vagueness_pct + '%'"></td></template></tr>
+                        <tr><td>Delivered / missed</td><template x-for="r in deep.data.rows" :key="'d' + r.symbol"><td x-text="r.counts.delivered + ' / ' + r.counts.missed"></td></template></tr>
+                        <tr><td>Dropped guidance</td><template x-for="r in deep.data.rows" :key="'g' + r.symbol"><td x-text="r.dropped_guidance"></td></template></tr>
+                      </tbody></table>
+                  </div>
                 </template>
-                <p class="xs mute" style="margin-top:6px" x-text="(deep.data.cached ? 'Cached · ' : '') + deep.data.receipt.llm_calls + ' model calls · ' + deep.data.receipt.seconds + ' s'"></p>
+                <p class="receipt mt12" x-text="(deep.data.cached ? 'cached · ' : '') + deep.data.receipt.llm_calls + ' model calls · ' + deep.data.receipt.seconds + ' s' + (deep.data.method ? ' · ' + deep.data.method : '')"></p>
               </div>
             </template>
           </div>
 
-          <details class="block"><summary><strong class="small">Receipt</strong> <span class="xs mute" x-text="rq.report.receipt.sources_read + ' of ' + rq.report.receipt.sources_listed + ' sources · ' + rq.report.receipt.seconds + ' s · $' + rq.report.receipt.cost_usd"></span></summary>
-            <dl class="kv small" style="margin-top:8px">
+          <!-- receipt -->
+          <details class="card mt16">
+            <summary class="receipt" style="cursor:pointer; min-height:24px" x-text="receiptLine()"></summary>
+            <dl class="kv mt12">
               <dt>Unverified claims shown</dt><dd x-text="rq.report.receipt.unverified_claims_shown"></dd>
               <dt>Facts dropped (quote not on page)</dt><dd x-text="rq.report.receipt.facts_dropped_unverified"></dd>
               <dt>Sentences removed (numbers)</dt><dd x-text="rq.report.receipt.sentences_removed_unsupported_numbers"></dd>
               <dt>Model calls / cache hits</dt><dd x-text="rq.report.receipt.llm_calls + ' / ' + rq.report.receipt.cache_hits"></dd>
-              <dt>Tokens in / out</dt><dd x-text="rq.report.receipt.in_tokens + ' / ' + rq.report.receipt.out_tokens"></dd>
               <dt>Models</dt><dd x-text="rq.report.receipt.models.join(', ')"></dd></dl>
-            <p class="xs mute" x-text="rq.report.receipt.strong_tier_note"></p>
-            <template x-for="s in rq.report.sources" :key="s.id"><div class="xs" style="margin:3px 0">
+            <div class="eyebrow mt12">Sources</div>
+            <template x-for="s in rq.report.sources" :key="s.id"><div class="xs mt4">
               <a :href="s.url" target="_blank" rel="noopener" x-text="s.id + ' ' + (s.title || s.kind)"></a>
-              <span class="mute" x-text="' · ' + s.status + (s.pages ? ' · ' + s.pages + ' pp' : '') + (s.reason ? ' · ' + s.reason.slice(0,80) : '')"></span></div></template>
-            <button class="btn ghost small" @click="openResearch(param, true)">Rebuild report</button>
+              <span class="t2" x-text="' · ' + s.status + (s.pages ? ' · ' + s.pages + ' pp' : '') + (s.reason ? ' · ' + s.reason.slice(0, 80) : '')"></span></div></template>
+            <button class="btn quiet mt8" @click="openResearch(param, true)"><svg class="i s"><use href="#i-refresh"/></svg>Rebuild report</button>
           </details>
         </div>
       </template>
     </section>
 
-    <!-- ===== Alerts ===== -->
-    <section x-show="route==='alerts'">
-      <template x-if="!alerts"><div><div class="skel"></div><div class="skel"></div></div></template>
-      <template x-if="alerts && !alerts.length"><div class="empty"><div class="big">No alerts yet</div><div class="small">Set thresholds in Settings.</div></div></template>
-      <template x-if="alerts && alerts.length">
+    <!-- ===================== Alerts ===================== -->
+    <section x-show="route==='alerts'" x-cloak>
+      <!-- rules strip -->
+      <div class="strip" style="margin-top:16px" aria-label="Alert rules">
+        <template x-for="r in (rules || [])" :key="r.kind"><a class="chip" href="#settings" :aria-pressed="r.enabled" x-text="ruleChip(r)"></a></template>
+      </div>
+      <!-- push banner -->
+      <template x-if="pushBanner()">
+        <div class="card mt12 row"><svg class="i acc"><use href="#i-bell"/></svg>
+          <span class="grow small" x-text="isIOS && !standalone ? 'On iPhone, add FINN to your Home Screen first to get lock-screen alerts.' : 'Get alerts on your lock screen'"></span>
+          <button class="btn quiet" x-show="!(isIOS && !standalone)" @click="enablePush()">Enable</button></div>
+      </template>
+      <template x-if="!alerts"><div class="list mt16"><template x-for="n in 5" :key="n"><div class="li"><div class="sk" style="width:32px; height:32px"></div><div class="grow"><div class="sk" style="width:60%"></div><div class="sk" style="width:85%"></div></div></div></template></div></template>
+      <template x-if="alerts && !alerts.length">
+        <div class="card empty mt16"><div class="mark n"><svg class="i"><use href="#i-bell"/></svg></div><h3>No alerts yet</h3><p x-text="rulesLine()"></p></div>
+      </template>
+      <template x-for="g in alertGroups()" :key="g.day + alertsAll">
         <div>
-          <div class="row" style="margin-bottom:8px"><span class="small ink2" x-text="unread + ' unread'"></span><span class="spacer"></span>
-            <button class="btn ghost small" @click="readAll()" x-show="unread">Mark all read</button></div>
+          <div class="section-h"><span class="eyebrow" x-text="g.label"></span></div>
           <div class="list">
-            <template x-for="a in alerts" :key="a.id">
-              <button class="compact" @click="openAlert(a)">
-                <span class="unread" :style="a.read ? 'visibility:hidden' : ''" aria-hidden="true"></span>
-                <div style="flex:1"><div class="small" :style="a.read ? '' : 'font-weight:620'" x-text="a.title"></div>
-                  <div class="xs ink2" x-text="a.line"></div><div class="xs mute" x-text="day(a.date)"></div></div>
+            <template x-for="a in g.items" :key="a.id">
+              <button class="li" @click="openAlert(a)">
+                <span class="alert-i"><svg class="i s"><use :href="alertIcon(a.kind)"/></svg></span>
+                <div class="grow"><div class="small" :class="!a.read && 'unread'" x-text="a.title"></div><div class="xs t2 mt4" x-text="a.line"></div></div>
+                <span class="dot" x-show="!a.read" aria-label="Unread"></span>
               </button>
             </template>
           </div>
         </div>
       </template>
+      <button class="btn block mt12" x-show="(alerts || []).length > 30 && !alertsAll" @click="alertsAll = true" x-text="'Show ' + (alerts.length - 30) + ' older alerts'"></button>
     </section>
 
-    <!-- ===== Settings ===== -->
-    <section x-show="route==='settings'">
-      <div class="block"><h2>Notifications</h2>
-        <p class="small ink2" x-show="isIOS && !standalone">On iPhone, web notifications only work once FINN is on your Home Screen: tap Share → Add to Home Screen, open FINN from the icon, then enable here.</p>
-        <div class="row"><button class="btn primary" @click="enablePush()">Enable notifications</button><button class="btn" @click="testPush()">Send a test</button></div>
-        <p class="small" x-show="push.msg" x-text="push.msg"></p></div>
-      <div class="block"><h2>Alert rules</h2>
-        <template x-if="!rules"><div class="skel"></div></template>
+    <!-- ===================== Settings ===================== -->
+    <section x-show="route==='settings'" x-cloak>
+      <div class="section-h"><span class="eyebrow">Alert rules</span></div>
+      <div class="card">
+        <template x-if="!rules"><div><div class="sk"></div><div class="sk"></div></div></template>
         <template x-for="r in rules || []" :key="r.kind">
-          <div style="margin:10px 0">
-            <label class="row small"><input type="checkbox" x-model="r.enabled" @change="saveRule(r)"> <strong x-text="r.label"></strong></label>
-            <template x-if="r.params.multiple !== undefined"><div class="row"><label class="f" :for="'m'+r.id" style="margin:0">Multiple of the 20-day median</label>
-              <input :id="'m'+r.id" type="number" step="0.1" style="width:90px" x-model.number="r.params.multiple" @change="saveRule(r)"></div></template>
-            <template x-if="r.params.pct !== undefined"><div class="row"><label class="f" :for="'p'+r.id" style="margin:0">Daily move ≥ ± %</label>
-              <input :id="'p'+r.id" type="number" step="0.5" style="width:90px" x-model.number="r.params.pct" @change="saveRule(r)"></div></template>
-            <template x-if="r.params.types"><div class="row wrap" style="margin-top:4px">
-              <template x-for="t in ['results','mgmt_change','governance','m_and_a','fundraise','order_win','credit_rating','litigation_regulatory','insider_pledge']" :key="t">
-                <button class="chip" :aria-pressed="r.params.types.includes(t)" @click="r.params.types.includes(t) ? r.params.types.splice(r.params.types.indexOf(t),1) : r.params.types.push(t); saveRule(r)" x-text="type(t)"></button>
-              </template></div></template>
+          <div class="rule">
+            <div class="row"><span class="grow small" style="font-weight:500" x-text="r.label"></span>
+              <button class="switch" role="switch" :aria-checked="r.enabled" :aria-label="r.label" @click="r.enabled = !r.enabled; saveRule(r)"></button></div>
+            <template x-if="r.params.multiple !== undefined"><div class="mt8"><div class="row xs t2"><span class="grow">Volume vs 20-day median</span><span class="num" x-text="Number(r.params.multiple).toFixed(1) + '×'"></span></div>
+              <input type="range" min="1.2" max="6" step="0.1" x-model.number="r.params.multiple" @change="saveRule(r)" aria-label="Volume multiple"></div></template>
+            <template x-if="r.params.pct !== undefined"><div class="mt8"><div class="row xs t2"><span class="grow">Daily move</span><span class="num" x-text="'±' + Number(r.params.pct).toFixed(1) + '%'"></span></div>
+              <input type="range" min="1" max="15" step="0.5" x-model.number="r.params.pct" @change="saveRule(r)" aria-label="Daily move percent"></div></template>
+            <template x-if="r.params.types"><div class="row wrap mt8">
+              <template x-for="t in ruleTypes" :key="t"><button class="chip" :aria-pressed="r.params.types.includes(t)" @click="toggleType(r, t)" x-text="type(t)"></button></template></div></template>
           </div>
         </template>
-        <button class="btn" @click="runPipeline()">Check for new alerts now</button>
+        <button class="btn block mt8" @click="runPipeline()">Check for new alerts now</button>
       </div>
-      <div class="block"><h2>Data refresh</h2>
-        <p class="small ink2" x-show="sched?.enabled" x-text="'Automatic: every ' + sched?.interval_min + ' minutes on trading days (08:00-21:00 IST), prices and calendar each evening.'"></p>
-        <p class="small ink2" x-show="sched && !sched.enabled">Automatic refresh is off here; the daily GitHub workflow refreshes the data.</p>
-        <p class="xs mute" x-show="sched?.last_run" x-text="'Last refresh ' + when(sched?.last_run) + (sched?.last_result?.new_filings != null ? ' · ' + sched.last_result.new_filings + ' new filings' : '') + (sched?.last_error ? ' · failed: ' + sched.last_error : '')"></p>
-        <div class="notice warn small" x-show="sched?.last_result?.bse" x-text="sched?.last_result?.bse"></div>
-        <button class="btn" @click="refreshNow()" :disabled="sched?.running" x-text="sched?.running ? 'Refreshing…' : 'Refresh now'"></button></div>
-      <div class="block"><h2>Appearance</h2>
-        <div class="row" role="group" aria-label="Theme"><template x-for="t in ['system','light','dark']" :key="t">
-          <button class="chip" :aria-pressed="theme===t" @click="theme=t; applyTheme()" x-text="t[0].toUpperCase()+t.slice(1)"></button></template></div></div>
-      <div class="block"><h2>About</h2><p class="small ink2">Decision support only: FINN never says buy, sell or hold. Research uses primary documents only (annual reports, earnings-call transcripts, exchange filings); every fact links to its quote and page.</p>
-        <a class="small" href="#gallery">Component gallery</a></div>
+
+      <div class="section-h"><span class="eyebrow">Notifications</span></div>
+      <div class="card">
+        <p class="small t2" x-show="isIOS && !standalone">On iPhone, web notifications work once FINN is on your Home Screen: Share → Add to Home Screen, open FINN from the icon, then enable here.</p>
+        <div class="row"><button class="btn primary grow" @click="enablePush()">Enable notifications</button><button class="btn" @click="testPush()">Send a test</button></div>
+        <p class="small mt8" x-show="push.msg" x-text="push.msg"></p>
+      </div>
+
+      <div class="section-h"><span class="eyebrow">Portfolio</span><span class="xs t2" x-text="(holdings || []).length + ' holdings'"></span></div>
+      <div class="list">
+        <template x-for="h in (holdings || [])" :key="h.symbol">
+          <a class="li" :href="'#holding/' + h.symbol" style="align-items:center"><b class="small" style="width:96px" x-text="h.symbol"></b><span class="grow xs t2 trunc" x-text="h.name"></span>
+            <span class="badge" :class="h.status" x-text="status(h.status)"></span></a>
+        </template>
+      </div>
+      <p class="xs t2 mt8">The portfolio is the <span class="num">is_portfolio</span> column of <span class="num">data/companies.csv</span>; theses are edited on each holding.</p>
+
+      <div class="section-h"><span class="eyebrow">Data refresh</span></div>
+      <div class="card">
+        <p class="small" x-text="sched?.enabled ? 'Automatic: every ' + sched.interval_min + ' minutes on trading days (08:00–21:00 IST); prices and calendar each evening.' : 'Automatic refresh is off on this server; the daily GitHub workflow refreshes the data.'"></p>
+        <dl class="kv mt8">
+          <dt>Latest filing</dt><dd x-text="appState?.latest_filing_at ? when(appState.latest_filing_at) : 'Not in sources'"></dd>
+          <dt>Latest prices</dt><dd x-text="appState?.latest_price_date ? day(appState.latest_price_date) : 'Not in sources'"></dd>
+          <dt>Last refresh</dt><dd x-text="sched?.last_run ? when(sched.last_run) : 'Not since start'"></dd></dl>
+        <div class="notice warn mt8" x-show="sched?.last_result?.bse" x-text="sched?.last_result?.bse"></div>
+        <div class="notice err mt8" x-show="sched?.last_error" x-text="'Last refresh failed: ' + sched?.last_error"></div>
+        <button class="btn block mt12" @click="refreshNow()" :disabled="sched?.running"><svg class="i s"><use href="#i-refresh"/></svg><span x-text="sched?.running ? 'Refreshing…' : 'Refresh now'"></span></button>
+      </div>
+
+      <div class="section-h"><span class="eyebrow">Appearance</span></div>
+      <div class="tabs-seg" role="radiogroup" aria-label="Theme">
+        <template x-for="t in ['system', 'light', 'dark']" :key="t"><button role="radio" :aria-selected="theme===t" :aria-checked="theme===t" @click="theme=t; applyTheme()" x-text="t[0].toUpperCase() + t.slice(1)"></button></template>
+      </div>
+
+      <div class="section-h"><span class="eyebrow">About</span></div>
+      <div class="card">
+        <p class="small"><b>Decision support only. Not investment advice.</b></p>
+        <p class="small t2 mt4">FINN never says buy, sell or hold. Research reads primary documents only (annual reports, earnings-call transcripts, exchange filings); every fact links to its quote and page.</p>
+        <a class="btn quiet mt8" href="#gallery" style="padding-left:0">Component gallery →</a>
+      </div>
     </section>
   </main>
 
-  <!-- ===== card sheet ===== -->
+  <!-- ===================== sheets ===================== -->
+  <!-- card detail -->
   <template x-if="sheet === 'card'">
     <div>
       <div class="scrim" @click="closeSheet()"></div>
       <div class="sheet" role="dialog" aria-modal="true" aria-label="Filing detail" @keydown.escape.window="closeSheet()">
         <div class="grab"></div>
-        <template x-if="!cardDetail"><div><div class="skel"></div><div class="skel"></div></div></template>
+        <template x-if="!cardDetail"><div><div class="sk" style="width:40%"></div><div class="sk h"></div><div class="sk mt12" style="height:96px"></div></div></template>
         <template x-if="cardDetail">
           <div>
-            <div class="card-meta"><span class="sym" x-text="cardDetail.symbol"></span><span>·</span><span x-text="type(cardDetail.type)"></span><span>·</span><span x-text="when(cardDetail.filed_at)"></span></div>
-            <h2 style="font-size:18px; margin:4px 0 10px" x-text="cardDetail.headline"></h2>
-            <div class="card-why" :class="cardDetail.thesis_impact" x-show="cardDetail.why_it_matters" x-text="cardDetail.why_it_matters"></div>
+            <div class="meta"><span class="sym" x-text="cardDetail.symbol"></span><span class="badge" x-text="type(cardDetail.type)"></span>
+              <span class="badge" :class="cardDetail.thesis_impact" x-show="impact(cardDetail)" x-text="impact(cardDetail)"></span><span class="when" x-text="when(cardDetail.filed_at)"></span></div>
+            <h2 class="mt8" x-text="cardDetail.headline"></h2>
+            <p class="small t2 mt4" x-show="cardDetail.why_it_matters" x-text="cardDetail.why_it_matters"></p>
 
             <template x-if="cardDetail.payload?.table && cardDetail.payload?.ok">
-              <div class="block" style="margin-top:10px"><h2 x-text="(cardDetail.payload.period || 'Quarter') + ' · ' + cardDetail.payload.basis"></h2>
-                <table class="mini num"><thead><tr><th>₹ crore</th><th>Current</th><th>Prev qtr</th><th>Year ago</th><th>QoQ</th><th>YoY</th></tr></thead>
-                  <tbody><template x-for="r in cardDetail.payload.table.filter(r=>r.found)" :key="r.metric"><tr>
-                    <td x-text="metricName(r.metric) + (r.derived ? '*' : '')"></td><td x-text="Math.round(r.current).toLocaleString('en-IN')"></td>
-                    <td x-text="r.previous != null ? Math.round(r.previous).toLocaleString('en-IN') : '–'"></td><td x-text="r.year_ago != null ? Math.round(r.year_ago).toLocaleString('en-IN') : '–'"></td>
-                    <td :class="cls(r.qoq)" x-text="pct(r.qoq)"></td><td :class="cls(r.yoy)" x-text="pct(r.yoy)"></td></tr></template></tbody></table>
-                <p class="xs mute" x-show="cardDetail.payload.table.some(r=>r.derived)">* EBITDA derived: PBT + finance costs + depreciation − other income.</p>
-                <div class="row wrap"><span class="pill" :class="cardDetail.payload.confidence === 'high' ? 'intact' : 'watch'" x-text="'Confidence ' + cardDetail.payload.confidence"></span>
-                  <span class="xs mute" x-text="cardDetail.payload.source"></span></div>
-                <template x-for="n in cardDetail.payload.notes || []" :key="n"><div class="xs ink2" x-text="'• ' + n"></div></template>
-                <template x-for="r in cardDetail.payload.table.filter(r=>r.found && r.quote)" :key="'q'+r.metric">
-                  <button class="cite" @click="openEvidence(cardDetail.document_id, r.page, r.quote)" x-text="metricName(r.metric) + ': page ' + r.page"></button></template>
+              <div class="mt12"><div class="eyebrow" x-text="(cardDetail.payload.period || 'Quarter') + ' · ' + cardDetail.payload.basis + ' · ₹ crore'"></div>
+                <div class="scroll-x"><table class="tbl"><thead><tr><th>₹ cr</th><th>Now</th><th>Prev</th><th>Yr ago</th><th>QoQ</th><th>YoY</th></tr></thead>
+                  <tbody><template x-for="r in resultRows(cardDetail)" :key="r.metric"><tr>
+                    <td x-text="metricName(r.metric) + (r.derived ? '*' : '')"></td><td x-text="whole(r.current)"></td><td x-text="whole(r.previous)"></td><td x-text="whole(r.year_ago)"></td>
+                    <td :class="cls(r.qoq)" x-text="arrow(r.qoq)"></td><td :class="cls(r.yoy)" x-text="arrow(r.yoy)"></td></tr></template></tbody></table></div>
+                <p class="tbl-note" x-show="cardDetail.payload.table.some(r => r.derived)">* EBITDA derived: PBT + finance costs + depreciation − other income.</p>
+                <div class="row wrap mt8"><span class="badge" :class="cardDetail.payload.confidence === 'high' || !cardDetail.payload.confidence ? 'delivered' : 'verify'" x-text="'Confidence ' + (cardDetail.payload.confidence || 'high')"></span>
+                  <span class="xs t2" x-text="cardDetail.payload.source"></span></div>
+                <template x-for="n in cardDetail.payload.notes || []" :key="n"><div class="notice warn mt8" x-text="'Verify: ' + n"></div></template>
+                <div class="row wrap mt8"><template x-for="r in resultRows(cardDetail).filter(r => r.quote)" :key="'q' + r.metric">
+                  <button class="cite" @click="openEvidence(cardDetail.document_id, r.page, r.quote)" x-text="metricName(r.metric) + ' · p.' + r.page"></button></template></div>
               </div>
             </template>
             <template x-if="cardDetail.payload?.results_day?.comparisons?.length">
-              <div class="block"><h2>Against management's own guidance</h2>
-                <template x-for="x in cardDetail.payload.results_day.comparisons" :key="x.metric + x.promised"><div class="small" style="margin:4px 0">
-                  <strong x-text="x.metric"></strong>: promised <span x-text="x.promised"></span> (<span x-text="x.said_in"></span>) → <span x-text="x.delivered"></span><span x-text="x.delivered_unit || '%'"></span>
-                  <span class="pill" :class="x.verdict === 'on track' || x.verdict === 'delivered' ? 'intact' : 'watch'" x-text="x.verdict"></span></div></template></div>
+              <div class="mt12"><div class="eyebrow">Against management's own guidance</div>
+                <template x-for="x in cardDetail.payload.results_day.comparisons" :key="x.metric + x.promised"><div class="small mt8">
+                  <b x-text="x.metric"></b>: promised <span x-text="x.promised"></span> <span class="t2" x-text="'(' + (x.said_in || '') + ')'"></span> → <span class="num" x-text="x.delivered + (x.delivered_unit || '%')"></span>
+                  <span class="badge" :class="cmpCls(x.verdict)" x-text="x.verdict"></span></div></template></div>
             </template>
-            <template x-if="cardDetail.payload && cardDetail.payload.ok === false">
-              <div class="notice warn" x-text="cardDetail.payload.reason"></div></template>
+            <template x-if="cardDetail.payload && cardDetail.payload.ok === false && cardDetail.payload.reason">
+              <div class="notice warn mt12" x-text="'Figures not shown: ' + cardDetail.payload.reason"></div></template>
             <template x-if="cardDetail.payload?.people?.length">
-              <div class="block"><h2>People</h2>
-                <template x-for="p in cardDetail.payload.people" :key="p.name"><div style="margin-bottom:8px">
-                  <div class="small"><span class="pill" :class="p.direction === 'appointed' ? 'intact' : 'watch'" x-text="p.direction"></span> <strong x-text="p.name"></strong> <span class="ink2" x-text="p.role"></span></div>
-                  <div class="xs mute" x-show="p.effective_date" x-text="'Effective ' + p.effective_date"></div>
+              <div class="mt12"><div class="eyebrow">People</div>
+                <template x-for="p in cardDetail.payload.people" :key="p.name"><div class="mt8">
+                  <div class="person" style="margin-top:0"><span class="dir" :class="isIn(p) ? 'in' : 'out'" x-text="isIn(p) ? 'IN' : 'OUT'"></span><span class="avatar" x-text="initials(p.name)"></span>
+                    <div class="grow"><div class="small" style="font-weight:600" x-text="p.name"></div><div class="xs t2" x-text="(p.role || 'Role not in filing') + (p.effective_date ? ' · effective ' + p.effective_date : '')"></div></div></div>
                   <div class="quote" x-show="p.profile_quote" x-text="p.profile_quote"></div>
                   <div class="quote" x-show="p.reason_quote" x-text="'Reason given: ' + p.reason_quote"></div>
-                  <template x-if="p.web_bio"><div class="xs">Web bio: <span x-text="p.web_bio.text"></span> <a :href="p.web_bio.url" target="_blank" rel="noopener">source</a></div></template>
-                  <button class="cite" x-show="p.page" @click="openEvidence(cardDetail.document_id, p.page, p.quote)" x-text="'Filing, page ' + p.page"></button></div></template></div>
+                  <template x-if="p.web_bio"><div class="xs mt4">Bio: <span x-text="p.web_bio.text"></span> <a :href="p.web_bio.url" target="_blank" rel="noopener">Bio source</a></div></template>
+                  <button class="cite" x-show="p.page" @click="openEvidence(cardDetail.document_id, p.page, p.quote)" x-text="'Filing, page ' + p.page + ' →'"></button></div></template></div>
             </template>
-            <template x-if="(cardDetail.payload?.flags || cardDetail.payload?.governance_flags || []).length">
-              <div class="block"><h2>Governance flags</h2><template x-for="f in (cardDetail.payload.flags || cardDetail.payload.governance_flags)" :key="f.kind + f.summary">
-                <div class="small"><span class="pill" :class="f.severity === 'high' ? 'at_risk' : 'watch'" x-text="f.kind.replace(/_/g,' ')"></span> <span class="ink2" x-text="f.summary"></span></div></template></div>
+            <template x-if="flags(cardDetail).length">
+              <div class="mt12"><div class="eyebrow">Governance flags</div>
+                <template x-for="f in flags(cardDetail)" :key="f.kind + f.summary"><div class="small mt8">
+                  <span class="badge" :class="f.severity === 'high' ? 'gov' : 'watch'" x-text="f.kind.replace(/_/g, ' ')"></span> <span x-text="f.summary"></span>
+                  <div class="quote" x-show="f.quote" x-text="clip(f.quote, 260)"></div>
+                  <button class="cite" x-show="f.page" @click="openEvidence(cardDetail.document_id, f.page, f.quote)" x-text="'Filing, page ' + f.page + ' →'"></button></div></template></div>
             </template>
-            <div class="block" x-show="cardDetail.one_liner"><h2>Summary</h2><p class="small" x-text="cardDetail.one_liner"></p></div>
+            <template x-if="cardDetail.one_liner"><div class="mt12"><div class="eyebrow">Summary</div><p class="small mt4" x-text="cardDetail.one_liner"></p></div></template>
 
-            <details class="block"><summary class="row"><svg class="i s"><use href="#i-info"/></svg><strong class="small">Why am I seeing this?</strong></summary>
-              <dl class="kv small num" style="margin-top:8px">
-                <dt>Type weight</dt><dd x-text="cardDetail.why?.type_weight"></dd><dt>Magnitude</dt><dd x-text="cardDetail.why?.magnitude"></dd>
-                <dt>Novelty</dt><dd x-text="cardDetail.why?.novelty"></dd><dt>Thesis</dt><dd x-text="cardDetail.why?.thesis_multiplier"></dd>
-                <dt><strong>Score</strong></dt><dd><strong x-text="cardDetail.why?.score"></strong></dd></dl>
-              <template x-for="r in cardDetail.why?.reasons || []" :key="r"><div class="xs ink2" x-text="'• ' + r"></div></template>
-              <p class="xs mute" x-text="cardDetail.why?.formula"></p></details>
+            <button class="li" style="padding-left:0" @click="openWhy(cardDetail)"><svg class="i s acc"><use href="#i-info"/></svg><span class="small acc">Why am I seeing this?</span></button>
 
-            <div class="block" x-show="cardDetail.id > 0">
-              <h2>Was this useful?</h2>
-              <div class="row wrap">
-                <button class="chip" @click="sendFeedback(cardDetail, 'useful')">Useful</button>
-                <button class="chip" @click="sendFeedback(cardDetail, 'not_useful')">Not useful</button>
-                <button class="chip" @click="sendFeedback(cardDetail, 'higher')">Should be higher</button>
+            <template x-if="cardDetail.id > 0">
+              <div class="mt8">
+                <div class="eyebrow">Was this useful?</div>
+                <div class="row wrap mt8">
+                  <button class="chip" @click="sendFeedback(cardDetail, 'useful')"><svg class="i s"><use href="#i-up"/></svg>Useful</button>
+                  <button class="chip" @click="sendFeedback(cardDetail, 'not_useful')"><svg class="i s"><use href="#i-dn"/></svg>Not useful</button>
+                  <button class="chip" @click="sendFeedback(cardDetail, 'higher')"><svg class="i s"><use href="#i-raise"/></svg>Should be higher</button>
+                </div>
+                <label class="f" for="jr">Decision journal: acting on this?</label>
+                <div class="row"><input id="jr" type="text" x-model="jr.reason" placeholder="One line: what you're doing and why">
+                  <button class="btn" @click="saveJournal(cardDetail)" :disabled="jr.reason.trim().length < 3">Save</button></div>
               </div>
-              <label class="f" for="jr">Decision journal: acting on this?</label>
-              <div class="row"><input id="jr" type="text" x-model="jr.reason" placeholder="One line: what you're doing and why">
-                <button class="btn" @click="saveJournal(cardDetail)" :disabled="jr.reason.trim().length < 3">Save</button></div>
+            </template>
+            <div class="row mt16">
+              <a class="btn grow" :href="cardDetail.pdf_url" target="_blank" rel="noopener" x-show="cardDetail.pdf_url"><svg class="i s"><use href="#i-file"/></svg>Open filing</a>
+              <a class="btn primary grow" :href="'#research/' + cardDetail.symbol">Dig deeper →</a>
             </div>
-            <div class="row" style="margin-top:6px">
-              <a class="btn" style="flex:1; text-align:center" :href="cardDetail.pdf_url" target="_blank" rel="noopener" x-show="cardDetail.pdf_url">Open filing PDF</a>
-              <button class="btn primary" style="flex:1" @click="nav('#research/' + cardDetail.symbol)">Dig deeper →</button>
-            </div>
-            <template x-if="evidence"><div style="margin-top:12px">
-              <div class="notice err" x-show="evidence.error" x-text="evidence.error"></div>
-              <template x-if="evidence.text"><div><div class="xs mute" x-text="(evidence.title || '') + ' · page ' + evidence.page"></div>
-                <div class="page-text" x-html="highlight(evidence.text, evidence.quote)"></div></div></template></div></template>
           </div>
         </template>
       </div>
     </div>
   </template>
 
-  <!-- ===== evidence sheet (research quotes) ===== -->
+  <!-- evidence -->
   <template x-if="sheet === 'evidence'">
     <div>
-      <div class="scrim" @click="sheet=null"></div>
-      <div class="sheet" role="dialog" aria-modal="true" aria-label="Source page" @keydown.escape.window="sheet=null">
+      <div class="scrim" @click="sheet = prevSheet; prevSheet = null"></div>
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="Evidence" @keydown.escape.window="sheet = prevSheet; prevSheet = null">
         <div class="grab"></div>
-        <template x-if="!evidence || evidence.loading"><div class="skel"></div></template>
-        <div class="notice err" x-show="evidence?.error" x-text="evidence?.error"></div>
-        <template x-if="evidence?.text"><div>
-          <div class="row"><strong class="small" x-text="(evidence.title || '') + ' · page ' + evidence.page"></strong><span class="spacer"></span>
-            <a class="small" :href="evidence.url" target="_blank" rel="noopener">PDF</a></div>
-          <div class="quote" x-text="evidence.quote"></div>
-          <div class="page-text" x-html="highlight(evidence.text, evidence.quote)"></div></div></template>
+        <div class="eyebrow">Evidence</div>
+        <template x-if="!evidence || evidence.loading"><div class="mt8"><div class="sk h" style="width:60%"></div><div class="sk mt12" style="height:120px"></div></div></template>
+        <div class="notice err mt8" x-show="evidence?.error" x-text="evidence?.error"></div>
+        <template x-if="evidence?.text">
+          <div>
+            <h2 class="mt4" x-text="(evidence.title || 'Document') + ' · page ' + evidence.page"></h2>
+            <div class="quote" x-show="evidence.quote" x-text="'“' + evidence.quote + '”'"></div>
+            <p class="xs t2" x-text="quoteOnPage() ? 'Quote found on this page ✓' : 'Quote not matched verbatim on this page: read the page text below.'"></p>
+            <div class="page-text" x-html="highlight(evidence.text, evidence.quote)"></div>
+            <a class="btn primary block mt12" :href="evidence.url + '#page=' + evidence.page" target="_blank" rel="noopener" x-show="evidence.url"><svg class="i s"><use href="#i-file"/></svg><span x-text="'Open PDF at page ' + evidence.page"></span></a>
+          </div>
+        </template>
+        <button class="btn block mt8" x-show="prevSheet" @click="sheet = prevSheet; prevSheet = null">Back</button>
       </div>
     </div>
   </template>
 
-  <!-- ===== time-travel replay ===== -->
+  <!-- why am I seeing this -->
+  <template x-if="sheet === 'why' && whyCard">
+    <div>
+      <div class="scrim" @click="sheet = prevSheet; prevSheet = null"></div>
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="Why am I seeing this?" @keydown.escape.window="sheet = prevSheet; prevSheet = null">
+        <div class="grab"></div>
+        <div class="eyebrow">Why am I seeing this?</div>
+        <h2 class="mt4 clamp2" x-text="whyCard.symbol + ' · ' + whyCard.headline"></h2>
+        <div class="mt12">
+          <template x-for="f in whyFactors()" :key="f[0]">
+            <div class="factor"><div class="row small"><span class="grow" x-text="f[0]"></span><span class="num" x-text="'× ' + Number(f[1]).toFixed(2)"></span></div>
+              <div class="bar"><span :style="'width:' + Math.min(100, f[1] / 1.5 * 100) + '%'"></span></div></div>
+          </template>
+        </div>
+        <div class="inset mt16 small num" x-text="'Score ' + Number(whyCard.why?.score ?? 0).toFixed(2) + ' → ' + bucketName(whyCard.bucket)"></div>
+        <p class="xs t2 mt8">Needs attention ≥ 0.70 · Worth a look ≥ 0.30 · otherwise routine. Score is capped at 1.</p>
+        <template x-for="r in whyCard.why?.reasons || []" :key="r"><p class="small mt4" x-text="'• ' + r"></p></template>
+        <p class="xs t2 mt8" x-text="whyCard.why?.formula"></p>
+        <button class="btn block mt12" @click="sheet = prevSheet; prevSheet = null">Close</button>
+      </div>
+    </div>
+  </template>
+
+  <!-- context menu (long-press) -->
+  <template x-if="sheet === 'menu' && menuCard">
+    <div>
+      <div class="scrim" @click="sheet = null"></div>
+      <div class="sheet menu" role="dialog" aria-modal="true" aria-label="Card actions" @keydown.escape.window="sheet = null">
+        <div class="grab"></div>
+        <div class="meta"><span class="sym" x-text="menuCard.symbol"></span><span x-text="type(menuCard.type)"></span></div>
+        <p class="small t2 mt4 clamp2" x-text="menuCard.headline"></p>
+        <div class="list mt12" role="menu">
+          <button class="li" role="menuitem" @click="sheet = null; review(menuCard, menuCard.reviewed)"><svg class="i"><use href="#i-check"/></svg><span x-text="menuCard.reviewed ? 'Undo reviewed' : 'Mark reviewed'"></span></button>
+          <button class="li" role="menuitem" @click="sheet = null; snooze(menuCard)"><svg class="i"><use href="#i-clock"/></svg>Snooze until tomorrow</button>
+          <button class="li" role="menuitem" @click="openCardSheet(menuCard)"><svg class="i"><use href="#i-pen"/></svg>Acting on this…</button>
+          <button class="li" role="menuitem" @click="sheet = null; sendFeedback(menuCard, 'useful')"><svg class="i"><use href="#i-up"/></svg>Useful</button>
+          <button class="li" role="menuitem" @click="sheet = null; sendFeedback(menuCard, 'not_useful')"><svg class="i"><use href="#i-dn"/></svg>Not useful</button>
+          <button class="li" role="menuitem" @click="sheet = null; sendFeedback(menuCard, 'higher')"><svg class="i"><use href="#i-raise"/></svg>Should be higher</button>
+          <button class="li" role="menuitem" @click="openWhy(menuCard)"><svg class="i"><use href="#i-info"/></svg>Why am I seeing this?</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- custom range -->
+  <template x-if="sheet === 'range'">
+    <div>
+      <div class="scrim" @click="sheet = null"></div>
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="Custom range" @keydown.escape.window="sheet = null">
+        <div class="grab"></div>
+        <h2>Custom range</h2><p class="xs t2 mt4">IST dates, up to 90 days.</p>
+        <div class="row mt12"><div class="grow"><label class="f" for="cf" style="margin-top:0">From</label><input id="cf" type="date" x-model="custom.from" :max="today()"></div>
+          <div class="grow"><label class="f" for="ct" style="margin-top:0">To</label><input id="ct" type="date" x-model="custom.to" :max="today()"></div></div>
+        <button class="btn primary block mt16" @click="applyCustom()">Show this range</button>
+      </div>
+    </div>
+  </template>
+
+  <!-- time-travel replay -->
   <template x-if="sheet === 'replay'">
     <div>
-      <div class="scrim" @click="sheet=null"></div>
-      <div class="sheet" role="dialog" aria-modal="true" aria-label="Replay a past date" @keydown.escape.window="sheet=null">
+      <div class="scrim" @click="sheet = null"></div>
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="Replay a past date" @keydown.escape.window="sheet = null">
         <div class="grab"></div>
-        <h2 style="font-size:17px; margin:4px 0">Replay the feed as of a past date</h2>
-        <p class="small ink2">Shows only what had been filed by that day, then what each surfaced stock did over the next five sessions: a test of the filter.</p>
-        <label class="f" for="rpd" x-text="'As of ' + day(replayDate()) + ' (' + rp.daysAgo + ' days ago)'"></label>
-        <input id="rpd" type="range" min="2" max="88" x-model.number="rp.daysAgo" style="width:100%">
-        <button class="btn primary block" @click="loadReplay()" :disabled="rp.loading" x-text="rp.loading ? 'Replaying…' : 'Replay'"></button>
-        <template x-if="rp.data"><div style="margin-top:10px">
+        <h2>Replay the feed as of a past date</h2>
+        <p class="small t2 mt4">Shows only what had been filed by that day, then what each surfaced stock did over the next five sessions: a test of the filter.</p>
+        <div class="row small mt16"><span class="grow">As of</span><span class="num" x-text="day(replayDate()) + ' · ' + rp.daysAgo + ' days ago'"></span></div>
+        <input type="range" min="2" max="88" x-model.number="rp.daysAgo" aria-label="Days ago">
+        <button class="btn primary block mt12" @click="loadReplay()" :disabled="rp.loading" x-text="rp.loading ? 'Replaying…' : 'Replay'"></button>
+        <template x-if="rp.data"><div class="mt12">
           <p class="small" x-text="rp.data.counts.attention + ' needed attention, ' + rp.data.counts.worth_a_look + ' worth a look in the 7 days to ' + day(rp.data.as_of)"></p>
-          <div class="block" x-show="rp.data.flagged_before_big_move.length"><h2>Surfaced before a ≥5% move</h2>
-            <template x-for="m in rp.data.flagged_before_big_move" :key="m.symbol"><div style="margin:6px 0">
-              <div class="small"><strong x-text="m.symbol"></strong> <span class="num" :class="cls(m.move_pct)" x-text="pct(m.move_pct)"></span>
-                <span class="mute" x-text="'over ' + m.sessions + ' sessions to ' + day(m.to)"></span></div>
-              <template x-for="c in m.cards" :key="c.id"><button class="cite" style="display:block; text-align:left" @click="nav('#card/' + c.id)" x-text="c.headline"></button></template>
-            </div></template></div>
-          <p class="small ink2" x-show="!rp.data.flagged_before_big_move.length">No surfaced stock moved 5% or more in the next five sessions.</p>
-          <p class="xs mute" x-text="rp.data.note"></p>
-        </div></template>
+          <template x-if="rp.data.flagged_before_big_move.length"><div class="mt8"><div class="eyebrow">Surfaced before a ≥ 5% move</div>
+            <template x-for="m in rp.data.flagged_before_big_move" :key="m.symbol"><div class="mt8">
+              <div class="small"><b x-text="m.symbol"></b> <span class="num" :class="cls(m.move_pct)" x-text="arrow(m.move_pct) + '%'"></span>
+                <span class="t2" x-text="'over ' + m.sessions + ' sessions to ' + day(m.to)"></span></div>
+              <template x-for="c in m.cards" :key="c.id"><a class="cite" style="display:flex" :href="'#card/' + c.id" x-text="c.headline"></a></template></div></template></div></template>
+          <p class="small t2" x-show="!rp.data.flagged_before_big_move.length">No surfaced stock moved 5% or more in the next five sessions.</p>
+          <p class="xs t2 mt8" x-text="rp.data.note"></p></div></template>
       </div>
     </div>
   </template>
 
-  <!-- ===== copilot bar + sheet (Holding and Research) ===== -->
-  <button class="copilot-bar" x-show="(route==='holding' && holding) || (route==='research' && param)" @click="openCopilot()"
-          :aria-label="'Ask about ' + copilotSymbol()">
+  <!-- copilot -->
+  <button class="copilot-bar" x-show="(route==='holding' && holding) || (route==='research' && param)" x-cloak @click="openCopilot()" :aria-label="'Ask about ' + copilotSymbol()">
     <svg class="i s"><use href="#i-search"/></svg><span x-text="'Ask about ' + (copilotSymbol() || 'your portfolio') + '…'"></span>
   </button>
   <template x-if="sheet === 'copilot'">
     <div>
-      <div class="scrim" @click="sheet=null"></div>
-      <div class="sheet" role="dialog" aria-modal="true" aria-label="Ask FINN" @keydown.escape.window="sheet=null">
+      <div class="scrim" @click="sheet = null"></div>
+      <div class="sheet copilot" role="dialog" aria-modal="true" aria-label="Ask FINN" @keydown.escape.window="sheet = null">
         <div class="grab"></div>
-        <form class="row" @submit.prevent="askCopilot()">
+        <div class="body">
+          <div class="row"><span class="badge acc" x-text="copilotContext()"></span><span class="grow"></span>
+            <button class="ibtn" @click="sheet = null" aria-label="Close"><svg class="i s"><use href="#i-x"/></svg></button></div>
+          <template x-if="!cp.answer && !cp.busy && !cp.steps.length">
+            <div class="mt12"><div class="eyebrow">Try</div>
+              <div class="row wrap mt8"><template x-for="s in suggestions()" :key="s"><button class="chip" style="white-space:normal; text-align:left; padding:6px 12px" @click="cp.q = s; askCopilot(s)" x-text="s"></button></template></div>
+              <p class="xs t2 mt12">Answers come only from your filings, call transcripts and annual reports, each sentence with its source.</p></div>
+          </template>
+          <template x-if="cp.q && (cp.busy || cp.answer)"><p class="small mt12" style="font-weight:600" x-text="cp.q"></p></template>
+          <ul class="steps mt8" x-show="cp.steps.length || cp.busy">
+            <template x-for="(s, i) in cp.steps" :key="i"><li class="done"><span class="n">✓</span>
+              <span class="grow" x-text="s.note || (toolLabel(s.tool) + (s.args?.query ? ': ' + s.args.query : s.args?.metric ? ': ' + s.args.metric : ''))"></span></li></template>
+            <li class="now" x-show="cp.busy"><span class="n"><span class="spin"></span></span>Reading…</li>
+          </ul>
+          <div class="notice err mt8" x-show="cp.error" x-text="cp.error"></div>
+          <template x-if="cp.answer">
+            <div class="card mt12">
+              <div class="row"><span class="eyebrow grow">Answer</span>
+                <span class="badge" :class="cp.answer.not_in_sources ? 'outline' : 'delivered'" x-text="cp.answer.not_in_sources ? 'Not in sources' : cp.answer.evidence.length + ' sources'"></span></div>
+              <template x-for="(s, i) in cp.answer.answer" :key="i"><p class="small mt8"><span x-text="s.text"></span>
+                <template x-for="c in s.citations" :key="c"><sup class="ref" role="button" tabindex="0" @click="citeOpen(c)" @keydown.enter="citeOpen(c)" x-text="c"></sup></template></p></template>
+              <template x-if="cp.answer.evidence.length"><div class="mt12"><div class="eyebrow">Evidence</div>
+                <template x-for="e in cp.answer.evidence" :key="e.id"><button class="li" style="padding:8px 0" @click="citeOpen(e.id)">
+                  <span class="num xs acc" style="width:28px" x-text="e.id"></span><span class="grow xs t2 clamp2" x-text="e.text.slice(0, 200)"></span></button></template></div></template>
+              <p class="receipt mt8" x-text="cp.answer.receipt.tool_steps + ' steps · ' + cp.answer.receipt.seconds + ' s · $' + cp.answer.receipt.cost_usd"></p>
+            </div>
+          </template>
+        </div>
+        <form class="search" @submit.prevent="askCopilot()">
           <label class="sr" for="cpq">Question</label>
-          <input id="cpq" type="text" x-model="cp.q" :placeholder="'Ask about ' + (copilotSymbol() || 'your portfolio')" autocomplete="off">
+          <input id="cpq" type="text" style="text-transform:none" x-model="cp.q" :placeholder="'Ask about ' + (copilotSymbol() || 'your portfolio')" autocomplete="off" enterkeyhint="send">
           <button class="btn primary" type="submit" :disabled="cp.busy">Ask</button>
         </form>
-        <div class="row wrap" style="margin:8px 0" x-show="!cp.answer && !cp.busy">
-          <template x-for="s in suggestions()" :key="s"><button class="chip" @click="cp.q = s; askCopilot(s)" x-text="s"></button></template>
-        </div>
-        <ul class="steps" x-show="cp.steps.length">
-          <template x-for="(s, i) in cp.steps" :key="i"><li class="done"><span class="dot"></span>
-            <span x-text="s.note || (toolLabel(s.tool) + (s.args.query ? ': ' + s.args.query : s.args.metric ? ': ' + s.args.metric : ''))"></span></li></template>
-          <li class="now" x-show="cp.busy"><span class="dot"></span>Thinking…</li>
-        </ul>
-        <div class="notice err" x-show="cp.error" x-text="cp.error"></div>
-        <template x-if="cp.answer">
-          <div class="block">
-            <template x-for="(s, i) in cp.answer.answer" :key="i"><p class="small" style="margin:6px 0"><span x-text="s.text"></span>
-              <template x-for="c in s.citations" :key="c"><button class="cite" style="margin-left:4px" @click="citeOpen(c)" x-text="'[' + c + ']'"></button></template></p></template>
-            <details class="small" x-show="cp.answer.evidence.length"><summary class="mute" x-text="'Sources (' + cp.answer.evidence.length + ')'"></summary>
-              <template x-for="e in cp.answer.evidence" :key="e.id"><div class="xs ink2" style="margin:4px 0">
-                <button class="cite" @click="citeOpen(e.id)" x-text="e.id"></button> <span x-text="e.text.slice(0, 220)"></span></div></template></details>
-            <p class="xs mute" x-text="cp.answer.receipt.tool_steps + ' steps · ' + cp.answer.receipt.seconds + ' s · $' + cp.answer.receipt.cost_usd + ' · from your filings, calls and reports only'"></p>
-          </div>
-        </template>
       </div>
     </div>
   </template>
 
-  <div class="notice" x-show="toast" x-transition role="status" aria-live="polite"
-       style="position:fixed; left:16px; right:16px; bottom:84px; z-index:50; max-width:600px; margin:0 auto" x-text="toast"></div>
+  <!-- toast -->
+  <template x-if="toast">
+    <div class="toast" role="status" aria-live="polite"><span x-text="toast"></span>
+      <button class="btn quiet" style="min-height:36px" x-show="toastUndo" @click="runUndo()">Undo</button></div>
+  </template>
 
-  <!-- ===== tabs ===== -->
+  <!-- bottom tabs -->
   <nav class="tabs" aria-label="Main">
     <div class="tabs-in">
-      <button class="tab" :aria-current="route==='today' && 'page'" @click="nav('#today')"><svg class="i"><use href="#i-today"/></svg>Today</button>
-      <button class="tab" :aria-current="['holdings','holding'].includes(route) && 'page'" @click="nav('#holdings')"><svg class="i"><use href="#i-hold"/></svg>Holdings</button>
-      <button class="tab" :aria-current="route==='research' && 'page'" @click="nav('#research')"><svg class="i"><use href="#i-search"/></svg>Research</button>
-      <button class="tab" :aria-current="route==='alerts' && 'page'" @click="nav('#alerts')"><svg class="i"><use href="#i-bell"/></svg>Alerts
-        <span class="badge" x-show="unread" x-text="unread > 99 ? '99+' : unread" :aria-label="unread + ' unread alerts'"></span></button>
+      <a class="tab" href="#today" :aria-current="route==='today' ? 'page' : null"><svg class="i"><use href="#i-today"/></svg>Today</a>
+      <a class="tab" href="#holdings" :aria-current="['holdings','holding'].includes(route) ? 'page' : null"><svg class="i"><use href="#i-hold"/></svg>Holdings</a>
+      <a class="tab" href="#research" :aria-current="route==='research' ? 'page' : null"><svg class="i"><use href="#i-search"/></svg>Research</a>
+      <a class="tab" href="#alerts" :aria-current="route==='alerts' ? 'page' : null"><svg class="i"><use href="#i-bell"/></svg>Alerts
+        <span class="count" x-show="unread" x-text="unread > 99 ? '99+' : unread" :aria-label="unread + ' unread alerts'"></span></a>
     </div>
   </nav>
 </div>

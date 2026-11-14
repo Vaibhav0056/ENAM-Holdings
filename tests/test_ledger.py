@@ -77,6 +77,17 @@ def test_drift_cut_raised_and_dropped():
     assert "export share" not in d
 
 
+def test_drift_compares_money_in_crore():
+    # "₹1,200-1,600 crore" restated as "₹12-16 billion" is the same target, not a cut
+    ps = [P("annual capex", 1200, 1600, "crore", "FY26", "Q1 FY26", "G1"),
+          P("annual capex", 12, 16, "billion", "FY26", "Q3 FY26", "G2")]
+    d = {x["metric"]: x for x in L.drift(ps)}
+    step = d.get("annual capex", {"steps": [{"change": "maintained"}]})["steps"][0]
+    assert step["change"] == "maintained"
+    ps[1] = P("annual capex", 14, 18, "billion", "FY26", "Q3 FY26", "G2")
+    assert L.drift(ps)[0]["steps"][0]["change"] == "raised"
+
+
 def test_guards_remove_unsupported_numbers_and_advice():
     allowed = guards.allowed_numbers({"margin": 14.4, "growth": 12.35})
     text = "Margins reached 14.4% in Q2 FY27. Growth was 12.4%. Revenue rose 18%. Investors should buy the stock."

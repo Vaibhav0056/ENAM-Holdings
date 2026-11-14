@@ -72,13 +72,23 @@ def holding(symbol: str):
               s.scalars(select(CalendarEvent).where(CalendarEvent.company_id == c.id,
                                                     CalendarEvent.event_date >= datetime.now().date())
                         .order_by(CalendarEvent.event_date).limit(5))]
-        return {"symbol": c.nse_symbol, "name": c.name, "sector": c.industry or c.sector, "is_portfolio": c.is_portfolio,
+        prices = [{"date": d.isoformat(), "close": round(px, 2)} for d, px in
+                  s.execute(select(Price.date, Price.adj_close).where(Price.company_id == c.id, Price.adj_close.is_not(None),
+                                                                      Price.date >= datetime.now().date() - timedelta(days=95))
+                            .order_by(Price.date))]
+        return {"prices": prices, "symbol": c.nse_symbol, "name": c.name, "sector": c.industry or c.sector, "is_portfolio": c.is_portfolio,
                 "thesis": {"statement": t.statement, "kpis": t.kpis, "breakers": t.breakers, "source": t.source,
                            "citations": t.citations, "updated_at": to_ist(t.updated_at).isoformat()} if t else None,
                 "timeline": timeline, "cards": [_card(f, e, c) for f, e in rows], "catalysts": ev}
     h = read_session_run(q)
     if not h:
         raise HTTPException(404, "not a company FINN tracks")
+    # KPI check against the latest verified results card: the same numbers the status engine uses, computed here
+    from .thesis.kpi import check, kpi_values
+    latest = next((c for c in h["cards"] if c["type"] == "results" and (c.get("payload") or {}).get("ok")), None)
+    h["kpi_check"] = None if not (latest and h["thesis"]) else {
+        "filing_id": latest["id"], "period": latest["payload"].get("period"),
+        "rows": check(h["thesis"]["kpis"] or [], kpi_values(latest["payload"]))}
     rep = cached_report(symbol)
     h["research"] = None if not rep else {
         "report_id": rep["report_id"], "credibility": rep["credibility"],
@@ -203,5 +213,9 @@ async def copilot_stream(q: str, symbol: str | None = None):
 def state():
     def q(s):
         st = s.get(UserState, 1)
-        return {"last_checked_at": to_ist(st.last_checked_at).isoformat() if st and st.last_checked_at else None}
+        filing = s.scalar(select(func.max(Filing.filed_at)))
+        price = s.scalar(select(func.max(Price.date)).where(Price.company_id.is_not(None)))
+        return {"last_checked_at": to_ist(st.last_checked_at).isoformat() if st and st.last_checked_at else None,
+                "latest_filing_at": to_ist(filing).isoformat() if filing else None,
+                "latest_price_date": price.isoformat() if price else None}
     return read_session_run(q)

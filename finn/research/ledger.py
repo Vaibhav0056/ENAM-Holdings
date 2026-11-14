@@ -151,8 +151,11 @@ def match(promises: list[dict], actuals: list[dict]) -> list[dict]:
 
 
 def _bounds(p):
+    """(low, high) with money converted to ₹ crore, so "₹1,200-1,600 crore" and "₹12-16 billion" are the same target."""
     lo, hi = p.get("target_low"), p.get("target_high")
-    return (hi if lo is None else lo, lo if hi is None else hi)
+    lo, hi = (hi if lo is None else lo, lo if hi is None else hi)
+    f = money_factor(p.get("unit"))
+    return (round(lo * f, 6), round(hi * f, 6)) if f and lo is not None else (lo, hi)
 
 
 def same_promise(a: dict, b: dict) -> bool:
@@ -226,14 +229,15 @@ def drift(promises: list[dict]) -> list[dict]:
             (alo, ahi), (blo, bhi) = _bounds(a), _bounds(b)
             mid_a, mid_b = (alo + ahi) / 2, (blo + bhi) / 2
             lower_better = bool(LOWER_IS_BETTER.search(a["metric"]))
-            if abs(mid_b - mid_a) < 1e-9:
+            if abs(mid_b - mid_a) <= 1e-6 * max(abs(mid_a), 1):
                 kind = "narrowed" if (bhi - blo) < (ahi - alo) else "widened" if (bhi - blo) > (ahi - alo) else "maintained"
             elif (mid_b > mid_a) != lower_better:
                 kind = "raised"
             else:
                 kind = "cut"
             steps.append({"from": a.get("said_in"), "to": b.get("said_in"), "change": kind,
-                          "before": a.get("target_text"), "after": b.get("target_text")})
+                          "before": a.get("target_text"), "after": b.get("target_text"),
+                          "before_mid": round(mid_a, 2), "after_mid": round(mid_b, 2)})
         last_said = period(g[-1].get("said_in"))
         later_calls = [c for c in calls if last_said and last_said < period(c)]
         hz = period(g[-1].get("horizon"))
@@ -244,6 +248,7 @@ def drift(promises: list[dict]) -> list[dict]:
                    and (hz is None or not (hz < period(later_calls[-1]))))
         if steps or dropped:
             out.append({"metric": g[-1]["metric"], "horizon": g[-1].get("horizon"), "unit": g[-1].get("unit"),
+                        "mid_unit": "₹ crore" if money_factor(g[-1].get("unit")) else g[-1].get("unit"),
                         "steps": steps, "dropped": dropped,
                         "last_said_in": g[-1].get("said_in"), "promise_ids": [p.get("id") for p in g]})
     return out
