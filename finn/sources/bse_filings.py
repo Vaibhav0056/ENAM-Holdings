@@ -19,7 +19,6 @@ from sqlalchemy import select
 from ..database import session
 from ..fiscal import to_utc
 from ..models import Filing
-from .common import insert_ignore, log_run
 
 log = logging.getLogger("finn.sources.bse")
 PDF_BASE = "https://www.bseindia.com/xml-data/corpfiling/AttachLive/"
@@ -70,15 +69,15 @@ def fetch_all(b, code: str, days: int) -> list[dict]:
         if not rows or len(out) >= total or page >= 30:
             return out
         page += 1
-        time.sleep(0.5)
+        time.sleep(1.0)
 
 
 def _retry(fn, attempts=3):
     for i in range(attempts):
         try:
             return fn()
-        except (TimeoutError, ConnectionError):
-            if i == attempts - 1:
+        except (TimeoutError, ConnectionError) as e:
+            if i == attempts - 1 or _refused(e):
                 raise
             time.sleep(2 * (i + 1))
 
@@ -101,24 +100,52 @@ def link_revisions(company_id: int) -> int:
     return n
 
 
-def ingest(companies, days: int = 90) -> dict[str, dict]:
+SPACING = 1.5          # seconds between companies: BSE refused FINN for days after a fast backfill (Nov 2026)
+last_refusal: dict = {}
+
+
+def _refused(e: Exception) -> bool:
+    t = str(e)
+    return any(x in t for x in ("403", "429", "Forbidden", "Too Many"))
+
+
+def _record_refusal(r, *_, **__):
+    """Response hook: keep the exact refusal (status, headers, body) for /health/data and the build log."""
+    if r.status_code >= 400:
+        last_refusal.update(status=r.status_code, url=r.url[:160], at=datetime.now().isoformat(timespec="seconds"),
+                            headers={k: r.headers.get(k) for k in ("Server", "Content-Type", "Retry-After",
+                                                                   "Akamai-GRN", "X-Akamai-Request-ID") if r.headers.get(k)},
+                            body=r.text[:300])
+        log.warning("BSE refused: %s", last_refusal)
+
+
+def fetch(companies, days: int) -> tuple[list[dict], list]:
+    """Announcements for each company as filing rows. Returns (rows, companies that failed). Exponential backoff on
+    403/429 (2 s, 4 s); after 3 companies in a row are refused, stops asking BSE this run and hands the rest on."""
     from bse import BSE
-    out = {}
+    rows, failed, refused_run = [], [], 0
     with BSE(download_folder=tempfile.gettempdir()) as b:
-        for c in companies:
+        b.session.hooks["response"].append(_record_refusal)
+        for i, c in enumerate(companies):
+            if refused_run >= 3:
+                failed += list(companies[i:])
+                break
             if not c.bse_code:
-                out[c.nse_symbol] = {"seen": 0, "added": 0, "error": "no BSE code"}
+                failed.append(c)
                 continue
-            try:
-                raw = fetch_all(b, c.bse_code, days)
-                rows = [r for r in (to_filing(x, c.id) for x in raw) if r]
-                added = insert_ignore(Filing, rows, ["content_hash"])
-                revised = link_revisions(c.id)
-                out[c.nse_symbol] = {"seen": len(rows), "added": added, "revisions_linked": revised}
-                log_run("bse_filings", c.id, added, len(rows))
-            except Exception as e:  # noqa: BLE001
-                log.warning("bse failed %s: %s", c.nse_symbol, e)
-                out[c.nse_symbol] = {"seen": 0, "added": 0, "error": str(e)[:200]}
-                log_run("bse_filings", c.id, 0, 0, ok=False, error=str(e))
-            time.sleep(0.5)
-    return out
+            for attempt in range(3):
+                try:
+                    raw = fetch_all(b, c.bse_code, days)
+                    rows += [r for r in (to_filing(x, c.id) for x in raw) if r]
+                    refused_run = 0
+                    break
+                except Exception as e:  # noqa: BLE001
+                    if _refused(e) and attempt < 2:
+                        time.sleep(2 * 2 ** attempt)
+                        continue
+                    log.warning("bse failed %s: %s", c.nse_symbol, e)
+                    refused_run = refused_run + 1 if _refused(e) else 0
+                    failed.append(c)
+                    break
+            time.sleep(SPACING)
+    return rows, failed

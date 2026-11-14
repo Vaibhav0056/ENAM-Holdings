@@ -86,11 +86,10 @@ def board_meetings_from_filings(by_id: dict[int, object], since: date) -> list[d
     return rows
 
 
-def ingest(companies, back_days: int = 90, ahead_days: int = 30) -> dict:
+def bse_events(companies, back_days: int = 30, ahead_days: int = 45) -> list[dict]:
+    """BSE results calendar + corporate actions (ex-dates, record dates). Raises if BSE answers neither."""
     from bse import BSE
     by_code = {str(c.bse_code): c for c in companies if c.bse_code}
-    by_id = {c.id: c for c in companies}
-    today = date.today()
     start, end = datetime.now() - timedelta(days=back_days), datetime.now() + timedelta(days=ahead_days)
     rows, errors = [], []
     with BSE(download_folder=tempfile.gettempdir()) as b:
@@ -103,29 +102,65 @@ def ingest(companies, back_days: int = 90, ahead_days: int = 30) -> dict:
                                  "title": "Board meeting: results", "source": "bse_result_calendar"})
         except Exception as e:  # noqa: BLE001
             errors.append(f"resultCalendar: {e}")
-        for by in ("ex",):
-            try:
-                for a in b.actions(from_date=start, to_date=end, by_date=by):
-                    c = by_code.get(str(a.get("scrip_code")))
-                    purpose = (a.get("Purpose") or "").strip()
-                    d = parse_bse_date(a.get("Ex_date")) or parse_bse_date(a.get("exdate")) or parse_bse_date(a.get("RD_Date"))
-                    if c and d and purpose:
-                        rows.append({"company_id": c.id, "kind": action_kind(purpose), "event_date": d,
-                                     "title": action_title(purpose)[:300], "source": "bse_actions"})
-                        rd = parse_bse_date(a.get("RD_Date"))
-                        if rd and rd != d:
-                            rows.append({"company_id": c.id, "kind": "record_date", "event_date": rd,
-                                         "title": f"Record date: {action_title(purpose)}"[:300], "source": "bse_actions"})
-            except Exception as e:  # noqa: BLE001
-                errors.append(f"actions: {e}")
-    rows += board_meetings_from_filings(by_id, today - timedelta(days=back_days))
-    seen, unique = set(), []
-    for r in rows:
-        k = (r["company_id"], r["kind"], r["event_date"], r["title"])
-        if k not in seen:
-            seen.add(k)
-            unique.append(r)
-    added = insert_ignore(CalendarEvent, unique, ["company_id", "kind", "event_date", "title"])
-    log_run("calendar", None, added, len(unique), ok=not errors, error="; ".join(errors) or None)
-    upcoming = sum(1 for r in unique if today <= r["event_date"] <= today + timedelta(days=7))
-    return {"seen": len(unique), "added": added, "next_7_days": upcoming, "errors": errors}
+        try:
+            for a in b.actions(from_date=start, to_date=end, by_date="ex"):
+                c = by_code.get(str(a.get("scrip_code")))
+                purpose = (a.get("Purpose") or "").strip()
+                d = parse_bse_date(a.get("Ex_date")) or parse_bse_date(a.get("exdate")) or parse_bse_date(a.get("RD_Date"))
+                if c and d and purpose:
+                    rows.append({"company_id": c.id, "kind": action_kind(purpose), "event_date": d,
+                                 "title": action_title(purpose)[:300], "source": "bse_actions"})
+                    rd = parse_bse_date(a.get("RD_Date"))
+                    if rd and rd != d:
+                        rows.append({"company_id": c.id, "kind": "record_date", "event_date": rd,
+                                     "title": f"Record date: {action_title(purpose)}"[:300], "source": "bse_actions"})
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"actions: {e}")
+    if len(errors) == 2:
+        raise RuntimeError("; ".join(errors)[:300])
+    return rows
+
+
+_ANY_DATE_RE = re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?(?:\s*(?:and|&|-|to)\s*\d{1,2}(?:st|nd|rd|th)?)?\s+"
+                          r"(" + _MONTHS + r")[a-z]*,?\s+(\d{4})\b", re.I)
+_MEET_RE = re.compile(r"analyst|investor meet|institutional investor|con\.? ?call|conference call|earnings call", re.I)
+
+
+def dates_in_text(text: str) -> list[date]:
+    """Every '16 November 2026' / '18 and 19 November 2026' style date (the first day of a range)."""
+    out = []
+    for m in _ANY_DATE_RE.finditer(text or ""):
+        try:
+            out.append(datetime.strptime(f"{m.group(1)} {m.group(2)[:3]} {m.group(3)}", "%d %b %Y").date())
+        except ValueError:
+            continue
+    return out
+
+
+def investor_meets_from_filings(by_id: dict[int, object], since: date) -> list[dict]:
+    """Analyst / investor meetings scheduled in stored intimations, on dates from today on."""
+    rows, today = [], date.today()
+    with session() as s:
+        q = select(Filing).where(Filing.company_id.in_(list(by_id)), Filing.status != "duplicate")
+        for f in s.scalars(q):
+            text = f"{f.subject} {f.body or ''}"
+            if f.filed_at.date() < since or not _MEET_RE.search(text):
+                continue
+            for d in sorted(set(dates_in_text(text))):
+                if today <= d <= today + timedelta(days=60):
+                    rows.append({"company_id": f.company_id, "kind": "investor_meet", "event_date": d,
+                                 "title": "Analyst / investor meet", "source": f"filing:{f.id}"})
+    return rows
+
+
+def derived_events(companies, back_days: int = 30) -> list[dict]:
+    """Events announced in stored filings: board meetings ("intimation of board meeting on 12 November 2026") and
+    analyst / investor meetings with their dates. Used whatever the exchange calendars say."""
+    by_id, since = {c.id: c for c in companies}, date.today() - timedelta(days=back_days)
+    return board_meetings_from_filings(by_id, since) + investor_meets_from_filings(by_id, since)
+
+
+def ingest(companies, back_days: int = 90, ahead_days: int = 30) -> dict:
+    """Kept for `python -m finn.sources.run calendar`; the scheduled path is finn.sources.chain.event_chain."""
+    from .chain import event_chain
+    return event_chain(companies)

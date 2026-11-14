@@ -218,4 +218,10 @@ def state():
         return {"last_checked_at": to_ist(st.last_checked_at).isoformat() if st and st.last_checked_at else None,
                 "latest_filing_at": to_ist(filing).isoformat() if filing else None,
                 "latest_price_date": price.isoformat() if price else None}
-    return read_session_run(q)
+    out = read_session_run(q)
+    try:
+        from .ingest import freshness
+        out["freshness"] = freshness()
+    except Exception:  # noqa: BLE001 - freshness is a nicety; never fail the state call over it
+        out["freshness"] = None
+    return out

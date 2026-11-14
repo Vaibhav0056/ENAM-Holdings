@@ -70,7 +70,7 @@ def candidate_pages(pages: list[str]) -> list[int]:
             out.append(i)
     def rank(i):
         t = pages[i - 1]
-        dense = len(re.findall(r"\d[\d,]*\.\d{2}|\d{1,3}(?:,\d{2,3})+", t))
+        dense = len(re.findall(r"\d[\d,]*\.\d{2}\b|\d{1,3}(?:,\d{2,3})+\b", t))
         return (page_basis(t) != "consolidated", detect_unit(t) is None, -min(dense, 60), i)
     return sorted(out, key=rank)
 

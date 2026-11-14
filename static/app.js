@@ -103,7 +103,7 @@ function finn() {
       if (this.route === "holding" && param) this.loadHolding(param);
       if (this.route === "research") { if (!this.holdings) this.loadHoldings(); if (param) this.openResearch(param); else this.rq.report = null; }
       if (this.route === "alerts") { this.loadAlerts(); if (!this.rules) this.loadRules(); }
-      if (this.route === "settings") { this.loadRules(); this.loadSched(); this.loadHoldings(); this.loadState(); }
+      if (this.route === "settings") { this.loadRules(); this.loadSched(); this.loadHoldings(); this.loadState(); this.loadDataHealth(); }
       if (this.route === "gallery") this.loadGallery();
     },
     nav(hash) { location.hash = hash; },
@@ -158,12 +158,18 @@ function finn() {
     },
     async markChecked() { await this.api("/api/state/checked", { method: "POST" }); this.say("Marked as your last check"); this.loadState(); },
     dateEyebrow() { return new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", ...IST }); },
-    staleLabel() {
-      const t = this.appState?.latest_filing_at;
-      if (!t) return "";
-      const h = (Date.now() - new Date(t)) / 36e5;
-      return h < 18 ? "" : h < 48 ? `Last filing ${Math.round(h)}h ago` : `Last filing ${Math.round(h / 24)}d ago`;
+    freshLabel() {
+      const h = this.appState?.freshness?.hours_ago;
+      if (h == null) return "";
+      return "Data updated " + (h < 1 ? `${Math.max(1, Math.round(h * 60))}m` : h < 48 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`) + " ago";
     },
+    sourceName(s) {
+      return { bse_announcements: "BSE announcements", nse_api_announcements: "NSE announcements", nse_rss_announcements: "NSE RSS feed",
+               yfinance_prices: "Prices (Yahoo Finance)", nse_bhavcopy_prices: "Prices (NSE bhavcopy)", bse_events: "BSE calendar",
+               nse_events: "NSE event calendar", derived_events: "Events from filings" }[s] || s;
+    },
+    dataHealth: null,
+    async loadDataHealth() { try { this.dataHealth = await this.api("/health/data"); } catch (e) { this.net.error = null; } },
     pulseAsOf() { return this.appState?.latest_price_date ? "Day change · close " + this.day(this.appState.latest_price_date) : "Day change"; },
     statusCount(s) { return (this.holdings || []).filter((h) => h.status === s).length; },
     isSnoozed(c) { const u = this.snoozed[c.id]; return !!u && new Date(u) > new Date(); },
@@ -686,7 +692,7 @@ function finn() {
       const t = setInterval(async () => {
         await this.loadSched();
         if (this.sched && !this.sched.running) {
-          clearInterval(t); this.say("Refresh done"); this.loadAlerts(); this.loadState();
+          clearInterval(t); this.say("Refresh done"); this.loadAlerts(); this.loadState(); this.loadDataHealth();
           if (this.route === "today") { this.digest = null; this.loadDigest(); }
         }
       }, 4000);

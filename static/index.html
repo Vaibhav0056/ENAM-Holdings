@@ -61,7 +61,7 @@
       <div>
         <div class="row">
           <span class="eyebrow grow" x-text="dateEyebrow()"></span>
-          <template x-if="staleLabel()"><span class="badge watch" x-text="staleLabel()"></span></template>
+          <template x-if="freshLabel()"><a class="badge" :class="appState?.freshness?.stale ? 'watch' : 'outline'" href="#settings" x-text="freshLabel()"></a></template>
           <a class="ibtn" href="#settings" aria-label="Settings"><svg class="i"><use href="#i-gear"/></svg></a>
         </div>
         <div class="row" style="margin-top:2px">
@@ -347,7 +347,7 @@
               <div class="notice mt12"><div class="row"><span class="spin"></span><span>Waking FINN up… the first request after a quiet spell takes up to 30 s.</span></div></div>
               <div class="notice err"><div class="row"><svg class="i s down"><use href="#i-alert"/></svg><span class="grow">Couldn't load: 503</span><button class="btn quiet">Retry</button></div></div>
               <div class="notice warn">Showing the last copy: the server didn't answer just now.</div>
-              <div class="row mt12"><span class="badge watch">Filings 5d old</span><span class="xs t2">stale-data pill in the Today header</span></div>
+              <div class="row mt12"><span class="badge outline">Data updated 3h ago</span><span class="badge watch">Data updated 2d ago</span><span class="xs t2">freshness pill: amber only after 26h on a trading day</span></div>
 
               <div class="eyebrow gal-h">Sheets and toast</div>
               <div class="row wrap">
@@ -878,13 +878,23 @@
 
       <div class="section-h"><span class="eyebrow">Data refresh</span></div>
       <div class="card">
-        <p class="small" x-text="sched?.enabled ? 'Automatic: every ' + sched.interval_min + ' minutes on trading days (08:00–21:00 IST); prices and calendar each evening.' : 'Automatic refresh is off on this server; the daily GitHub workflow refreshes the data.'"></p>
+        <p class="small" x-text="(sched?.enabled ? 'This app refreshes' : 'GitHub Actions refreshes') + ' at 08:00, 16:30, 19:00 and 22:00 IST: filings, prices, events, then alerts.'"></p>
         <dl class="kv mt8">
+          <dt>Data updated</dt><dd :class="appState?.freshness?.stale && 'watch'" x-text="freshLabel() ? freshLabel().replace('Data updated ', '') : 'Not yet'"></dd>
           <dt>Latest filing</dt><dd x-text="appState?.latest_filing_at ? when(appState.latest_filing_at) : 'Not in sources'"></dd>
-          <dt>Latest prices</dt><dd x-text="appState?.latest_price_date ? day(appState.latest_price_date) : 'Not in sources'"></dd>
-          <dt>Last refresh</dt><dd x-text="sched?.last_run ? when(sched.last_run) : 'Not since start'"></dd></dl>
-        <div class="notice warn mt8" x-show="sched?.last_result?.bse" x-text="sched?.last_result?.bse"></div>
-        <div class="notice err mt8" x-show="sched?.last_error" x-text="'Last refresh failed: ' + sched?.last_error"></div>
+          <dt>Latest prices</dt><dd x-text="appState?.latest_price_date ? day(appState.latest_price_date) : 'Not in sources'"></dd></dl>
+        <template x-if="dataHealth?.sources?.length">
+          <div class="mt12"><div class="eyebrow">Sources</div>
+            <template x-for="h in dataHealth.sources" :key="h.source">
+              <div class="row xs mt8"><span class="badge" :class="h.circuit_open_until ? 'missed' : h.ok ? 'delivered' : 'watch'"
+                  x-text="h.circuit_open_until ? 'Paused' : h.ok ? 'OK' : 'Failing'"></span>
+                <span class="grow trunc" x-text="sourceName(h.source)"></span>
+                <span class="t2 num" x-text="h.last_success_at ? when(h.last_success_at) : 'never'"></span></div>
+            </template>
+            <p class="xs t2 mt8">A source that fails 3 runs in a row is paused for 3 hours; the next one in its chain takes over.</p>
+          </div>
+        </template>
+        <div class="notice err mt8" x-show="sched?.last_error" x-text="'Last refresh failed: ' + sched?.last_error + '. The app keeps showing the last good data.'"></div>
         <button class="btn block mt12" @click="refreshNow()" :disabled="sched?.running"><svg class="i s"><use href="#i-refresh"/></svg><span x-text="sched?.running ? 'Refreshing…' : 'Refresh now'"></span></button>
       </div>
 

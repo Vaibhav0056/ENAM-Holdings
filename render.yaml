@@ -32,5 +32,7 @@ services:
         value: mailto:admin@example.com
       - key: TAVILY_API_KEY
         sync: false
+      - key: FINN_TASK_TOKEN
+        sync: false
       - key: APP_TZ
         value: Asia/Kolkata

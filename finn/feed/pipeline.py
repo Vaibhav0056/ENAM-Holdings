@@ -259,7 +259,8 @@ def run(rescore_all: bool = False, use_llm: bool = True, reclassify_llm: bool = 
     stats = {"new": 0, "classified_by": defaultdict(int), "scored": 0, "failed": 0, "one_liners": defaultdict(int),
              "buckets": defaultdict(int)}
     with session() as s:
-        new = [_filing_dict(f) for f in s.scalars(select(Filing).where(~Filing.enrichment.has()).order_by(Filing.filed_at))]
+        new = [_filing_dict(f) for f in s.scalars(select(Filing).where(~Filing.enrichment.has(), Filing.status != "duplicate")
+                                                .order_by(Filing.filed_at))]
     stats["new"] = len(new)
     types = cls.classify(new, use_llm=use_llm)
     with session() as s:

@@ -1,11 +1,20 @@
-# Daily refresh at 18:30 IST (13:00 UTC), after Indian markets close and the evening filings land, plus a
+# Scheduled ingest -> pipeline -> alerts -> push, at 08:00, 16:30, 19:00 and 22:00 IST (cron is UTC), plus a
 # keep-awake ping every 10 minutes that hits /health only (no database, no model calls).
-name: daily
+# The run is idempotent and holds a Postgres advisory lock, so it never overlaps a run triggered from the app or
+# from cron-job.org (POST /tasks/ingest). The job fails when every announcement source has failed for 24 hours.
+name: ingest
 on:
   schedule:
-    - cron: "0 13 * * *"      # 18:30 IST: ingest + pipeline
+    - cron: "30 2 * * *"      # 08:00 IST: morning catch-up
+    - cron: "0 11 * * *"      # 16:30 IST: after the market closes
+    - cron: "30 13 * * *"     # 19:00 IST: evening results filings
+    - cron: "30 16 * * *"     # 22:00 IST: late filings
     - cron: "*/10 * * * *"    # keep-awake
   workflow_dispatch: {}
+
+concurrency:
+  group: finn-ingest
+  cancel-in-progress: false
 
 jobs:
   keep-awake:
@@ -14,7 +23,7 @@ jobs:
     steps:
       - run: curl -fsS --max-time 30 "${{ secrets.FINN_URL }}/health" || true
 
-  refresh:
+  ingest:
     if: github.event.schedule != '*/10 * * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -27,7 +36,7 @@ jobs:
       EMBED_MODEL: gemini-embedding-2
       VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
       VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-      VAPID_SUBJECT: mailto:admin@example.com
+      VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
       PYTHONIOENCODING: utf-8
     steps:
@@ -38,6 +47,5 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python tasks.py migrate
-      - run: python -m finn.sources.run prices bse snapshot calendar
-      - run: python tasks.py pipeline
+      - run: python -m finn.ingest
       - run: python scripts/export_snapshot.py --check

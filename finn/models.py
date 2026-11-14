@@ -57,6 +57,7 @@ class Company(Base):
     sector: Mapped[str | None] = mapped_column(String(120))
     industry: Mapped[str | None] = mapped_column(String(160))
     is_portfolio: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(16), default="ok", server_default="ok")  # ok | removed (hidden, history kept)
     peer_of: Mapped[int | None] = mapped_column(ForeignKey("companies.id"))
     validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     note: Mapped[str | None] = mapped_column(Text)  # e.g. swap reason
@@ -388,6 +389,22 @@ class IngestRun(Base):
     ok: Mapped[bool] = mapped_column(Boolean, default=True)
     error: Mapped[str | None] = mapped_column(Text)
     at: Mapped[datetime] = utcnow_col()
+
+
+class SourceHealth(Base):
+    """One row per data source: circuit-breaker state and the last outcome, shared by every process that ingests
+    (local scheduler, GitHub Actions, the /tasks/ingest endpoint)."""
+    __tablename__ = "source_health"
+    source: Mapped[str] = mapped_column(String(40), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16))                    # announcements | prices | events
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+    open_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))   # breaker open = skip until then
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    last_added: Mapped[int] = mapped_column(Integer, default=0)
+    last_seen: Mapped[int] = mapped_column(Integer, default=0)
+    total_added: Mapped[int] = mapped_column(Integer, default=0)
 
 
 Index("ix_filings_company_filed", Filing.company_id, Filing.filed_at)

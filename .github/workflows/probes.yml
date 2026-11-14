@@ -1,0 +1,22 @@
+# Manual: one small request to every data source from a GitHub-hosted runner, to see whether cloud IPs are
+# blocked anywhere. Writes nothing; needs no secrets.
+name: probes
+on:
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONIOENCODING: utf-8
+      DATABASE_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m finn.ingest --probe | tee probe.txt
+      - run: cat probe.txt >> "$GITHUB_STEP_SUMMARY"

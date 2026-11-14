@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from ..database import session
 from ..models import Company, Document
-from . import bse_filings, bse_snapshot, calendar, prices, screener
+from . import bse_snapshot, calendar, chain, prices, screener
 from .common import PoliteHTTP, insert_ignore, log_run
 from .pdfstore import fetch_document
 
@@ -81,8 +81,8 @@ def main(which: list[str]) -> dict:
     report, t0 = {}, time.time()
     if "prices" in which:
         report["prices"] = prices.ingest(cos, 90)
-    if "bse" in which:
-        report["bse"] = bse_filings.ingest(cos, 90)
+    if "bse" in which:     # announcements through the source chain (BSE -> NSE API -> NSE RSS)
+        report["announcements"] = chain.announcements(cos, 90)
     if "snapshot" in which:
         report["snapshot"] = bse_snapshot.ingest(cos)
     if "calendar" in which:
@@ -96,6 +96,8 @@ def main(which: list[str]) -> dict:
 
 
 def print_table(report: dict):
+    if "announcements" in report:
+        print("announcements:", json.dumps(report["announcements"], default=str))
     syms = sorted({s for k in ("prices", "bse", "docs", "pdfs") for s in report.get(k, {})})
     print(f"{'symbol':12} {'price+':>6} {'filings':>7} {'filing+':>7} {'transcr':>7} {'ARs':>4} {'latest transcript':>18}")
     tot = {"p": 0, "f": 0, "fa": 0}

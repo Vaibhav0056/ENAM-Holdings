@@ -106,7 +106,7 @@ def digest(window: str | None = "24h", start: str | None = None, end: str | None
         q = (select(Filing, Enrichment, Company)
              .options(defer(Filing.raw), defer(Filing.body), defer(Company.bse_snapshot), defer(Company.note))
              .join(Enrichment, Enrichment.filing_id == Filing.id).join(Company, Company.id == Filing.company_id)
-             .where(Filing.filed_at >= w["from"], Filing.filed_at <= w["to"])
+             .where(Filing.filed_at >= w["from"], Filing.filed_at <= w["to"], Filing.status != "duplicate")
              .order_by(Enrichment.score.desc(), Filing.filed_at.desc()))
         if not include_peers:
             q = q.where(Company.is_portfolio.is_(True))
