@@ -296,36 +296,87 @@ def _clean_bullets(items: list[dict], ids: set[str], allowed: set[float], limit:
     return out, bad_num, bad_adv
 
 
+MAX_EVIDENCE_CHARS = 24_000      # ~6k tokens: enough for every measured promise plus the most recent others
+STEP_BUDGET_S = 75.0             # one synthesis step's wall-clock budget across retries and fallbacks
+
+
+def cap_evidence(evidence: dict, limit: int = MAX_EVIDENCE_CHARS) -> tuple[dict, int]:
+    """Verified evidence for synthesis, trimmed to `limit` characters of JSON. Keeps every measured promise
+    (delivered / partial / missed) first, then pending and unverifiable ones, newest first; then actuals, drift and
+    the snapshot. Returns the capped evidence and how many items were left out (stated in the receipt)."""
+    ev = {"credibility": evidence["credibility"], "promises": [], "actuals": [], "drift": [], "snapshot": []}
+    rank = {"delivered": 0, "partial": 0, "missed": 0, "pending": 1, "unverifiable": 2}
+    queue = [("promises", p) for p in sorted(evidence["promises"], key=lambda p: rank.get(p["verdict"], 3))]
+    queue += [("drift", d) for d in evidence["drift"]] + [("snapshot", s) for s in evidence["snapshot"]]
+    queue += [("actuals", a) for a in evidence["actuals"]]
+    size, left_out = len(json.dumps(ev, ensure_ascii=False, default=str)), 0
+    for key, item in queue:
+        n = len(json.dumps(item, ensure_ascii=False, default=str)) + 2
+        if size + n > limit:
+            left_out += 1
+            continue
+        ev[key].append(item)
+        size += n
+    return ev, left_out
+
+
+def ledger_reading(cred: dict) -> str:
+    """The ledger's own verdict, computed in Python: what the devil's advocate argues against. Independent of the
+    synthesis call, so the two run in parallel."""
+    c = cred.get("counts") or {}
+    score = f"credibility {cred['score']}/100" if cred.get("score") is not None else "not scored (too few promises have matured)"
+    return (f"{score}; {cred.get('measured', 0)} of {cred.get('total', 0)} promises measurable so far; delivered "
+            f"{c.get('delivered', 0)}, partial {c.get('partial', 0)}, missed {c.get('missed', 0)}, pending {c.get('pending', 0)}, "
+            f"too vague to check {c.get('unverifiable', 0)} ({cred.get('vagueness_pct', 0)}%).")
+
+
 def synthesize(company: str, evidence: dict, budget_key: str, notes: list[str]) -> tuple[dict, dict]:
-    ev_json = json.dumps(evidence, ensure_ascii=False, default=str)
+    ev, left_out = cap_evidence(evidence)
+    ev_json = json.dumps(ev, ensure_ascii=False, default=str)
     allowed = guards.allowed_numbers(ev_json)
     ids = set(__import__("re").findall(r'"id": "([A-Z]\d+)"', ev_json))
-    stats = {"removed_unsupported_numbers": 0, "removed_advice": 0, "removed_uncited": 0}
+    stats = {"removed_unsupported_numbers": 0, "removed_advice": 0, "removed_uncited": 0, "evidence_items_left_out": left_out,
+             "evidence_chars": len(ev_json), "fallbacks": []}
     syn = {"credibility": [], "bull": [], "bear": [], "devils_advocate": []}
     models = []
-    try:
-        r = router.call("synthesis", "synthesis", {"company": company, "evidence": ev_json}, Synthesis, budget_key=budget_key)
+
+    def main():
+        return router.call("synthesis", "synthesis", {"company": company, "evidence": ev_json}, Synthesis,
+                           budget_key=budget_key, deadline_s=STEP_BUDGET_S)
+
+    def devil():
+        return router.call("devils_advocate", "devils_advocate@v2",
+                           {"company": company, "reading": ledger_reading(evidence["credibility"]), "evidence": ev_json},
+                           Devil, budget_key=budget_key, deadline_s=STEP_BUDGET_S)
+
+    with ThreadPoolExecutor(max_workers=2) as ex:      # the two sections are independent: run them together
+        futs = {"synthesis": ex.submit(main), "devils_advocate": ex.submit(devil)}
+        results = {}
+        for name, f in futs.items():
+            try:
+                results[name] = f.result()
+            except router.BudgetExceeded as e:
+                notes.append(f"{name.replace('_', ' ').capitalize()} skipped: per-report budget reached ({e}).")
+            except Exception as e:  # noqa: BLE001 - a missing section is stated, never faked
+                notes.append(f"{'Synthesis' if name == 'synthesis' else 'Counter-argument'} unavailable: {str(e)[:160]}")
+    for name, r in results.items():
         models.append(r.model)
-        stats["downgraded"] = bool(r.meta.get("downgraded"))
+        stats["downgraded"] = stats.get("downgraded") or bool(r.meta.get("downgraded"))
+        if r.meta.get("fallback"):
+            stats["fallbacks"].append({"step": name, "model": r.model, "reasons": r.meta.get("fallback_reasons") or []})
+    if "synthesis" in results:
+        r = results["synthesis"]
         for sec, lim in (("credibility", 4), ("bull", 3), ("bear", 3)):
             raw = [b.model_dump() for b in getattr(r.data, sec)]
             syn[sec], n, a = _clean_bullets(raw, ids, allowed, lim)
             stats["removed_unsupported_numbers"] += n
             stats["removed_advice"] += a
             stats["removed_uncited"] += len(raw[:lim]) - len(syn[sec])
-        reading = json.dumps({k: [b["text"] for b in v] for k, v in syn.items() if v}, ensure_ascii=False)
-        d = router.call("devils_advocate", "devils_advocate", {"company": company, "reading": reading, "evidence": ev_json},
-                        Devil, budget_key=budget_key)
-        models.append(d.model)
-        stats["downgraded"] = stats.get("downgraded") or bool(d.meta.get("downgraded"))
-        raw = [b.model_dump() for b in d.data.points]
+    if "devils_advocate" in results:
+        raw = [b.model_dump() for b in results["devils_advocate"].data.points]
         syn["devils_advocate"], n, a = _clean_bullets(raw, ids, allowed, 3)
         stats["removed_unsupported_numbers"] += n
         stats["removed_advice"] += a
-    except router.BudgetExceeded as e:
-        notes.append(f"Synthesis skipped: per-report budget reached ({e}).")
-    except Exception as e:  # noqa: BLE001
-        notes.append(f"Synthesis unavailable: {str(e)[:160]}")
     stats["models"] = models
     return syn, stats
 
@@ -451,10 +502,14 @@ def run(symbol: str, job_id: str) -> dict:
         "out_tokens": sum(c.out_tokens for c in calls_q), "cost_usd": round(sum(c.cost_usd for c in calls_q), 4),
         "cost_cap_usd": router.config.MAX_COST_PER_REPORT_USD,
         "models": sorted({c.model for c in calls_q if c.ok and not c.cache_hit} | set(syn_stats.get("models", []))),
-        "strong_tier_note": ("Every strong-tier model was out of quota, so synthesis ran on the cheap tier."
+        "strong_tier_note": (("Synthesis fell back to the cheap tier: " + "; ".join(
+                                 r for f in syn_stats.get("fallbacks", []) for r in f["reasons"]) + ".")
                              if syn_stats.get("downgraded") else
                              "No Pro-class model is available on this key; synthesis ran on the best available Flash model."),
         "synthesis_models": syn_stats.get("models", []),
+        "synthesis_fallbacks": syn_stats.get("fallbacks", []),
+        "synthesis_evidence_chars": syn_stats.get("evidence_chars"),
+        "synthesis_evidence_left_out": syn_stats.get("evidence_items_left_out", 0),
         "quote_check": f"rapidfuzz partial_ratio ≥ {THRESHOLD} on the cited page ±1; figures must be printed in their quote",
         "facts_dropped_unverified": sum(s.get("dropped") or 0 for s in sources),
         "sentences_removed_unsupported_numbers": syn_stats.get("removed_unsupported_numbers", 0),

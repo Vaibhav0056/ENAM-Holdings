@@ -135,3 +135,73 @@ def test_embed_wraps_each_text_and_checks_the_count(sqldb):
     router.set_client(SimpleNamespace(models=M()))
     with pytest.raises(router.LLMUnavailable):
         router.embed(["a", "b"], sleep=lambda s: None)
+
+
+def test_deadline_moves_to_next_model_without_retrying(sqldb):
+    slept = []
+    m = fake([RuntimeError("504 DEADLINE_EXCEEDED. Deadline expired before operation could complete."), GOOD])
+    r = router.call("probe", "probe", INPUTS, Probe, sleep=slept.append)
+    assert [c[0] for c in m.calls] == ["cheap-a", "cheap-b"] and slept == []      # no second try on cheap-a, no wait
+    assert r.meta["fallback"] and r.meta["fallback_reasons"] == ["cheap-a: no answer within 60 s"]
+
+
+def test_strong_tier_falls_back_to_cheap_model_second_and_says_so(sqldb):
+    assert router.pool("strong") == ["strong-a", "cheap-a", "strong-b", "cheap-b"]
+    m = fake([RuntimeError("504 DEADLINE_EXCEEDED"), GOOD])
+    r = router.call("synthesis", "probe", INPUTS, Probe)
+    assert [c[0] for c in m.calls] == ["strong-a", "cheap-a"]
+    assert r.model == "cheap-a" and r.meta["downgraded"] and "strong-a" in r.meta["fallback_reasons"][0]
+
+
+def test_step_budget_stops_further_attempts(sqldb):
+    fake([GOOD])
+    with pytest.raises(router.LLMUnavailable):
+        router.call("probe", "probe", INPUTS, Probe, deadline_s=0)
+
+
+def test_synthesis_evidence_is_capped_measured_promises_first():
+    from finn.research.engine import cap_evidence
+    promises = [{"id": f"G{i}", "metric": "m" * 50, "target": "t", "horizon": "FY27", "said_in": "Q1 FY27",
+                 "verdict": "pending" if i % 3 else "delivered", "actual": None} for i in range(200)]
+    ev = {"credibility": {"score": 70}, "promises": promises, "actuals": [], "drift": [], "snapshot": []}
+    capped, left_out = cap_evidence(ev, limit=3000)
+    import json
+    assert len(json.dumps(capped)) <= 3000 and left_out > 0
+    verdicts = [p["verdict"] for p in capped["promises"]]
+    assert verdicts[0] == "delivered" and verdicts == sorted(verdicts, key=lambda v: v != "delivered")
+
+
+def test_strong_tier_goes_to_cheap_model_even_when_it_is_also_a_strong_fallback(sqldb, monkeypatch):
+    monkeypatch.setenv("STRONG_FALLBACKS", "strong-b,cheap-a")
+    assert router.pool("strong")[:2] == ["strong-a", "cheap-a"]
+
+
+def test_busy_strong_model_is_not_retried(sqldb):
+    slept = []
+    m = fake([RuntimeError("503 UNAVAILABLE high demand"), GOOD])
+    r = router.call("synthesis", "probe", INPUTS, Probe, sleep=slept.append)
+    assert [c[0] for c in m.calls] == ["strong-a", "cheap-a"] and slept == [] and r.model == "cheap-a"
+
+
+def test_client_is_created_once_under_concurrency(monkeypatch):
+    import threading
+    router.set_client(None)
+    made = []
+
+    class FakeGenai:
+        class Client:
+            def __init__(self, **kw):
+                made.append(1)
+                __import__("time").sleep(0.05)
+    monkeypatch.setattr(router.config, "GEMINI_API_KEY", "x")
+    import sys, types as T
+    google = T.ModuleType("google"); google.genai = FakeGenai
+    gtypes = T.SimpleNamespace(HttpOptions=lambda **k: None, HttpRetryOptions=lambda **k: None)
+    FakeGenai.types = gtypes
+    monkeypatch.setitem(sys.modules, "google", google)
+    monkeypatch.setitem(sys.modules, "google.genai", FakeGenai)
+    monkeypatch.setitem(sys.modules, "google.genai.types", gtypes)
+    ts = [threading.Thread(target=router.get_client) for _ in range(8)]
+    [x.start() for x in ts]
+    [x.join() for x in ts]
+    assert len(made) == 1

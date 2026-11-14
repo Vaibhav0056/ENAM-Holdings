@@ -347,3 +347,31 @@ Lighthouse 12.8.2, mobile, headless Chrome 157, local server. Feed `/digest`: p5
 - The Alerts badge counts unread alerts from the last 7 days; older unread alerts stay listed under their dates ("10 new this week · 48 older unread below").
 
 **Results (live data, 15 Nov 2026).** Re-evaluation of 97 alerts: 30 volume alerts below the new rule superseded, 14 surviving volume alerts restated with the average-based ratio (their titles still said "median"), 9 same-company same-day groups merged. Active alerts 58; **unread in the last 7 days: 10** (target 5-15). The 48 older unread are mostly real results and management-change filings from the Oct-Nov results season that nobody opened. Tests: 205 passed (volume average + liquidity floor, grouping and priority, idempotent consolidation, repeatable re-evaluation).
+
+## Final fix pass, step 3: the slow verdict
+
+**Why.** Rebuilding the POLYCAB report took 503 s, 476 s of it in "Writing the verdict" (two model calls).
+
+**Diagnosis, from `llm_calls` for that rebuild (budget key = the job id).**
+
+| Step | Model | Attempts | Latency each | Outcome |
+|---|---|---|---|---|
+| synthesis | gemini-3.8-flash | 3 | 28.5-30.8 s | 504 DEADLINE_EXCEEDED |
+| synthesis | gemini-3.7-flash | 3 | 28.5-28.7 s | 504 DEADLINE_EXCEEDED |
+| synthesis | gemini-3.5-flash | 1 | 15.7 s | OK (15,835 tokens in, 598 out) |
+| devils_advocate | gemini-3.8-flash / 3.7-flash / 3.5-flash | 3 + 3 + 3 | 28.2-29.5 s | 504 DEADLINE_EXCEEDED |
+| devils_advocate | gemini-3.5-flash-lite | 1 | 2.3 s | OK (16,024 in, 205 out) |
+
+**Cause.** The router gave the SDK a 30 s timeout, which the SDK forwards as the server-side deadline; the strong model needed longer on ~16k input tokens, so the server cut it off at ~28.5 s with 504, and the router treated that as transient and retried the same model three times before falling back. 15 timed-out attempts × ~29 s ≈ 7.3 min, plus backoff sleeps. The two steps also ran one after the other, and each sent every promise, actual and snapshot item.
+
+**Built.**
+- Router: 60 s per request (`LLM_TIMEOUT_S`); a deadline moves straight to the next model; on the strong tier a 503/429 also moves on at once (synthesis has a fast model behind it); strong tier order is STRONG_MODEL → CHEAP_MODEL → the rest (CHEAP_MODEL second even when it is also listed as a strong fallback); `deadline_s` caps a step's total time (75 s for synthesis); every result carries `fallback_reasons`, and the receipt shows them (`synthesis_fallbacks`, and the strong-tier note names the reason).
+- Synthesis input: verified JSON only (as before), now capped at 24,000 characters, measured promises first, then pending and unverifiable, drift, snapshot, actuals; the receipt states how many items were left out.
+- Synthesis and the devil's advocate run in parallel. The devil's advocate now argues against the ledger's own computed reading (score, measured, delivered/missed/pending, vagueness: prompt `devils_advocate.v2`) instead of the synthesis text, which is what made the two independent.
+- Bug found by running them in parallel: two threads could each create the shared Gemini client, and the discarded one was closed while in use ("client has been closed"). Client creation is now locked; a test runs 8 threads.
+
+**Results.**
+- POLYCAB forced rebuild, warm extraction caches: 503 s → **86 s** on the first run (STRONG_MODEL 503 then no answer in 60 s, flash-lite answered), → 9.8 s once the synthesis answers were cached. Cached reopen: **569 ms**.
+- TCS forced rebuild with 19 live extraction calls: 132.7 s total, verdict stage 27.1 s. On that run CHEAP_MODEL had used up its daily free-tier quota and both strong models answered 503 "high demand"; the router moved past each in 4-7 s instead of waiting.
+- Target "cold report under 90 s" is met for the verdict stage but not for a fully cold report on the free tier today (extraction calls take 8-18 s each under contention). Step 6 adds the partial state for that path.
+- Tests: 213 passed (deadline fallback, strong→cheap order, busy strong model not retried, step budget, evidence cap order, client created once under concurrency).
