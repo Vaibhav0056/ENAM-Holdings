@@ -29,7 +29,7 @@ BREAKER_OPEN = timedelta(hours=3)
 DUP_WINDOW = timedelta(minutes=20)
 KIND = {"bse_announcements": "announcements", "nse_api_announcements": "announcements", "nse_rss_announcements": "announcements",
         "yfinance_prices": "prices", "nse_bhavcopy_prices": "prices",
-        "bse_events": "events", "nse_events": "events", "derived_events": "events"}
+        "bse_events": "events", "nse_events": "events", "derived_events": "events", "bse_snapshot": "snapshots"}
 _http = None
 
 
@@ -289,6 +289,26 @@ def event_chain(companies) -> dict:
         record("derived_events", False, error=str(e))
         report["derived_events"] = {"error": str(e)[:200]}
     return report
+
+
+SNAPSHOT_MAX_AGE = timedelta(hours=12)
+
+
+def snapshot_step(companies) -> dict:
+    """BSE's structured results summary per company (an independent check on PDF extraction, and the figures shown
+    when a filing PDF cannot be read). Refreshed when older than 12 h, behind its own circuit breaker."""
+    from . import bse_snapshot
+    until = breaker_open("bse_snapshot")
+    if until:
+        return {"skipped": f"circuit open until {until.isoformat(timespec='minutes')}"}
+    due = [c for c in companies if c.bse_code and (c.snapshot_at is None or now() - aware(c.snapshot_at) > SNAPSHOT_MAX_AGE)]
+    if not due:
+        return {"skipped": "all snapshots fresh"}
+    res = bse_snapshot.ingest(due)
+    failed = [s for s, v in res.items() if v.get("error")]
+    ok = len(failed) < max(1, len(due) / 2)
+    record("bse_snapshot", ok, len(due) - len(failed), len(due), error=None if ok else f"{len(failed)} of {len(due)} failed")
+    return {"refreshed": len(due) - len(failed), "failed": failed[:20]}
 
 
 def health() -> list[dict]:

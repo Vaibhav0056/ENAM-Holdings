@@ -76,13 +76,14 @@ def ingest(companies) -> dict:
                 continue
             try:
                 snap = parse(b.resultsSnapshot(c.bse_code))
-                with session() as s:
-                    row = s.get(Company, c.id)
-                    row.bse_snapshot, row.snapshot_at = snap, datetime.now(timezone.utc)
+                if snap:   # an empty answer never replaces a good snapshot
+                    with session() as s:
+                        row = s.get(Company, c.id)
+                        row.bse_snapshot, row.snapshot_at = snap, datetime.now(timezone.utc)
                 out[c.nse_symbol] = {"periods": (snap or {}).get("periods")}
                 log_run("bse_snapshot", c.id, 1 if snap else 0, 1, ok=snap is not None, error=None if snap else "empty")
             except Exception as e:  # noqa: BLE001
                 out[c.nse_symbol] = {"error": str(e)[:200]}
                 log_run("bse_snapshot", c.id, 0, 0, ok=False, error=str(e))
-            time.sleep(0.5)
+            time.sleep(1.0)
     return out

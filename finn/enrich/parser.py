@@ -22,6 +22,11 @@ def parse_number(tok: str) -> Optional[float]:
     t = tok.strip().replace("−", "-")
     if t in {"-", "–", "—", "--", "nil", "Nil"}:
         return 0.0
+    m = re.fullmatch(r"(\(?-?(?:\d{1,3}(?:,\d{2,3})*,)?\d*\d{3}),(\d{1,2})(\)?)", t)
+    if m:
+        # OCR decimal comma: "36024,07", "19,885,3", "115,086,5". A final comma group of 1-2 digits after a group of
+        # exactly 3 can only be decimals (Indian and international grouping both end in 3 digits before the point).
+        t = m.group(1).replace(",", "") + "." + m.group(2) + m.group(3)
     m = re.fullmatch(r"(\()?(-)?([\d,]*\d(?:\.\d+)?)(\))?", t)
     if not m:
         return None
@@ -30,16 +35,17 @@ def parse_number(tok: str) -> Optional[float]:
 
 
 _UNIT_WORD = r"(crores?|cr\.?|lakhs?|lacs?|millions?|mn|billions?)"
+_END = r"(?:[a-z]?\b|[^a-z])"     # OCR leaves a stray letter: "I~ in Croresl"
 
 
 def detect_unit(text: str) -> Optional[str]:
-    """Finds the statement's unit in its header. OCR often mangles ₹ into f, t, ` or {, so we key off
+    """Finds the statement's unit in its header. OCR often mangles ₹ into f, t, ~, ` or {, so we key off
     a short line or parenthesis containing 'in <unit>' / '<symbol> <unit>' rather than the symbol."""
     head = text[:3000].lower()
-    pats = [rf"\(\s*[^\s()]{{0,3}}\s*(?:in\s+)?{_UNIT_WORD}\b",            # (₹ million) (f in Crores)
-            rf"(?:₹|rs\.?|inr|`|rupees)\s*(?:in\s+)?{_UNIT_WORD}\b",       # ₹ in crore
-            rf"\bin\s+(?:₹|rs\.?|inr|`|t|f)?\s*{_UNIT_WORD}\b",             # amounts in crore
-            rf"\b(?:amount|figures)s?\s*(?:are\s*)?in\s*\S{{0,4}}\s*{_UNIT_WORD}\b"]
+    pats = [rf"\(\s*[^\s()]{{0,3}}\s*(?:in\s+)?{_UNIT_WORD}{_END}",            # (₹ million) (f in Crores)
+            rf"(?:₹|rs\.?|inr|`|~|rupees)\s*(?:in\s+)?{_UNIT_WORD}{_END}",      # ₹ in crore, ~ Crore
+            rf"\bin\s+(?:₹|rs\.?|inr|`|~|t|f)?\s*{_UNIT_WORD}{_END}",           # amounts in crore, I~ in Croresl
+            rf"\b(?:amount|figures)s?\s*(?:are\s*)?in\s*\S{{0,4}}\s*{_UNIT_WORD}{_END}"]
     for p in pats:
         m = re.search(p, head)
         if m:
@@ -75,8 +81,43 @@ def candidate_pages(pages: list[str]) -> list[int]:
     return sorted(out, key=rank)
 
 
+def _has_revenue(text: str) -> bool:
+    low = text.lower()
+    return (any(l in low for l in METRIC_LABELS["revenue"]) or "total income" in low or "total revenue" in low
+            or re.search(r"revenue\s+from\s+oper\w*", low) is not None)
+
+
+def statement_pages(pages: list[str]) -> list[int]:
+    """candidate_pages plus the first page of a statement that continues onto the next page (revenue here, profit
+    before tax on the following page), in the same ranked order."""
+    out = list(candidate_pages(pages))
+    for i in range(1, len(pages)):
+        if i not in out and _has_revenue(pages[i - 1]) and "profit before tax" in pages[i].lower() \
+                and "profit before tax" not in pages[i - 1].lower():
+            out.append(i)
+    # last: any page headed as a standalone / consolidated results statement with a revenue line, even if its
+    # profit line is worded differently ("Profit before exceptional items and tax") or unreadable
+    for i, t in enumerate(pages, 1):
+        if i not in out and page_basis(t) and "result" in t[:1500].lower() and _has_revenue(t):
+            out.append(i)
+    return out
+
+
+_SPACE_GROUP = re.compile(r"(?<![\d.,])(\d{1,3})((?: \d{2,3})*) (\d{3}\.\d{1,2})(?![\d])")
+
+
+def join_space_thousands(line: str) -> str:
+    """OCR'd statements sometimes group thousands with a space: '13 066.27 12 709.52'. Rejoin them, but only on a
+    row that does it at least twice, so a lone note number before a figure ('5 123.45') is never glued on."""
+    if len(_SPACE_GROUP.findall(line)) < 2:
+        return line
+    return _SPACE_GROUP.sub(lambda m: m.group(1) + m.group(2).replace(" ", "") + m.group(3), line)
+
+
 def _clean(line: str) -> str:
-    return re.sub(r"\s+", " ", line.lower().replace("/(loss)", "").replace("/ (loss)", "").replace("(loss)", "")
+    line = re.sub(r"revenue\s+from\s+oper\w*", "revenue from operations", line.lower())   # OCR: 'operalions'
+    line = join_space_thousands(line)
+    return re.sub(r"\s+", " ", line.replace("/(loss)", "").replace("/ (loss)", "").replace("(loss)", "")
                   .replace("profit /", "profit").replace("profit/", "profit"))
 
 
@@ -121,6 +162,15 @@ def parse_page(text: str) -> dict:
                 continue
             for lab in labels:
                 pos = line.find(lab)
+                if pos < 0:
+                    # some PDFs drop the spaces inside labels ("net profitfortheperiod/year"): match without spaces,
+                    # then read the numbers that follow the label's last word
+                    compact, clab = line.replace(" ", ""), lab.replace(" ", "")
+                    cpos = compact.find(clab)
+                    if 0 <= cpos <= 10:
+                        tail_word = lab.split()[-1]
+                        k = line.find(tail_word, 0)
+                        pos = max(0, k + len(tail_word) - len(lab)) if k >= 0 else -1
                 if pos < 0 or pos > 12:  # label must start the row (after a short sr. no.)
                     continue
                 if metric == "pat" and ("attributable" in line or "comprehensive" in line):
@@ -131,7 +181,7 @@ def parse_page(text: str) -> dict:
                 nums = _row_numbers(toks)
                 j = idx + 1
                 while len(nums) < 3 and j < min(idx + 3, len(lines)):
-                    nxt = lines[j].split()
+                    nxt = join_space_thousands(lines[j]).split()
                     if not nxt or parse_number(nxt[0]) is None:
                         break  # only pure-number continuation lines belong to this row
                     nums += _row_numbers(nxt)

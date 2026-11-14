@@ -166,7 +166,7 @@ function finn() {
     sourceName(s) {
       return { bse_announcements: "BSE announcements", nse_api_announcements: "NSE announcements", nse_rss_announcements: "NSE RSS feed",
                yfinance_prices: "Prices (Yahoo Finance)", nse_bhavcopy_prices: "Prices (NSE bhavcopy)", bse_events: "BSE calendar",
-               nse_events: "NSE event calendar", derived_events: "Events from filings" }[s] || s;
+               nse_events: "NSE event calendar", derived_events: "Events from filings", bse_snapshot: "BSE results summaries" }[s] || s;
     },
     dataHealth: null,
     async loadDataHealth() { try { this.dataHealth = await this.api("/health/data"); } catch (e) { this.net.error = null; } },
@@ -260,8 +260,10 @@ function finn() {
     cmpCls(v) { return /on track|deliver|beat|ahead|met/i.test(v || "") ? "delivered" : /miss|below|behind/i.test(v || "") ? "missed" : "partial"; },
     resultRows(c) { return (c.payload?.table || []).filter((r) => r.found); },
     resultsNote(c) {
+      if (c.payload.from_bse_summary) return "BSE's own figures · ₹ crore · the filing PDF could not be read";
       const b = c.payload.basis ? c.payload.basis[0].toUpperCase() + c.payload.basis.slice(1) : "Basis not stated";
-      return `${b} · ₹ crore · computed in code` + (this.resultRows(c).some((r) => r.derived) ? " · *derived" : "");
+      const checked = (c.payload.bse_check || {}).match || (c.payload.bse_check || {}).explained_by_basis ? " · checked against BSE" : "";
+      return `${b} · ₹ crore · computed in code${checked}` + (this.resultRows(c).some((r) => r.derived) ? " · *derived" : "");
     },
     isIn(p) { return /appoint|join|induct|elevat|promot|designat|inducted/i.test(p.direction || ""); },
     initials(n) {

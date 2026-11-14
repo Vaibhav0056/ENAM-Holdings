@@ -120,7 +120,8 @@ def run(days: int = LOOKBACK_DAYS, trigger: str = "manual", pipeline: bool = Tru
             cos = companies()
             for name, fn in [("announcements", lambda: chain.announcements(cos, days)),
                              ("prices", lambda: chain.price_chain(cos, max(days, 10))),
-                             ("events", lambda: chain.event_chain(cos))]:
+                             ("events", lambda: chain.event_chain(cos)),
+                             ("snapshots", lambda: chain.snapshot_step(cos))]:
                 try:
                     out[name] = fn()
                 except Exception as e:  # noqa: BLE001 - one stage failing never stops the others

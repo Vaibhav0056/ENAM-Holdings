@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from .. import fiscal
 from ..grounding import verify
-from .parser import candidate_pages, detect_unit, page_basis, parse_page, sane
+from .parser import candidate_pages, detect_unit, page_basis, parse_page, sane, statement_pages
 
 log = logging.getLogger("finn.enrich.results")
 CORE = ["revenue", "ebitda", "pbt", "pat"]
@@ -80,8 +80,10 @@ def bse_check(norm: dict, snapshot: dict | None, period: str | None) -> dict | N
 
 
 def build(metrics: dict, unit: str, basis: str, source: str, period: str | None = None,
-          snapshot: dict | None = None, cross: dict | None = None) -> dict:
-    conf, notes = "high", []
+          snapshot: dict | None = None, cross: dict | None = None, other: dict | None = None) -> dict:
+    """other: the parser's reading of the other basis from the same PDF ({"basis", "revenue", "pat", "page"} in
+    ₹ crore), used to explain a mismatch with BSE's summary, which is one basis (usually standalone)."""
+    conf, notes, checks = "high", [], []
     if fiscal.unit_factor(unit) is None:
         return {"ok": False, "reason": f"unknown unit '{unit}'", "confidence": "low"}
     norm = normalise(metrics, unit)
@@ -141,21 +143,44 @@ def build(metrics: dict, unit: str, basis: str, source: str, period: str | None 
                     "reason": f"figures are {scale:g}× off BSE's own numbers (unit or digit misread); not shown",
                     "bse_check": check}
         if not check["match"]:
-            notes.append("differs from BSE's snapshot (it may be on the other basis)")
+            alt = bse_check({"revenue": {"current_quarter": (other or {}).get("revenue")},
+                             "pat": {"current_quarter": (other or {}).get("pat")}}, snapshot, period) if other else None
+            rev_only = bool(other and other.get("pat") is None and alt and alt.get("available")
+                            and abs(other["revenue"] - alt["bse_revenue"]) <= 0.0001 * abs(alt["bse_revenue"]))
+            if rev_only:
+                check["explained_by_basis"] = f"{other['basis']} (revenue)"
+                checks.append(f"BSE's summary is the {other['basis']} statement: FINN's {other['basis']} revenue from the same "
+                              f"PDF (₹{other['revenue']:,.2f} cr, page {other['page']}) matches BSE's exactly; that statement's "
+                              f"PAT line could not be read. The {basis} figures shown come from the same filing")
+            elif alt and alt.get("match"):
+                check["explained_by_basis"] = other["basis"]
+                gap = max(abs(other["revenue"] - alt["bse_revenue"]) / abs(alt["bse_revenue"]),
+                          abs(other["pat"] - alt["bse_net_profit"]) / max(abs(alt["bse_net_profit"]), 1e-9))
+                how = "matches it exactly" if gap <= 0.0001 else f"is within {gap:.1%} of it"
+                checks.append(f"BSE's summary is the {other['basis']} statement (revenue ₹{alt['bse_revenue']:,.2f} cr, PAT "
+                              f"₹{alt['bse_net_profit']:,.2f} cr); FINN's {other['basis']} reading of the same PDF "
+                              f"(₹{other['revenue']:,.2f} cr, ₹{other['pat']:,.2f} cr, page {other['page']}) {how}. "
+                              f"The {basis} figures shown come from the same filing")
+            else:
+                why = []
+                if other:
+                    why.append(f"FINN's {other['basis']} reading is revenue ₹{other['revenue']:,.2f} cr, PAT ₹{other['pat']:,.2f} cr")
+                notes.append(f"differs from BSE's summary (BSE revenue ₹{check['bse_revenue']:,.2f} cr, PAT "
+                             f"₹{(check.get('bse_net_profit') or 0):,.2f} cr" + ("; " + "; ".join(why) if why else "") + ")")
     if cross:
         for m in ("revenue", "pat"):
             a, b = norm.get(m, {}).get("current_quarter"), cross.get(m)
             if a is not None and b is not None and abs(a - b) > max(0.01 * abs(b), 0.05):
                 if bse_agrees:  # BSE's independent figures side with these values: the parser misread
-                    notes.append(f"{m}: parser disagreed; BSE's figures confirm the extracted value")
+                    checks.append(f"{m}: the parser read a different figure; BSE's own figures confirm this one")
                 else:
                     conf = "low"
                     notes.append(f"{m}: model and parser disagree")
     if bse_agrees:
-        notes.append("revenue and PAT match BSE's structured figures")
+        checks.append("revenue and PAT match BSE's structured figures")
     pat_row = next((t for t in table if t["metric"] == "pat" and t["found"]), None)
     return {"ok": True, "kind": "results", "period": period, "basis": basis, "unit_reported": unit, "unit": "₹ crore",
-            "confidence": conf, "notes": notes, "source": source, "table": table, "bse_check": check,
+            "confidence": conf, "notes": notes, "checks": checks, "source": source, "table": table, "bse_check": check,
             "pat_yoy": pat_row["yoy"] if pat_row else None,
             "tax_gap": None if tax_gap is None else round(tax_gap, 3)}
 
@@ -169,13 +194,89 @@ def period_from_text(text: str) -> str | None:
     return None
 
 
-def parser_pass(pages: list[str]) -> tuple[dict, str | None, str | None]:
-    for p in candidate_pages(pages)[:6]:
-        parsed = parse_page(pages[p - 1])
-        unit = detect_unit(pages[p - 1])
-        if parsed.get("revenue") and parsed.get("pat") and unit and sane(parsed):
-            return {k: dict(v, page=p) for k, v in parsed.items()}, unit, page_basis(pages[p - 1]) or "standalone"
-    return {}, None, None
+def parser_all(pages: list[str], revenue_only: dict | None = None) -> dict[str, tuple[dict, str, int]]:
+    """basis -> (metrics, unit, page) for the first sane P&L the parser can read on each basis. A table that runs
+    onto the next page is read as the page plus the next one. If `revenue_only` is given, statements where only
+    revenue could be read are added to it (basis -> (revenue, unit, page)), to explain a basis mismatch with BSE."""
+    out = {}
+    revenue_only = {} if revenue_only is None else revenue_only
+    for p in statement_pages(pages):
+        texts = [pages[p - 1]] + ([pages[p - 1] + "\n" + pages[p]] if p < len(pages) else [])
+        for text in texts:
+            parsed = parse_page(text)
+            unit = detect_unit(pages[p - 1]) or detect_unit(text)
+            basis = page_basis(pages[p - 1]) or "standalone"
+            if basis not in out and parsed.get("revenue") and parsed.get("pat") and sane(parsed):
+                out[basis] = ({k: dict(v, page=p) for k, v in parsed.items()}, unit, p)
+                break
+            if parsed.get("revenue") and unit and basis not in revenue_only:
+                revenue_only[basis] = (parsed["revenue"]["current_quarter"], unit, p)
+        if len(out) == 2:
+            break
+    return out
+
+
+UNIT_GUESSES = ("crore", "million", "lakh", "thousand")
+
+
+def infer_units(found: dict, snapshot: dict | None, period: str | None) -> str | None:
+    """A statement whose unit is not printed (a header graphic): the scale at which one basis' revenue AND PAT equal
+    BSE's own figures to within 0.05% is the document's unit. Returns the unit (and fills it in), or None."""
+    if not snapshot or not period or all(u for _, u, _ in found.values()):
+        return None
+    rb, pb = snapshot.get("revenue", {}).get(period), snapshot.get("net_profit", {}).get(period)
+    if not rb or pb is None:
+        return None
+    for basis, (m, unit, page) in found.items():
+        if unit:
+            continue
+        for u in UNIT_GUESSES:
+            rev, pat = fiscal.to_crore(m["revenue"]["current_quarter"], u), fiscal.to_crore(m["pat"]["current_quarter"], u)
+            if rev and abs(rev - rb) <= 0.0005 * abs(rb) and abs(pat - pb) <= max(0.0005 * abs(pb), 0.01):
+                for b, (mm, uu, pp) in list(found.items()):
+                    found[b] = (mm, uu or u, pp)
+                return u
+    return None
+
+
+def bse_summary_card(snapshot: dict | None, period: str | None, reason: str) -> dict | None:
+    """When the PDF cannot be read reliably (a scan, or OCR garbage), BSE's own structured figures for the quarter:
+    revenue and net profit, with QoQ from BSE's previous quarter. Labelled as BSE's, never as FINN's reading."""
+    if not snapshot or not period:
+        return None
+    rev = snapshot.get("revenue", {}).get(period)
+    pat = snapshot.get("net_profit", {}).get(period)
+    if rev is None or pat is None:
+        return None
+    prev = fiscal.parse_period(period)
+    prev_label = None
+    if prev and prev.q:
+        q, fy = (prev.q - 1, prev.fy) if prev.q > 1 else (4, prev.fy - 1)
+        prev_label = fiscal.Period(fy, q).label()
+    table = []
+    for metric, key in (("revenue", "revenue"), ("pat", "net_profit")):
+        cur = snapshot[key].get(period)
+        before = snapshot[key].get(prev_label) if prev_label else None
+        table.append({"metric": metric, "found": True, "current": cur, "previous": before, "year_ago": None,
+                      "qoq": pct_change(cur, before), "yoy": None, "page": None, "quote": None, "derived": None})
+    table += [{"metric": "ebitda", "found": False}, {"metric": "pbt", "found": False}]
+    return {"ok": True, "kind": "results", "period": period, "basis": "as published by BSE", "unit": "₹ crore",
+            "confidence": "high", "notes": [], "source": "BSE's structured results summary",
+            "checks": [f"FINN could not read the filing itself ({reason}); these are BSE's own figures for {period}. "
+                       "Year-on-year, EBITDA and PBT are not in BSE's summary."],
+            "table": table, "bse_check": None, "from_bse_summary": True, "pdf_reason": reason}
+
+
+def _other(found: dict, shown_basis: str | None, revenue_only: dict | None = None) -> dict | None:
+    """The parser's reading of the basis not shown, in ₹ crore, for explaining a mismatch with BSE."""
+    for basis, (m, unit, page) in found.items():
+        if basis != shown_basis:
+            return {"basis": basis, "page": page, "revenue": fiscal.to_crore(m["revenue"]["current_quarter"], unit),
+                    "pat": fiscal.to_crore(m["pat"]["current_quarter"], unit)}
+    for basis, (rev, unit, page) in (revenue_only or {}).items():
+        if basis != shown_basis:
+            return {"basis": basis, "page": page, "revenue": fiscal.to_crore(rev, unit), "pat": None}
+    return None
 
 
 def extract(pages: list[str], subject: str = "", snapshot: dict | None = None, use_llm: bool = True,
@@ -184,18 +285,32 @@ def extract(pages: list[str], subject: str = "", snapshot: dict | None = None, u
     if not period and filed_on:
         # Results are filed after the quarter closes, so the last completed quarter on the filing date is the period.
         period = fiscal.last_completed_quarter(filed_on).label()
-    if not candidate_pages(pages):
+    if not statement_pages(pages):
         return {"ok": False, "reason": "no P&L statement found in the PDF", "period": period}
-    det, det_unit, det_basis = parser_pass(pages)
-    has_consolidated = any(page_basis(pages[p - 1]) == "consolidated" for p in candidate_pages(pages))
+    rev_only: dict = {}
+    found = parser_all(pages, rev_only)
+    inferred = infer_units(found, snapshot, period)
+    found = {b: v for b, v in found.items() if v[1]}           # a statement whose unit is still unknown is unusable
+    det, det_unit, det_basis = {}, None, None
+    for b in ("consolidated", "standalone"):
+        if b in found:
+            det, det_unit, _ = found[b]
+            det_basis = b
+            break
+    # any page headed as consolidated results, even one the parser cannot read: then standalone is not enough
+    has_consolidated = any(page_basis(t) == "consolidated" and "result" in t[:1500].lower() for t in pages)
     if det:
-        built = build(det, det_unit, det_basis, "parser", period, snapshot)
-        # The model-free shortcut only when the parser read the statement we would show anyway: consolidated, or
-        # standalone because the filing has no consolidated one (BSE's snapshot is often standalone, so a standalone
-        # match must not crowd out the consolidated statement).
-        if (built.get("ok") and built["confidence"] != "low" and (built.get("bse_check") or {}).get("match")
+        built = build(det, det_unit, det_basis, "parser", period, snapshot, other=_other(found, det_basis, rev_only))
+        if inferred and built.get("ok"):
+            built["checks"].append(f"the statement does not print its unit; FINN took ₹ {inferred} because at that "
+                                   "scale its figures equal BSE's own to within 0.05%")
+        chk = built.get("bse_check") or {}
+        # The model-free shortcut only when the parser read the statement we would show anyway (consolidated, or
+        # standalone because there is no consolidated one) and BSE's figures confirm the reading, on this basis or,
+        # for BSE's standalone summary, on the standalone statement of the same PDF.
+        if (built.get("ok") and built["confidence"] != "low" and (chk.get("match") or chk.get("explained_by_basis"))
                 and (det_basis == "consolidated" or not has_consolidated)):
-            built["source"] = "parser, matched BSE's structured figures"
+            built["source"] = "parser, checked against BSE's structured figures"
             return built  # verified twice without a model call
     det_cross = None
     if det and det_unit:
@@ -203,7 +318,9 @@ def extract(pages: list[str], subject: str = "", snapshot: dict | None = None, u
     if use_llm:
         try:
             from ..llm import router
-            cands = candidate_pages(pages)[:3]
+            sp = statement_pages(pages)
+            cons = [p for p in sp if page_basis(pages[p - 1]) == "consolidated"]
+            cands = (cons + [p for p in sp if p not in cons])[:3]        # the consolidated statement first
             doc = "\n\n".join(f"[PAGE {p}]\n{pages[p - 1][:9000]}" for p in sorted(cands))
             r = router.call("results_extract", "results_extract", {"document": doc}, ResultsExtraction, budget_key=budget_key)
             rows = [x.model_dump() for x in r.data.rows]
@@ -214,11 +331,17 @@ def extract(pages: list[str], subject: str = "", snapshot: dict | None = None, u
                 metrics = {x["metric"]: x for x in kept}
                 if "revenue" in metrics and "pat" in metrics:
                     out = build(metrics, kept[0]["unit"], basis, "model, quotes verified", period, snapshot,
-                                cross=det_cross if det_basis == basis else None)
+                                cross=det_cross if det_basis == basis else None, other=_other(found, basis, rev_only))
                     out["dropped_unverified"] = len(rows) - len([x for x in rows if x in kept])
+                    if out.get("ok") and basis == "standalone" and has_consolidated:
+                        out["checks"].append("the filing also has consolidated results, which FINN could not read; "
+                                             "standalone shown")
                     return out
         except Exception as e:  # noqa: BLE001
             log.warning("model results extraction failed: %s", e)
     if det:
-        return build(det, det_unit, det_basis, "parser", period, snapshot)
+        out = build(det, det_unit, det_basis, "parser", period, snapshot, other=_other(found, det_basis, rev_only))
+        if out.get("ok") and det_basis == "standalone" and has_consolidated:
+            out["checks"].append("the filing also has consolidated results, which FINN could not read; standalone shown")
+        return out
     return {"ok": False, "reason": "figures could not be read and verified", "period": period}

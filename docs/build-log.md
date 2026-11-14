@@ -374,4 +374,44 @@ Lighthouse 12.8.2, mobile, headless Chrome 157, local server. Feed `/digest`: p5
 - POLYCAB forced rebuild, warm extraction caches: 503 s → **86 s** on the first run (STRONG_MODEL 503 then no answer in 60 s, flash-lite answered), → 9.8 s once the synthesis answers were cached. Cached reopen: **569 ms**.
 - TCS forced rebuild with 19 live extraction calls: 132.7 s total, verdict stage 27.1 s. On that run CHEAP_MODEL had used up its daily free-tier quota and both strong models answered 503 "high demand"; the router moved past each in 4-7 s instead of waiting.
 - Target "cold report under 90 s" is met for the verdict stage but not for a fully cold report on the free tier today (extraction calls take 8-18 s each under contention). Step 6 adds the partial state for that path.
-- Tests: 213 passed (deadline fallback, strong→cheap order, busy strong model not retried, step budget, evidence cap order, client created once under concurrency).
+- Tests: 212 passed (deadline fallback, strong→cheap order, busy strong model not retried, step budget, evidence cap order, client created once under concurrency).
+
+
+## Final fix pass, step 4: results extraction
+
+**Why.** Of the 20 results cards for the holdings, 1 was verified, 12 carried a "Verify" badge and 7 showed no figures.
+
+**Card by card, before** (reason as stored): 11 × "differs from BSE's snapshot (it may be on the other basis)" (ASIANPAINT, BAJFINANCE, CAMS, DMART, LT, PERSISTENT, PIDILITIND, POLYCAB, TCS, TITAN), 2 × a confirmation filed as a warning (APOLLOHOSP "BSE's figures confirm the extracted value", SUNPHARMA "revenue and PAT match BSE's structured figures"), 2 × scanned PDF (DEEPAKNTR, HAL), 2 × "no P&L statement found" (DIXON, NAUKRI), 2 × "could not be read and verified" (HDFCBANK, TATAPOWER), 1 × "100× off BSE's numbers" (MARUTI), 1 × verified (KAYNES).
+
+**What the mismatches were.** BSE's structured summary is the **standalone** statement; FINN shows **consolidated**. Example: L&T BSE ₹43,583.58 cr vs consolidated ₹78,749.94 cr; TCS BSE ₹60,441 cr vs ₹73,188 cr. Reading the standalone statement from the same PDFs gives BSE's figures to the paisa (Polycab ₹9,839.66 cr / ₹965.17 cr, TCS ₹60,441 cr / ₹14,104 cr). So the consolidated figures were right; the "Verify" badges expressed no real uncertainty.
+
+**Our bugs, found while checking each card, all fixed:**
+1. The parser stopped at the first statement it read and never compared the other basis with BSE.
+2. PyMuPDF's text splits a table row's label from its numbers on these layouts; the parser needs pdfplumber's layout text, which enrichment used only for the first 40 pages. Now: candidate P&L pages are found on every page with the fast text, and layout text is taken for those pages (and the page after each) only.
+3. Tables that continue onto the next page were never candidates (revenue on one page, profit before tax on the next).
+4. OCR artefacts: spaces as thousands separators ("13 066.27" read as 66.27, CAMS PAT), decimal commas ("36024,07", "19,885,3": Sun Pharma's consolidated PAT read as 198,853), "Revenue from operalions", labels with no spaces ("Net Profitfortheperiod/year", Dixon), unit headers mangled ("~ Crore", "I~ in Croresl").
+5. A statement that prints no unit at all (Persistent: a header graphic) was unusable. The unit is now inferred only when revenue AND PAT equal BSE's to within 0.05% at that scale, and the card says so.
+6. Confirmations were stored as warnings, so "BSE confirms" showed a Verify badge. Warnings (`notes`) and confirmations (`checks`) are separate now; Verify appears only for warnings or low confidence.
+7. "Is there a consolidated statement?" looked only at candidate pages, so a standalone reading was accepted while an unread consolidated statement existed (Sun Pharma). The model now gets the consolidated statement's pages first, and a card that shows standalone while consolidated results exist says so.
+8. A filing PDF stored as a byte-duplicate of another document returned no pages (`docs.pages` did not follow the link).
+9. Regression from step 1: the new ingest chain dropped the BSE results-summary refresh, so HAL and Tata Power had no BSE figures for the quarter. Restored as its own step with a circuit breaker (`bse_snapshot`); an empty answer never overwrites a good summary.
+
+**Built.**
+- Mismatch explanation in the card: "BSE's summary is the standalone statement (revenue ₹X cr, PAT ₹Y cr); FINN's standalone reading of the same PDF (₹X cr, ₹Y cr, page N) matches it exactly / is within 0.5% of it". When only the other statement's revenue can be read (L&T page 16: its profit line is OCR-damaged), the card says exactly that.
+- When the PDF cannot be read (a scan, OCR garbage, or FINN's own reading fails its checks), the card shows BSE's own revenue and net profit for the quarter, QoQ from BSE's previous quarter, labelled "BSE's own figures · the filing PDF could not be read" with the reason; no year-on-year, EBITDA or PBT (not in BSE's summary).
+- XBRL was not used: the BSE summary covers the unreadable PDFs; XBRL parsing is listed under Next steps.
+- `python -m finn.enrich.run` gained `reextract_results()` (keeps the results-day comparison), used after any parser change.
+
+**After (20 cards, re-extracted 15 Nov 2026).** 20 show figures, 0 Verify badges:
+- FINN's own reading, confirmed by BSE directly: APOLLOHOSP, NAUKRI (standalone; Naukri's consolidated statement is too damaged by OCR to locate, and the card says so).
+- FINN's consolidated reading, BSE's standalone summary matched by FINN's standalone reading of the same PDF: ASIANPAINT, BAJFINANCE, CAMS, DMART, PERSISTENT (unit inferred), PIDILITIND, POLYCAB, SUNPHARMA, TCS, TITAN (within 0.5%), LT (standalone revenue only).
+- FINN's reading, parser and model agreeing: KAYNES.
+- BSE's own figures, labelled: DEEPAKNTR and HAL (scanned), MARUTI (OCR garbage, rejected as 100× off), DIXON (no readable P&L), TATAPOWER (not readable), HDFCBANK (bank layout; FINN's reading failed its checks).
+
+**For manual checking** (₹ crore, current / previous quarter / year ago, PDF page):
+- POLYCAB Q2 FY27 consolidated (filing 574, page 4): revenue 9,898.90 / 8,209.73 / 6,477.21; PBT 1,306.22 / 1,058.22 / 921.00; PAT 990.00 / 796.65 / 692.96. Standalone page 10: 9,839.66 / PAT 965.17 = BSE.
+- TCS Q2 FY27 consolidated (filing 686, page 8): revenue 73,188 / 72,275 / 65,799; PBT 18,638 / 17,944 / 16,068; PAT 13,934 / 13,420 / 12,131. Standalone page 17: 60,441 / 14,104 = BSE.
+- ASIANPAINT Q2 FY27 consolidated (filing 30, page 12): revenue 9,976.51 / 10,541.94 / 8,531.27; PBT 1,477.78 / 2,095.75 / 1,391.52; PAT 1,085.35 / 1,559.45 / 1,018.23. Standalone page 5: 8,453.83 / 1,095.55 = BSE.
+- EBITDA on these cards is derived (PBT + finance costs + depreciation − other income) and marked with *.
+
+Tests: 221 passed (both bases and continuation pages, OCR spaces and decimal commas, unit headers, unit inference only from an exact match, BSE-summary card, labels without spaces, basis explanations, confirmations not warnings).

@@ -41,7 +41,14 @@ def filing_document(filing_id: int) -> tuple[int, str]:
 
 
 def pages(doc_id: int) -> list[str]:
+    """Page texts. A document stored as a duplicate (same bytes as another) reads the original's pages."""
     with session() as s:
+        d = s.get(Document, doc_id)
+        if d and d.status == "duplicate" and d.error:
+            try:
+                doc_id = int(d.error.rsplit(" ", 1)[-1])
+            except ValueError:
+                pass
         rows = s.execute(select(Page.page_no, Page.text).where(Page.document_id == doc_id).order_by(Page.page_no)).all()
     return [t for _, t in rows]
 
@@ -55,6 +62,22 @@ def pdf_path(doc_id: int) -> Path | None:
             sha = s.get(Document, other).sha256
     p = PDF_DIR / f"{sha}.pdf" if sha else None
     return p if p and p.exists() else None
+
+
+def layout_pages(path: Path, fast_pages: list[str], wanted: list[int]) -> list[str]:
+    """Every page of the document: PyMuPDF text (fast, all pages), with pdfplumber's layout text (keeps a table row's
+    label and its numbers on one line) substituted for the pages in `wanted` (1-indexed). Searching all pages with
+    the fast text and paying for layout only where the P&L is lets long filings be read end to end."""
+    import pdfplumber
+    out = list(fast_pages)
+    with pdfplumber.open(path) as pdf:
+        for n in sorted(set(wanted)):
+            if 1 <= n <= len(pdf.pages) and n <= len(out):
+                try:
+                    out[n - 1] = pdf.pages[n - 1].extract_text() or out[n - 1]
+                except Exception:  # noqa: BLE001 - keep the fast text for a page pdfplumber cannot read
+                    pass
+    return out
 
 
 def plumber_pages(path: Path, max_pages: int = 40) -> list[str]:

@@ -131,10 +131,85 @@ def test_power_of_ten_mismatch_with_bse_is_rejected_not_shown():
 def test_bse_agreement_overrides_parser_disagreement():
     snap = {"revenue": {"Q2 FY27": 1200.0}, "net_profit": {"Q2 FY27": 150.0}}
     out = results.build(ROWS, "lakh", "consolidated", "t", "Q2 FY27", snapshot=snap, cross={"revenue": 999.0, "pat": 150.0})
-    assert out["confidence"] == "high" and any("BSE's figures confirm" in n for n in out["notes"])
+    assert out["confidence"] == "high" and out["notes"] == []          # a confirmation is not a warning
+    assert any("BSE's own figures confirm" in c for c in out["checks"])
+
+
+def test_bse_mismatch_explained_by_basis_is_not_a_warning():
+    snap = {"revenue": {"Q2 FY27": 1100.0}, "net_profit": {"Q2 FY27": 140.0}}          # BSE publishes standalone
+    other = {"basis": "standalone", "revenue": 1100.0, "pat": 140.0, "page": 9}
+    out = results.build(ROWS, "lakh", "consolidated", "t", "Q2 FY27", snapshot=snap, other=other)
+    assert out["notes"] == [] and out["bse_check"]["explained_by_basis"] == "standalone"
+    assert "standalone statement" in out["checks"][0] and "page 9" in out["checks"][0]
+    assert "matches it exactly" in out["checks"][0]
+    out = results.build(ROWS, "lakh", "consolidated", "t", "Q2 FY27", snapshot=snap,
+                        other={**other, "revenue": 1050.0})                             # neither basis matches
+    assert out["notes"] and "differs from BSE's summary" in out["notes"][0] and "1,050.00" in out["notes"][0]
+
+
+def test_parser_reads_both_bases_and_tables_that_continue_on_the_next_page():
+    from finn.enrich.results import parser_all
+    head = "CONSOLIDATED STATEMENT OF PROFIT AND LOSS (Rs in crore)\n"
+    p1 = head + "Revenue from operations 1,200.00 1,100.00 1,000.00\nTotal income 1,250.00 1,150.00 1,050.00\n"
+    p2 = ("Profit before tax 200.00 180.00 150.00\nTax expense 50.00 45.00 40.00\n"
+          "Profit for the period 150.00 135.00 110.00\n")
+    s1 = ("STANDALONE STATEMENT OF PROFIT AND LOSS (Rs in crore)\nRevenue from operations 1,100.00 1,000.00 900.00\n"
+          "Profit before tax 180.00 160.00 140.00\nProfit for the period 140.00 120.00 100.00\n")
+    found = parser_all([p1, p2, s1])
+    assert set(found) == {"consolidated", "standalone"}
+    assert found["consolidated"][0]["pat"]["current_quarter"] == 150.0 and found["consolidated"][2] == 1
+    assert found["standalone"][0]["revenue"]["current_quarter"] == 1100.0
 
 
 def test_period_falls_back_to_filing_date():
     from datetime import date
     out = results.extract(["no statement here"], "Outcome of board meeting", filed_on=date(2026, 10, 29), use_llm=False)
     assert out["period"] == "Q2 FY27"
+
+
+
+def test_unit_inferred_only_from_an_exact_match_with_bse():
+    from finn.enrich.results import infer_units
+    m = {"revenue": {"current_quarter": 44941.71}, "pat": {"current_quarter": 4828.94}}
+    snap = {"revenue": {"Q2 FY27": 4494.17}, "net_profit": {"Q2 FY27": 482.89}}
+    found = {"standalone": (m, None, 5), "consolidated": (m, None, 19)}
+    assert infer_units(found, snap, "Q2 FY27") == "million"
+    assert found["consolidated"][1] == "million"                       # the whole document gets the unit
+    off = {"standalone": ({"revenue": {"current_quarter": 44941.71}, "pat": {"current_quarter": 4900.0}}, None, 5)}
+    assert infer_units(off, snap, "Q2 FY27") is None                   # PAT does not match: no guess
+
+
+def test_bse_summary_card_when_the_pdf_cannot_be_read():
+    from finn.enrich.results import bse_summary_card
+    snap = {"revenue": {"Q2 FY27": 3647.0, "Q1 FY27": 2974.0}, "net_profit": {"Q2 FY27": 300.0, "Q1 FY27": 250.0}}
+    card = bse_summary_card(snap, "Q2 FY27", "scanned PDF with no text layer")
+    assert card["ok"] and card["from_bse_summary"] and card["notes"] == []
+    rev = next(r for r in card["table"] if r["metric"] == "revenue")
+    assert rev["current"] == 3647.0 and rev["qoq"] == round((3647 / 2974 - 1) * 100, 1) and rev["yoy"] is None
+    assert "BSE's own figures" in card["checks"][0]
+    assert bse_summary_card(snap, "Q3 FY27", "x") is None              # no BSE figures for that quarter: nothing
+
+
+def test_labels_without_spaces():
+    from finn.enrich.parser import parse_page
+    page = ("STATEMENT OF STANDALONE RESULTS (Rupees in Crores)\n"
+            "1 Revenue from operations 1,600.00 1,500.00 1,800.00\n"
+            "7 Profit before tax 160.00 150.00 140.00\n"
+            "9 Net Profitfortheperiod/year (7-8) 123.44 498.10 478.53 621.54\n")
+    assert parse_page(page)["pat"]["current_quarter"] == 123.44
+
+
+
+def test_basis_explained_by_revenue_alone_says_so():
+    snap = {"revenue": {"Q2 FY27": 1100.0}, "net_profit": {"Q2 FY27": 140.0}}
+    other = {"basis": "standalone", "revenue": 1100.0, "pat": None, "page": 16}
+    out = results.build(ROWS, "lakh", "consolidated", "t", "Q2 FY27", snapshot=snap, other=other)
+    assert out["notes"] == [] and "PAT line could not be read" in out["checks"][0]
+
+
+def test_ocr_decimal_comma():
+    from finn.enrich.parser import parse_number
+    assert parse_number("36024,07") == 36024.07 and parse_number("1,51,624.90") == 151624.90
+    assert parse_number("19,885,3") == 19885.3 and parse_number("115,086,5") == 115086.5
+    assert parse_number("(4,478,6)") == -4478.6
+    assert parse_number("12,345") == 12345.0 and parse_number("1,51,624") == 151624.0

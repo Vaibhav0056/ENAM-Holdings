@@ -942,6 +942,11 @@
                 <div class="row wrap mt8"><span class="badge" :class="cardDetail.payload.confidence === 'high' || !cardDetail.payload.confidence ? 'delivered' : 'verify'" x-text="'Confidence ' + (cardDetail.payload.confidence || 'high')"></span>
                   <span class="xs t2" x-text="cardDetail.payload.source"></span></div>
                 <template x-for="n in cardDetail.payload.notes || []" :key="n"><div class="notice warn mt8" x-text="'Verify: ' + n"></div></template>
+                <template x-if="(cardDetail.payload.checks || []).length">
+                  <div class="mt8"><div class="eyebrow">How these figures were checked</div>
+                    <template x-for="k in cardDetail.payload.checks" :key="k"><div class="row xs mt4" style="align-items:flex-start">
+                      <svg class="i s up" style="margin-top:1px"><use href="#i-check"/></svg><span class="t2" x-text="k"></span></div></template></div>
+                </template>
                 <div class="row wrap mt8"><template x-for="r in resultRows(cardDetail).filter(r => r.quote)" :key="'q' + r.metric">
                   <button class="cite" @click="openEvidence(cardDetail.document_id, r.page, r.quote)" x-text="metricName(r.metric) + ' · p.' + r.page"></button></template></div>
               </div>

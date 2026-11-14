@@ -120,6 +120,40 @@ def run(use_llm: bool = True, limit: int | None = None) -> dict:
     return stats
 
 
+def reextract_results(filing_ids: list[int] | None = None, use_llm: bool = True) -> list[dict]:
+    """Run results extraction again (after a parser or prompt change) for the given filings, or every results card of
+    a holding. Keeps the results-day comparison the thesis guardian added. Returns one status row per card."""
+    from ..models import Company as Co
+    out = []
+    with session() as s:
+        q = (select(Filing, Enrichment, Co).join(Enrichment, Enrichment.filing_id == Filing.id)
+             .join(Co, Co.id == Filing.company_id).where(Enrichment.type == "results", Filing.status != "duplicate"))
+        q = q.where(Filing.id.in_(filing_ids)) if filing_ids else q.where(Co.is_portfolio.is_(True), Enrichment.bucket != "routine")
+        rows = s.execute(q.order_by(Co.nse_symbol, Filing.filed_at.desc())).all()
+        for f, e, c in rows:
+            s.expunge(f), s.expunge(c)
+            e_payload = dict(e.payload or {})
+            out.append((f, c, e_payload))
+    report = []
+    for f, c, old in out:
+        try:
+            payload = _results(f, c, use_llm)
+        except Exception as ex:  # noqa: BLE001
+            payload = {"ok": False, "reason": f"couldn't process: {ex}"[:300]}
+        if old.get("results_day") and payload.get("ok"):
+            payload["results_day"] = old["results_day"]
+        _save(f.id, payload, results_headline(payload), payload.get("confidence"))
+        report.append({"symbol": c.nse_symbol, "filing_id": f.id, "status": card_status(payload), "payload": payload})
+    return report
+
+
+def card_status(p: dict) -> str:
+    """verified | verify | figures not shown: what the card shows. 'verify' only for genuine uncertainty."""
+    if not p.get("ok"):
+        return "figures not shown"
+    return "verify" if (p.get("notes") or p.get("confidence") == "low") else "verified"
+
+
 def _filing_pages(f: Filing) -> list[str] | None:
     try:
         doc_id, status = docs.filing_document(f.id)
@@ -139,14 +173,35 @@ def _results(f: Filing, c: Company | None, use_llm: bool) -> dict:
     except docs.NoPDF:
         return {"ok": False, "reason": "no PDF attached to the filing"}
     if status == "unparseable":
-        return {"ok": False, "reason": "scanned PDF with no text layer: figures not extracted"}
+        reason = "scanned PDF with no text layer"
+        from ..fiscal import last_completed_quarter, to_ist
+        period = results.period_from_text(f.subject or "") or last_completed_quarter(to_ist(f.filed_at).date()).label()
+        card = results.bse_summary_card(c.bse_snapshot if c else None, period, reason)
+        return card or {"ok": False, "reason": f"{reason}: figures not extracted", "period": period}
     if status not in ("parsed", "duplicate"):
         return {"ok": False, "reason": f"PDF could not be fetched ({status})"}
     path = docs.pdf_path(doc_id)
-    pages = docs.plumber_pages(path) if path else docs.pages(doc_id)
+    fast = docs.pages(doc_id)
+    from .parser import statement_pages
+    cands = statement_pages(fast)
+    # layout text for each candidate P&L page and the page after it (tables that continue onto the next page)
+    pages = docs.layout_pages(path, fast, cands + [c + 1 for c in cands]) if path and cands else (
+        docs.plumber_pages(path) if path else fast)
     from ..fiscal import to_ist
     out = results.extract(pages, f.subject, c.bse_snapshot if c else None, use_llm=use_llm, budget_key=f"filing:{f.id}",
                           filed_on=to_ist(f.filed_at).date())
+    if not out.get("ok") and any(k in (out.get("reason") or "") for k in ("off BSE's own numbers", "could not be read",
+                                                                          "no P&L statement")):
+        card = results.bse_summary_card(c.bse_snapshot if c else None, out.get("period"), out["reason"])
+        if card:
+            out = card
+    elif out.get("ok") and out.get("confidence") == "low":
+        # FINN's own reading failed its sanity checks (e.g. PAT changing more than 300%): BSE's figures, if it has
+        # them, are better than doubtful numbers.
+        card = results.bse_summary_card(c.bse_snapshot if c else None, out.get("period"),
+                                        "FINN's reading failed its checks: " + "; ".join(out.get("notes") or [])[:160])
+        if card:
+            out = card
     out["document_id"] = doc_id
     return out
 

@@ -65,3 +65,24 @@ def test_verify_drops_bad_items_and_fixes_page():
              {"quote": "margins will reach 30 percent next year", "page": 2}]
     kept = grounding.verify(items, pages)
     assert len(kept) == 2 and all(k["page"] == 2 for k in kept)
+
+
+def test_ocr_space_thousands_and_misspelt_labels():
+    from finn.enrich.parser import join_space_thousands, parse_page
+    assert join_space_thousands("Profit for the period 13 066.27 12 709.52 11 393.59") == \
+        "Profit for the period 13066.27 12709.52 11393.59"
+    assert join_space_thousands("Other income 5 123.45 110.20 98.00") == "Other income 5 123.45 110.20 98.00"   # a note ref
+    page = ("Statement of standalone results (Rupees in lakhs)\n"
+            "I Revenue from operalions 36,646.30 35,304.80 35,389.47 71,951.10\n"
+            "V Profit before tax 16,237.00 16,320.33 14,811.28 32,557.33\n"
+            "VII Profit for the period / year 12 232.38 12,181.36 11 093.73 24,413.74\n")
+    got = parse_page(page)
+    assert got["revenue"]["current_quarter"] == 36646.30 and got["pat"]["current_quarter"] == 12232.38
+
+
+def test_ocr_mangled_unit_headers():
+    from finn.enrich.parser import detect_unit
+    assert detect_unit("STATEMENT OF RESULTS\n~ Crore\nRevenue") == "crore"
+    assert detect_unit("Statement of Audited Standalone Results\nI~ in Croresl\nRevenue") == "crore"
+    assert detect_unit("(f in Crores)") == "crore" and detect_unit("(₹ million)") == "million"
+    assert detect_unit("We crossed a milestone in our journey") is None
