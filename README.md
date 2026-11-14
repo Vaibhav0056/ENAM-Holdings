@@ -21,6 +21,8 @@ neon init --org-id <org> --project-id <project>    # or paste DATABASE_URL / DAT
 python tasks.py setup; python tasks.py ingest; python tasks.py pipeline; python tasks.py serve
 ```
 
+While it runs, FINN refreshes itself: a catch-up at startup, new BSE filings every 30 minutes on trading days (08:00-21:00 IST), prices and the calendar each evening (Settings → Data refresh; `FINN_SCHEDULER=0` turns it off).
+
 Then open http://localhost:8000 (Chrome DevTools device mode, or a phone on the same Wi-Fi via the PC's LAN IP). `.env.example` lists every variable: a Gemini key is required, Tavily is optional, `python scripts/gen_vapid.py` makes the Web Push keys.
 
 | Task | What it does |

@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ["DATABASE_URL"] = ""          # load_dotenv never overrides a variable that is already set
 os.environ["FINN_NO_WARMER"] = "1"
+os.environ["FINN_SCHEDULER"] = "0"
 os.environ["DATABASE_URL_UNPOOLED"] = ""
 os.environ["FINN_TEST_DB"] = str(Path(tempfile.mkdtemp()) / "finn_test.sqlite")
 # The Step 1-8 SQLite store (finn.db) reads FINN_DB at import time, and finn.llm imports it during collection,

@@ -80,7 +80,7 @@ function finn() {
       if (this.route === "holding" && param) this.loadHolding(param);
       if (this.route === "research" && param) this.openResearch(param);
       if (this.route === "alerts") this.loadAlerts();
-      if (this.route === "settings") this.loadRules();
+      if (this.route === "settings") { this.loadRules(); this.loadSched(); }
       if (this.route === "gallery") this.gallery = galleryData();
     },
     nav(hash) { location.hash = hash; },
@@ -349,6 +349,16 @@ function finn() {
     async testPush() {
       const r = await this.api("/api/v2/push/test", { method: "POST" });
       this.push.msg = r.sent ? `Sent to ${r.sent} device${r.sent > 1 ? "s" : ""}.` : (r.skipped || "No subscribed device yet.");
+    },
+    sched: null,
+    async loadSched() { try { this.sched = await this.api("/api/v2/scheduler"); } catch (e) {} },
+    async refreshNow() {
+      const r = await this.api("/api/v2/refresh", { method: "POST" });
+      this.say(r.started ? "Refreshing filings, prices and alerts…" : r.reason);
+      const t = setInterval(async () => {
+        await this.loadSched();
+        if (this.sched && !this.sched.running) { clearInterval(t); this.say("Refresh done"); this.loadAlerts(); if (this.route === "today") { this.digest = null; this.loadDigest(); } }
+      }, 4000);
     },
     async runPipeline() { this.say("Checking for new alerts…"); const r = await this.api("/api/v2/alerts/evaluate", { method: "POST" }); this.loadAlerts(); this.say(`Done: ${JSON.stringify(r).length ? "alerts updated" : ""}`); },
 

@@ -300,3 +300,9 @@ Lighthouse 12.8.2, mobile, headless Chrome 157, local server. Feed `/digest`: p5
 **Checkpoint.** `python -m evals.run`: ALL PASS, every figure in the README table. Tests: 236 passed (twice in a row). ✅
 
 **Open items carried forward.** Cold research < 90 s on the free tier; `docker build`; real-device push; OCR and bank P&L; table-aware annual-report statements; human review of every `claude-provisional` label.
+
+## After Phase 12: automatic refresh when hosted locally
+
+**Why.** Hosted on a laptop, nothing ran ingest + pipeline (the daily GitHub workflow only fires once the repo is pushed), so after four days the 24h feed was empty. Once a day is also too slow for an inbox: filings land through market hours and results often after 16:00 IST.
+
+**Built.** `finn/scheduler.py`, started with the app: a catch-up run at startup; then every 30 minutes on NSE trading days 08:00-21:00 IST (`FINN_REFRESH_MINUTES`) it fetches the last 7 days of BSE filings and runs the pipeline (classify, score, enrich, thesis, alerts, push); once each evening after 18:30 IST it also refreshes prices, the BSE snapshot and the catalysts calendar. Runs never overlap. It is off on Render (`RENDER` is set there; the workflow refreshes) and with `FINN_SCHEDULER=0`. `GET /api/v2/scheduler` shows the last run; `POST /api/v2/refresh` and Settings → "Refresh now" run one immediately. Filings are content-hashed and model answers cached, so a quiet half-hour costs no model calls.

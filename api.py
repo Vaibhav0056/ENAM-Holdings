@@ -294,6 +294,29 @@ def index():
 
 
 @app.on_event("startup")
+def _start_scheduler():
+    from finn import scheduler
+    scheduler.start()
+
+
+@app.get("/api/v2/scheduler")
+def scheduler_status():
+    from finn import scheduler
+    return scheduler.state
+
+
+@app.post("/api/v2/refresh")
+def refresh_now():
+    """Run a full refresh in the background (filings, prices, calendar, pipeline); poll /api/v2/scheduler."""
+    import threading as _t
+    from finn import scheduler
+    if scheduler.state["running"]:
+        return {"started": False, "reason": "a refresh is already running"}
+    _t.Thread(target=scheduler.run_once, args=(True,), daemon=True).start()
+    return {"started": True}
+
+
+@app.on_event("startup")
 def _warm_feed():
     if os.getenv("FINN_NO_WARMER") != "1":
         from finn.feed import digest as _dg

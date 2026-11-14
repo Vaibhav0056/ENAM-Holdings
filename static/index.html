@@ -566,6 +566,11 @@
         </template>
         <button class="btn" @click="runPipeline()">Check for new alerts now</button>
       </div>
+      <div class="block"><h2>Data refresh</h2>
+        <p class="small ink2" x-show="sched?.enabled" x-text="'Automatic: every ' + sched?.interval_min + ' minutes on trading days (08:00-21:00 IST), prices and calendar each evening.'"></p>
+        <p class="small ink2" x-show="sched && !sched.enabled">Automatic refresh is off here; the daily GitHub workflow refreshes the data.</p>
+        <p class="xs mute" x-show="sched?.last_run" x-text="'Last refresh ' + when(sched?.last_run) + (sched?.last_result?.new_filings != null ? ' · ' + sched.last_result.new_filings + ' new filings' : '') + (sched?.last_error ? ' · failed: ' + sched.last_error : '')"></p>
+        <button class="btn" @click="refreshNow()" :disabled="sched?.running" x-text="sched?.running ? 'Refreshing…' : 'Refresh now'"></button></div>
       <div class="block"><h2>Appearance</h2>
         <div class="row" role="group" aria-label="Theme"><template x-for="t in ['system','light','dark']" :key="t">
           <button class="chip" :aria-pressed="theme===t" @click="theme=t; applyTheme()" x-text="t[0].toUpperCase()+t.slice(1)"></button></template></div></div>
