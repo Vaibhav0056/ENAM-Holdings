@@ -13,7 +13,7 @@ from .models import AlertRule, Company, UserState
 COMPANIES_CSV = Path(__file__).resolve().parent.parent / "data" / "companies.csv"
 
 DEFAULT_RULES = [
-    ("volume_spike", "Volume ≥ N × 20-day median", {"multiple": 2.0}),
+    ("volume_spike", "Volume ≥ N × 20-day average", {"multiple": 3.0, "min_avg_value_cr": 10.0}),
     ("price_move", "Daily move ≥ ±X %", {"pct": 5.0}),
     ("announcement_type", "Material filing types", {"types": ["results", "mgmt_change", "governance", "m_and_a"]}),
     ("new_promise", "New or dropped management promises", {"min_new": 1}),

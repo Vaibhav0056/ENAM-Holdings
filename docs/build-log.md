@@ -334,3 +334,16 @@ Lighthouse 12.8.2, mobile, headless Chrome 157, local server. Feed `/digest`: p5
 - Tests: 202 passed (fixtures for every adapter, failover, breaker open/half-open/close, dedupe, idempotence, lease lock, freshness rule, scheduler slots, task-token check, date extraction).
 
 **Open.** Cloud-IP probe results wait for the push. cron-job.org needs `FINN_TASK_TOKEN` set on Render and in the cron job.
+
+## Final fix pass, step 2: alert noise
+
+**Why.** 97 unread alerts, most of them volume spikes of 2-3× on large caps where a 2× day is ordinary, and up to four separate alerts for one company on one day (results + price + volume + peer).
+
+**Built.**
+- Volume rule: volume ≥ 3.0× the **20-session average** (was 2.0× the median) **and** a 20-session average traded value of at least `min_avg_value_cr` (default ₹10 crore a day; slider in Settings, 0-200). Escalation-only inside a burst is kept. Trade-off, stated: the mean is lifted by an earlier spike in the window, so a second spike shortly after a first must be larger to count; that is the quieter behaviour asked for.
+- One alert per company per day: every rule still records its trigger, then `consolidate()` keeps the highest-priority one active (filing > price move > promise change > peer read-across > volume), lists the others under "Also" on it, and marks them `superseded` (new `alerts.status`, `superseded_by`; migration `d4e8f1a2b3c5`). Superseded alerts are kept, never shown, never pushed.
+- Price alerts on corporate-action ex-dates and record dates were already suppressed (Phase 6); unchanged and still tested.
+- `python -m finn.alerting.engine --reevaluate` applies the current rules to every stored alert from scratch (undo merges → restate or supersede volume alerts → merge again), so it can be re-run after any rule change. Nothing is deleted.
+- The Alerts badge counts unread alerts from the last 7 days; older unread alerts stay listed under their dates ("10 new this week · 48 older unread below").
+
+**Results (live data, 15 Nov 2026).** Re-evaluation of 97 alerts: 30 volume alerts below the new rule superseded, 14 surviving volume alerts restated with the average-based ratio (their titles still said "median"), 9 same-company same-day groups merged. Active alerts 58; **unread in the last 7 days: 10** (target 5-15). The 48 older unread are mostly real results and management-change filings from the Oct-Nov results season that nobody opened. Tests: 205 passed (volume average + liquidity floor, grouping and priority, idempotent consolidation, repeatable re-evaluation).

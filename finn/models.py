@@ -189,6 +189,8 @@ class Alert(Base):
     deep_link: Mapped[str] = mapped_column(String(200))
     detail: Mapped[dict | None] = mapped_column(JSONType)
     read: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(16), default="active", server_default="active", index=True)  # active | superseded
+    superseded_by: Mapped[int | None] = mapped_column(ForeignKey("alerts.id"))
     notified: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = utcnow_col()
 

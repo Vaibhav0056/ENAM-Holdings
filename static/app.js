@@ -34,7 +34,7 @@ function finn() {
     win: store("finn.window") || "24h", custom: { from: "", to: "" }, pick: false,
     digest: null, catalysts: [], catalystsLoaded: false, routineOpen: false, worthAll: false,
     holdings: null, holding: null, editing: false, draft: null, appState: null,
-    alerts: null, unread: 0, rules: null, alertsAll: false,
+    alerts: null, unread: 0, unreadOlder: 0, rules: null, alertsAll: false,
     rq: { ticker: "", job: null, report: null, stage: null, progress: 0, stages: [], error: null, open: {}, st: {}, dur: {}, t0: 0 },
     rtab: "ledger", recent: store("finn.recent") || [], tick: Date.now(),
     sheet: null, prevSheet: null, cardDetail: null, evidence: null, whyCard: null, menuCard: null,
@@ -617,7 +617,7 @@ function finn() {
 
     // ---------- alerts ----------
     async loadAlerts(quiet = false) {
-      try { const r = await this.api("/api/v2/alerts"); this.alerts = r.alerts; this.unread = r.unread; }
+      try { const r = await this.api("/api/v2/alerts"); this.alerts = r.alerts; this.unread = r.unread; this.unreadOlder = r.unread_older || 0; }
       catch (e) { if (quiet) this.net.error = null; }
     },
     alertGroups() {
@@ -631,13 +631,18 @@ function finn() {
     },
     alertIcon(k) { return { volume_spike: "#i-vol", price_move: "#i-trend", announcement_type: "#i-file", new_promise: "#i-list", peer_read_across: "#i-users" }[k] || "#i-bell"; },
     async openAlert(a) {
-      if (!a.read) { a.read = true; this.unread = Math.max(0, this.unread - 1); this.api(`/api/v2/alerts/${a.id}/read`, { method: "POST" }).catch(() => {}); }
+      if (!a.read) {
+        a.read = true;
+        const recent = (Date.now() - new Date(a.date)) / 864e5 <= 7;
+        if (recent) this.unread = Math.max(0, this.unread - 1); else this.unreadOlder = Math.max(0, this.unreadOlder - 1);
+        this.api(`/api/v2/alerts/${a.id}/read`, { method: "POST" }).catch(() => {});
+      }
       if (a.link) location.hash = a.link.replace(/^\/?#?/, "#");
     },
-    async readAll() { await this.api("/api/v2/alerts/read_all", { method: "POST" }); (this.alerts || []).forEach((a) => (a.read = true)); this.unread = 0; },
+    async readAll() { await this.api("/api/v2/alerts/read_all", { method: "POST" }); (this.alerts || []).forEach((a) => (a.read = true)); this.unread = 0; this.unreadOlder = 0; },
     ruleChip(r) {
       const p = r.params, off = r.enabled ? "" : " · off";
-      if (p.multiple !== undefined) return `Volume ≥ ${Number(p.multiple).toFixed(1)}×` + off;
+      if (p.multiple !== undefined) return `Volume ≥ ${Number(p.multiple).toFixed(1)}× avg` + off;
       if (p.pct !== undefined) return `Price ±${Number(p.pct).toFixed(1)}%` + off;
       if (r.kind === "announcement_type") return `Types: ${p.types.slice(0, 3).map((t) => this.type(t)).join(", ")}${p.types.length > 3 ? " +" + (p.types.length - 3) : ""}` + off;
       if (r.kind === "new_promise") return "New or dropped promises" + off;
@@ -646,7 +651,7 @@ function finn() {
     },
     rulesLine() {
       const v = this.rules?.find((r) => r.kind === "volume_spike"), p = this.rules?.find((r) => r.kind === "price_move");
-      return v && p ? `Your thresholds: volume ${Number(v.params.multiple).toFixed(1)}× the 20-day median, price ±${Number(p.params.pct).toFixed(1)}%. Change them in Settings.`
+      return v && p ? `Your thresholds: volume ${Number(v.params.multiple).toFixed(1)}× the 20-day average, price ±${Number(p.params.pct).toFixed(1)}%. Change them in Settings.`
                     : "Set thresholds in Settings.";
     },
     pushBanner() {

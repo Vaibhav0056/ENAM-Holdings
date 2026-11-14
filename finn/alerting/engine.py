@@ -2,7 +2,9 @@
 (rule, company, day), so re-running never repeats one. The Alerts tab is the source of truth; push only points to it.
 
 Rules:
-- volume_spike      volume >= N × the 20-session median; inside one burst only an escalation re-alerts.
+- volume_spike      volume >= N × the 20-session average (default 3.0) on a stock whose 20-session average traded
+                    value is at least min_avg_value_cr (default ₹10 crore a day); inside one burst only an
+                    escalation re-alerts.
 - price_move        |move| >= X % or >= 3σ of the stock's own history in excess of the NIFTY 50; suppressed on the
                     stock's ex-dates (a dividend or split is not a move).
 - announcement_type material filing types the user picked (results, mgmt change, governance, M&A...).
@@ -10,7 +12,12 @@ Rules:
                     promise management had repeated (from the Credibility Ledger).
 - peer_read_across  a research-only peer filed something material: shown against the holding it is a peer of.
 
-    python -m finn.alerting.engine
+One alert per company per day: every rule records its trigger, then consolidate() keeps the most important one
+active (filing > price move > promise change > peer read-across > volume), folds the others into its "also" list and
+marks them superseded (kept, never deleted, never shown or pushed).
+
+    python -m finn.alerting.engine                 # evaluate the last LOOKBACK_DAYS
+    python -m finn.alerting.engine --reevaluate    # apply the current rules to every stored alert
 """
 from __future__ import annotations
 
@@ -24,7 +31,7 @@ from sqlalchemy.dialects import postgresql, sqlite
 from ..database import engine as db_engine
 from ..database import session
 from ..fiscal import first_session_after, to_ist
-from ..marketmath import VOL_WINDOW, index_moves, move_check, volume_baseline
+from ..marketmath import VOL_WINDOW, avg_traded_value_cr, index_moves, move_check, volume_average
 from ..models import Alert, AlertRule, CalendarEvent, Company, Enrichment, Filing, Price, Report
 
 log = logging.getLogger("finn.alerts")
@@ -52,17 +59,22 @@ def _insert(rule_id: int, company_id: int, d: date, title: str, line: str, link:
 
 # ---------- price / volume (pure over loaded rows) ----------
 
-def volume_hits(rows: list[dict], multiple: float, since: date) -> list[dict]:
+def volume_hits(rows: list[dict], multiple: float, since: date, min_value_cr: float = 0.0) -> list[dict]:
+    """Days whose volume is >= multiple × the 20-session average, on a stock that trades at least min_value_cr a
+    day on average (thin stocks spike on noise). Inside one burst only an escalation re-alerts."""
     vols = [r["volume"] for r in rows]
-    spikes, out = {}, []
+    closes = [r.get("raw_close") or r["close"] for r in rows]
+    spikes, base_at, value_at, out = {}, {}, {}, []
     for i in range(1, len(rows)):
-        base = volume_baseline(vols[: i + 1])
-        if base and vols[i] and vols[i] / base >= multiple:
-            spikes[i] = vols[i] / base
+        base = volume_average(vols[: i + 1])
+        value = avg_traded_value_cr(vols[: i + 1], closes[: i + 1])
+        if base and vols[i] and vols[i] / base >= multiple and (value or 0) >= min_value_cr:
+            spikes[i], base_at[i], value_at[i] = vols[i] / base, base, value
         if rows[i]["date"] < since or i not in spikes:
             continue
         if spikes[i] > max(spikes.get(j, 0) for j in range(i - VOL_COOLDOWN, i)):  # escalation-only inside a burst
-            out.append({"date": rows[i]["date"], "ratio": round(spikes[i], 2), "volume": vols[i], "median": base})
+            out.append({"date": rows[i]["date"], "ratio": round(spikes[i], 2), "volume": vols[i],
+                        "average": base_at[i], "avg_value_cr": round(value_at[i], 1)})
     return out
 
 
@@ -77,6 +89,12 @@ def move_hits(rows: list[dict], pct: float, market: dict, since: date, ex_dates:
         if m and m["hit"]:
             out.append({"date": d, **m, "close": closes[i], "prev_close": closes[i - 1]})
     return out
+
+
+def volume_text(symbol: str, h: dict) -> tuple[str, str]:
+    return (f"{symbol}: volume {h['ratio']:.1f}× its 20-day average",
+            f"{h['volume'] / 1e5:,.1f} lakh shares vs an average of {h['average'] / 1e5:,.1f} lakh "
+            f"(₹{h['avg_value_cr']:,.0f} cr traded a day)")
 
 
 def _price_alerts(r_vol: AlertRule | None, r_move: AlertRule | None, since: date) -> int:
@@ -97,9 +115,9 @@ def _price_alerts(r_vol: AlertRule | None, r_move: AlertRule | None, since: date
     for c in cos:
         prs = by_co.get(c.id, [])
         if r_vol:
-            for h in volume_hits(prs, float(r_vol.params.get("multiple", 2.0)), since):
-                n += _insert(r_vol.id, c.id, h["date"], f"{c.nse_symbol}: volume {h['ratio']:.1f}× its 20-day median",
-                             f"{h['volume'] / 1e5:,.1f} lakh shares vs a median of {h['median'] / 1e5:,.1f} lakh",
+            for h in volume_hits(prs, float(r_vol.params.get("multiple", 3.0)), since,
+                                 float(r_vol.params.get("min_avg_value_cr", 10.0))):
+                n += _insert(r_vol.id, c.id, h["date"], *volume_text(c.nse_symbol, h),
                              f"/#holding/{c.nse_symbol}", detail=h | {"date": h["date"].isoformat()})
         if r_move:
             for h in move_hits(prs, float(r_move.params.get("pct", 5.0)), market, since, ex[c.id]):
@@ -206,6 +224,100 @@ def _promise_alerts(rule: AlertRule) -> int:
     return n
 
 
+# ---------- one alert per company per day ----------
+
+PRIORITY = {"announcement_type": 0, "price_move": 1, "new_promise": 2, "peer_read_across": 3, "volume_spike": 4}
+
+
+def _short(title: str) -> str:
+    return title.split(": ", 1)[1] if ": " in title else title
+
+
+def consolidate(since: date | None = None) -> dict:
+    """Keep one active alert per (company, day): the highest-priority trigger, with the others listed under
+    detail["also"] and in its line; the others become status='superseded' (superseded_by = the kept one)."""
+    with session() as s:
+        q = (select(Alert, AlertRule.kind).join(AlertRule, AlertRule.id == Alert.rule_id).where(Alert.status == "active"))
+        if since:
+            q = q.where(Alert.triggered_on >= since)
+        groups = defaultdict(list)
+        for a, kind in s.execute(q).all():
+            groups[(a.company_id, a.triggered_on)].append((PRIORITY.get(kind, 9), a.id, a, kind))
+        merged = superseded = 0
+        for items in groups.values():
+            if len(items) < 2:
+                continue
+            items.sort(key=lambda t: (t[0], t[1]))
+            keep, rest = items[0][2], [t for t in items[1:]]
+            detail = dict(keep.detail or {})
+            also = list(detail.get("also") or [])
+            for _, _, a, kind in rest:
+                also.append({"kind": kind, "title": _short(a.title), "line": a.line, "link": a.deep_link, "alert_id": a.id})
+                a.status, a.superseded_by = "superseded", keep.id
+                superseded += 1
+            detail["also"] = also
+            keep.detail = detail
+            base_line = keep.line.split(" · also: ")[0]
+            keep.line = (base_line + " · also: " + "; ".join(x["title"] for x in also))[:600]
+            if any(not a.read for _, _, a, _ in rest):
+                keep.read = False
+            merged += 1
+    return {"groups_merged": merged, "superseded": superseded}
+
+
+def reevaluate() -> dict:
+    """Apply the current rules to every stored alert, from scratch and repeatably: undo previous merges, restate
+    volume alerts that still meet the volume rule with its numbers, supersede (or bring back) the ones that don't,
+    then merge to one alert per company per day. Nothing is deleted."""
+    rs = rules()
+    r_vol = rs.get("volume_spike")
+    out = {"volume_rewritten": 0, "volume_superseded": 0, "volume_restored": 0}
+    with session() as s:                                     # 1. undo merges
+        for a in s.scalars(select(Alert).where(Alert.superseded_by.is_not(None))):
+            a.status, a.superseded_by = "active", None
+        for a in s.scalars(select(Alert)):
+            if (a.detail or {}).get("also"):
+                a.detail = {k: v for k, v in a.detail.items() if k != "also"}
+            if " · also: " in (a.line or ""):
+                a.line = a.line.split(" · also: ")[0]
+    if r_vol:                                                # 2. volume alerts against the current rule
+        mult, min_val = float(r_vol.params.get("multiple", 3.0)), float(r_vol.params.get("min_avg_value_cr", 10.0))
+        with session() as s:
+            rows = s.execute(select(Price.company_id, Price.date, Price.close, Price.adj_close, Price.volume)
+                             .where(Price.company_id.is_not(None)).order_by(Price.company_id, Price.date)).all()
+        by_co = defaultdict(list)
+        for cid, d, close, adj, vol in rows:
+            by_co[cid].append({"date": d, "close": adj or close, "raw_close": close, "volume": vol})
+        hits = {(cid, h["date"]): h for cid, prs in by_co.items() for h in volume_hits(prs, mult, date(2000, 1, 1), min_val)}
+        reason = f"below the volume rule ({mult:.1f}× the 20-day average, ≥ ₹{min_val:,.0f} cr traded a day)"
+        with session() as s:
+            syms = dict(s.execute(select(Company.id, Company.nse_symbol)).all())
+            for a in s.scalars(select(Alert).where(Alert.rule_id == r_vol.id)):
+                h = hits.get((a.company_id, a.triggered_on))
+                if h:
+                    title, line = volume_text(syms.get(a.company_id, ""), h)
+                    if a.title != title or a.line != line:
+                        a.title, a.line = title, line
+                        out["volume_rewritten"] += 1
+                    if a.status != "active":
+                        out["volume_restored"] += 1
+                    a.status = "active"
+                    a.detail = {k: v for k, v in {**(a.detail or {}), **h}.items() if k not in ("date", "superseded_reason", "median")}
+                elif a.status == "active":
+                    a.status = "superseded"
+                    a.detail = {**(a.detail or {}), "superseded_reason": reason}
+                    out["volume_superseded"] += 1
+    out.update(consolidate(None))                            # 3. one per company per day
+    with session() as s:
+        from sqlalchemy import func
+        week = date.today() - timedelta(days=7)
+        active = select(func.count()).select_from(Alert).where(Alert.status == "active")
+        out["active"] = s.scalar(active)
+        out["unread_active"] = s.scalar(active.where(Alert.read.is_(False)))
+        out["unread_last_7_days"] = s.scalar(active.where(Alert.read.is_(False), Alert.triggered_on >= week))
+    return out
+
+
 def evaluate(lookback_days: int = LOOKBACK_DAYS) -> dict:
     rs = rules()
     since = date.today() - timedelta(days=lookback_days)
@@ -220,9 +332,18 @@ def evaluate(lookback_days: int = LOOKBACK_DAYS) -> dict:
         except Exception as e:  # noqa: BLE001 - one rule never blocks the others
             log.exception("alert rule %s failed", name)
             out[name] = f"failed: {e}"[:200]
+    try:
+        out["consolidated"] = consolidate(since - timedelta(days=1))
+    except Exception as e:  # noqa: BLE001
+        log.exception("consolidate failed")
+        out["consolidated"] = f"failed: {e}"[:200]
     return out
 
 
 if __name__ == "__main__":
+    import sys
     logging.basicConfig(level=logging.WARNING)
-    print(evaluate(int(__import__("sys").argv[1]) if len(__import__("sys").argv) > 1 else LOOKBACK_DAYS))
+    if "--reevaluate" in sys.argv:
+        print(reevaluate())
+    else:
+        print(evaluate(int(sys.argv[1]) if len(sys.argv) > 1 else LOOKBACK_DAYS))

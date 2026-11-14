@@ -75,7 +75,8 @@ def notify_new_alerts(max_age_days: int = 2) -> dict:
         cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
         with session() as s:
             fresh = [(a.id, a.title, a.line, a.deep_link) for a in
-                     s.scalars(select(Alert).where(Alert.notified.is_(False), Alert.created_at >= cutoff).order_by(Alert.id))]
+                     s.scalars(select(Alert).where(Alert.notified.is_(False), Alert.status == "active", Alert.created_at >= cutoff)
+                                .order_by(Alert.id))]
         for _, title, line, link in fresh[-BURST:]:
             r = send_to_all(title, line or "", link or "/#alerts")
             total["alerts"] += 1

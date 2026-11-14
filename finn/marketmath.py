@@ -28,6 +28,18 @@ def volume_baseline(volumes: list[float | None], window: int = VOL_WINDOW) -> fl
     return median(base) if len(base) == window else None
 
 
+def volume_average(volumes: list[float | None], window: int = VOL_WINDOW) -> float | None:
+    """Mean of the `window` traded sessions before the last one (the alert rule's baseline)."""
+    base = [v for v in volumes[:-1] if v and v > 0][-window:]
+    return sum(base) / len(base) if len(base) == window else None
+
+
+def avg_traded_value_cr(volumes: list[float | None], closes: list[float | None], window: int = VOL_WINDOW) -> float | None:
+    """Mean daily traded value in ₹ crore over the `window` sessions before the last one (shares × close / 1e7)."""
+    pairs = [(v, c) for v, c in zip(volumes[:-1], closes[:-1]) if v and v > 0 and c][-window:]
+    return sum(v * c for v, c in pairs) / len(pairs) / 1e7 if len(pairs) == window else None
+
+
 def volume_ratio(volumes: list[float | None], window: int = VOL_WINDOW) -> float | None:
     base = volume_baseline(volumes, window)
     return None if base is None or not volumes[-1] else volumes[-1] / base

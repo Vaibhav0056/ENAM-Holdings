@@ -131,14 +131,23 @@ def alerts_list(limit: int = 100):
     from .models import Alert, AlertRule, Company
 
     def q(s):
+        from sqlalchemy import func
         rows = s.execute(_select(Alert, AlertRule.kind, Company.nse_symbol).join(AlertRule, AlertRule.id == Alert.rule_id)
-                         .join(Company, Company.id == Alert.company_id)
+                         .join(Company, Company.id == Alert.company_id).where(Alert.status == "active")
                          .order_by(Alert.triggered_on.desc(), Alert.id.desc()).limit(limit)).all()
-        return [{"id": a.id, "kind": kind, "symbol": sym, "date": a.triggered_on.isoformat(), "title": a.title,
-                 "line": a.line, "link": a.deep_link, "filing_id": a.filing_id, "read": a.read,
-                 "created_at": to_ist(a.created_at).isoformat()} for a, kind, sym in rows]
-    items = read_session_run(q)
-    return {"alerts": items, "unread": sum(1 for a in items if not a["read"])}
+        from datetime import date as _date, timedelta as _td
+        week = _date.today() - _td(days=7)
+        unread = s.scalar(_select(func.count()).select_from(Alert).where(Alert.status == "active", Alert.read.is_(False),
+                                                                        Alert.triggered_on >= week))
+        older = s.scalar(_select(func.count()).select_from(Alert).where(Alert.status == "active", Alert.read.is_(False),
+                                                                       Alert.triggered_on < week))
+        return (unread, older), [{"id": a.id, "kind": kind, "symbol": sym, "date": a.triggered_on.isoformat(),
+                         "title": a.title, "line": a.line.split(" · also: ")[0], "link": a.deep_link,
+                         "filing_id": a.filing_id, "read": a.read, "also": (a.detail or {}).get("also") or [],
+                         "created_at": to_ist(a.created_at).isoformat()} for a, kind, sym in rows]
+    (unread, older), items = read_session_run(q)
+    # The badge counts unread alerts from the last 7 days; older unread ones stay listed under their dates.
+    return {"alerts": items, "unread": unread, "unread_older": older}
 
 
 @router.post("/api/v2/alerts/{alert_id}/read")
@@ -159,7 +168,7 @@ def alerts_read_all():
     from .database import session as _s
     from .models import Alert
     with _s() as s:
-        n = s.execute(update(Alert).where(Alert.read.is_(False)).values(read=True)).rowcount
+        n = s.execute(update(Alert).where(Alert.read.is_(False), Alert.status == "active").values(read=True)).rowcount
     return {"ok": True, "marked": n}
 
 
@@ -173,7 +182,7 @@ def rules_get():
                           for r in s.scalars(_select(AlertRule).order_by(AlertRule.id))]}
 
 
-RULE_LIMITS = {"multiple": (1.2, 10.0), "pct": (1.0, 20.0), "min_new": (1, 20)}
+RULE_LIMITS = {"multiple": (1.2, 10.0), "pct": (1.0, 20.0), "min_new": (1, 20), "min_avg_value_cr": (0.0, 500.0)}
 FILING_TYPES = {"results", "mgmt_change", "governance", "m_and_a", "fundraise", "order_win", "credit_rating",
                 "litigation_regulatory", "insider_pledge", "dividend_action"}
 

@@ -820,6 +820,7 @@
           <button class="btn quiet" x-show="!(isIOS && !standalone)" @click="enablePush()">Enable</button></div>
       </template>
       <template x-if="!alerts"><div class="list mt16"><template x-for="n in 5" :key="n"><div class="li"><div class="sk" style="width:32px; height:32px"></div><div class="grow"><div class="sk" style="width:60%"></div><div class="sk" style="width:85%"></div></div></div></template></div></template>
+      <p class="xs t2 mt12" x-show="alerts && alerts.length" x-text="unread + ' new this week' + (unreadOlder ? ' · ' + unreadOlder + ' older unread below' : '') + ' · one alert per company per day'"></p>
       <template x-if="alerts && !alerts.length">
         <div class="card empty mt16"><div class="mark n"><svg class="i"><use href="#i-bell"/></svg></div><h3>No alerts yet</h3><p x-text="rulesLine()"></p></div>
       </template>
@@ -830,7 +831,9 @@
             <template x-for="a in g.items" :key="a.id">
               <button class="li" @click="openAlert(a)">
                 <span class="alert-i"><svg class="i s"><use :href="alertIcon(a.kind)"/></svg></span>
-                <div class="grow"><div class="small" :class="!a.read && 'unread'" x-text="a.title"></div><div class="xs t2 mt4" x-text="a.line"></div></div>
+                <div class="grow"><div class="small" :class="!a.read && 'unread'" x-text="a.title"></div><div class="xs t2 mt4" x-text="a.line"></div>
+                  <div class="row wrap mt4" x-show="a.also?.length"><template x-for="x in (a.also || [])" :key="x.alert_id">
+                    <span class="badge outline" x-text="'Also: ' + x.title"></span></template></div></div>
                 <span class="dot" x-show="!a.read" aria-label="Unread"></span>
               </button>
             </template>
@@ -849,8 +852,10 @@
           <div class="rule">
             <div class="row"><span class="grow small" style="font-weight:500" x-text="r.label"></span>
               <button class="switch" role="switch" :aria-checked="r.enabled" :aria-label="r.label" @click="r.enabled = !r.enabled; saveRule(r)"></button></div>
-            <template x-if="r.params.multiple !== undefined"><div class="mt8"><div class="row xs t2"><span class="grow">Volume vs 20-day median</span><span class="num" x-text="Number(r.params.multiple).toFixed(1) + '×'"></span></div>
-              <input type="range" min="1.2" max="6" step="0.1" x-model.number="r.params.multiple" @change="saveRule(r)" aria-label="Volume multiple"></div></template>
+            <template x-if="r.params.multiple !== undefined"><div class="mt8"><div class="row xs t2"><span class="grow">Volume vs 20-day average</span><span class="num" x-text="Number(r.params.multiple).toFixed(1) + '×'"></span></div>
+              <input type="range" min="1.5" max="8" step="0.1" x-model.number="r.params.multiple" @change="saveRule(r)" aria-label="Volume multiple"></div></template>
+            <template x-if="r.params.min_avg_value_cr !== undefined"><div class="mt8"><div class="row xs t2"><span class="grow">Only stocks trading at least</span><span class="num" x-text="'₹' + Number(r.params.min_avg_value_cr).toFixed(0) + ' cr a day'"></span></div>
+              <input type="range" min="0" max="200" step="5" x-model.number="r.params.min_avg_value_cr" @change="saveRule(r)" aria-label="Minimum average traded value, crore a day"></div></template>
             <template x-if="r.params.pct !== undefined"><div class="mt8"><div class="row xs t2"><span class="grow">Daily move</span><span class="num" x-text="'±' + Number(r.params.pct).toFixed(1) + '%'"></span></div>
               <input type="range" min="1" max="15" step="0.5" x-model.number="r.params.pct" @change="saveRule(r)" aria-label="Daily move percent"></div></template>
             <template x-if="r.params.types"><div class="row wrap mt8">
