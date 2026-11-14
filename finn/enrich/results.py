@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from .. import fiscal
 from ..grounding import verify
-from ..results import candidate_pages, detect_unit, page_basis, parse_page, sane  # Step 1-8 parser (pure)
+from .parser import candidate_pages, detect_unit, page_basis, parse_page, sane
 
 log = logging.getLogger("finn.enrich.results")
 CORE = ["revenue", "ebitda", "pbt", "pat"]

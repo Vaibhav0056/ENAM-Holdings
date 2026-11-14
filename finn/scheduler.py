@@ -15,14 +15,15 @@ import logging
 import os
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .fiscal import IST, is_trading_day
 
 log = logging.getLogger("finn.scheduler")
 _lock = threading.Lock()
 state = {"enabled": False, "interval_min": None, "last_run": None, "last_result": None, "last_error": None,
-         "running": False, "last_daily": None, "next_check": None}
+         "running": False, "last_daily": None, "next_check": None, "bse_paused_until": None}
+BSE_BACKOFF = timedelta(hours=3)
 
 
 def enabled() -> bool:
@@ -62,14 +63,27 @@ def run_once(daily: bool) -> dict:
             cos = list(s.scalars(select(Company)))
             for c in cos:
                 s.expunge(c)
-        out = {"filings": {k: v.get("added", 0) for k, v in bse_filings.ingest(cos, 7).items()}}
-        out["new_filings"] = sum(v for v in out["filings"].values() if isinstance(v, int))
-        out.pop("filings")
-        if daily:
-            p = prices.ingest(cos, 30)
-            out["price_rows_added"] = sum(v.get("added", 0) for v in p.values())
+        now = datetime.now(timezone.utc)
+        bse_ok = not state["bse_paused_until"] or now >= datetime.fromisoformat(state["bse_paused_until"])
+        if bse_ok:
+            res = bse_filings.ingest(cos, 7)
+            refused = sum(1 for v in res.values() if "403" in str(v.get("error", "")))
+            out = {"new_filings": sum(v.get("added", 0) for v in res.values())}
+            if refused >= max(1, len(res) // 2):
+                # BSE is refusing FINN's requests. Back off instead of retrying every half hour, and never
+                # disguise the client to get past it.
+                state["bse_paused_until"] = (now + BSE_BACKOFF).isoformat(timespec="minutes")
+                out["bse"] = f"BSE refused {refused} of {len(res)} requests (403); paused until {state['bse_paused_until']}"
+            else:
+                state["bse_paused_until"] = None
+        else:
+            out = {"new_filings": 0, "bse": f"paused after BSE refused requests; resumes {state['bse_paused_until']}"}
+        if daily and bse_ok and not state["bse_paused_until"]:
             bse_snapshot.ingest(cos)
             out["calendar"] = calendar.ingest(cos).get("added")
+        if daily:   # prices come from Yahoo Finance, not BSE
+            p = prices.ingest(cos, 30)
+            out["price_rows_added"] = sum(v.get("added", 0) for v in p.values())
         from . import pipeline
         res = pipeline.run(rescore_all=False)
         feed = res.get("feed") if isinstance(res.get("feed"), dict) else {}

@@ -1,11 +1,14 @@
+# local environment and secrets
 .venv/
+.env
+.neon
+.claude/
+# caches and build output
 __pycache__/
 *.pyc
-.env
-data/finn.db*
-data/pdfs/
 .pytest_cache/
-static/_dev/
-data/*.log
-.neon
 node_modules/
+# local data: PDFs are re-fetched on demand; the database lives on Neon
+data/pdfs/
+data/*.sqlite
+data/*.log

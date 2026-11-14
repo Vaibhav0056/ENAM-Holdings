@@ -54,13 +54,23 @@ def _bounds_ok(g: dict, p: dict) -> bool:
     return bool(pv) and any(abs(a - b) <= 0.02 * max(abs(a), 1e-9) for a in gv for b in pv)
 
 
+def latest_report(symbol: str) -> dict | None:
+    from sqlalchemy import select
+    from finn.database import session
+    from finn.models import Company, Report
+    with session() as s:
+        rep = s.execute(select(Report).join(Company, Company.id == Report.company_id)
+                        .where(Company.nse_symbol == symbol, Report.kind == "core")
+                        .order_by(Report.created_at.desc()).limit(1)).scalar()
+        return {"report_id": rep.id, **rep.data, "receipt": rep.receipt} if rep else None
+
+
 def run(verbose: bool = True) -> dict:
-    from finn.research.engine import cached_report
     from finn.research.ledger import period
     gold = json.loads(GOLD.read_text(encoding="utf-8"))
-    rep = cached_report(gold["company"])
+    rep = latest_report(gold["company"])   # the eval scores the latest stored report, whatever its age
     if not rep:
-        out = {"error": f"no report for {gold['company']} in the last 24 h; run python -m finn.research.engine {gold['company']}"}
+        out = {"error": f"no report for {gold['company']}; run python -m finn.research.engine {gold['company']}"}
         print(out["error"]) if verbose else None
         return out
     ledger = rep["ledger"]
