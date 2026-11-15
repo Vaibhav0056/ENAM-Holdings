@@ -405,3 +405,4 @@ header .eyebrow, .top .eyebrow { font-size: 12px; line-height: 16px; font-weight
 .badge .i.s, .lnk .i.s, .go .i.s { width: 16px; height: 16px; }
 .lnk, .go { display: inline-flex; align-items: center; gap: 4px; }
 .tile .dot { top: 42px; right: 8px; } .tile .s { padding-right: 10px; }
+.bio { border-left: 2px solid var(--accent); padding-left: 10px; }

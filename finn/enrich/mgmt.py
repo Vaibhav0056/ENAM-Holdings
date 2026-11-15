@@ -108,18 +108,98 @@ def extract_batch(filings: list[dict], use_llm: bool = True) -> dict[int, list[d
     return out
 
 
-def web_bio(name: str, company: str) -> dict | None:
-    """Tavily, only when a key is configured. Returns {text, url} from the top result, or None."""
+BIO_PROMPT = (
+    "Using web search, write a factual background of {name}, who {direction} as {role} at {company} (an Indian listed "
+    "company). In at most 2 short sentences say where they worked before (company, role) and, if found, education or "
+    "years of experience. Prefer LinkedIn, the company's site and exchange filings. Use only facts the sources state "
+    "about this exact person; if you cannot confirm it is the same person, reply exactly NOT_FOUND.")
+
+
+def web_bio(name: str, company: str, role: str = "", direction: str = "appointed") -> dict | None:
+    """A short cited web background for a person in a management change, or None (fail soft).
+    Tavily's answer mode when TAVILY_API_KEY is set (keeps Gemini's free quota for research), else Gemini with
+    Google Search grounding on the existing key."""
+    return _tavily_bio(name, company, role) or _gemini_bio(name, company, role, direction)
+
+
+def _sentences(text: str, limit: int = 420) -> str:
+    """Whole sentences up to the limit, so a bio never stops mid-word."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    end = max(cut.rfind(". "), cut.rfind("."))
+    return cut[:end + 1] if end > 80 else cut.rsplit(" ", 1)[0] + "…"
+
+
+def _tavily_bio(name: str, company: str, role: str) -> dict | None:
     if not config.TAVILY_API_KEY:
         return None
     try:
         from tavily import TavilyClient
-        r = TavilyClient(api_key=config.TAVILY_API_KEY).search(f"{name} {company} professional background", max_results=3)
-        top = (r.get("results") or [None])[0]
-        return {"text": top["content"][:400], "url": top["url"]} if top else None
+        r = TavilyClient(api_key=config.TAVILY_API_KEY).search(
+            f"{name}, {role} at {company}: professional background, previous companies and roles, education",
+            max_results=4, include_answer="basic")
+        text = (r.get("answer") or "").strip()
+        sources = [{"title": x.get("title") or "Source", "url": x["url"]} for x in (r.get("results") or []) if x.get("url")][:3]
+        if not text or not sources:
+            return None
+        return {"text": _sentences(text), "url": sources[0]["url"], "sources": sources, "via": "web search"}
     except Exception as e:  # noqa: BLE001
         log.warning("tavily failed: %s", e)
         return None
+
+
+def _gemini_bio(name: str, company: str, role: str, direction: str) -> dict | None:
+    import time
+    from google.genai import types
+    from ..llm import router
+    t0, model = time.time(), config.CHEAP_MODEL
+    try:
+        resp = router.get_client().models.generate_content(
+            model=model, contents=BIO_PROMPT.format(name=name, company=company, role=role or "a senior role",
+                                                    direction="joined" if direction == "appointed" else "left"),
+            config=types.GenerateContentConfig(tools=[types.Tool(google_search=types.GoogleSearch())], temperature=0))
+        text = (resp.text or "").strip()
+        meta = resp.candidates[0].grounding_metadata if resp.candidates else None
+        sources = [{"title": c.web.title or "Source", "url": c.web.uri} for c in (getattr(meta, "grounding_chunks", None) or [])
+                   if getattr(c, "web", None) and c.web.uri][:3]
+        u = getattr(resp, "usage_metadata", None)
+        router._log(task="bio_extract", prompt_id="bio@v1", model=model, tier="cheap", cache_hit=False,
+                    in_tokens=getattr(u, "prompt_token_count", 0) or 0, out_tokens=getattr(u, "candidates_token_count", 0) or 0,
+                    latency_ms=int((time.time() - t0) * 1000))
+        if not text or "NOT_FOUND" in text or not sources:      # no grounded sources: not shown
+            return None
+        return {"text": _sentences(text), "url": sources[0]["url"], "sources": sources, "via": "web search"}
+    except Exception as e:  # noqa: BLE001
+        log.warning("bio search failed for %s: %s", name, e)
+        return None
+
+
+def add_bios(limit: int = 40) -> int:
+    """Backfill: add a web bio to senior people (in and out) on stored management-change cards that lack one."""
+    from sqlalchemy import select
+    from sqlalchemy.orm.attributes import flag_modified
+    from ..database import session
+    from ..models import Company, Enrichment, Filing
+    done = 0
+    with session() as s:
+        rows = s.execute(select(Enrichment, Company.name).join(Filing, Filing.id == Enrichment.filing_id)
+                         .join(Company, Company.id == Filing.company_id)
+                         .where(Enrichment.payload.is_not(None)).order_by(Filing.filed_at.desc())).all()
+        for e, company in rows:
+            if (e.payload or {}).get("kind") != "mgmt_change":
+                continue
+            changed = False
+            for p in (e.payload or {}).get("people") or []:
+                if done >= limit:
+                    break
+                if p.get("senior") and not p.get("web_bio") and p.get("name"):
+                    p["web_bio"] = web_bio(p["name"], company, p.get("role") or "", p.get("direction") or "")
+                    changed, done = True, done + 1
+            if changed:
+                flag_modified(e, "payload")
+                s.commit()
+    return done
 
 
 def governance_flags(people: list[dict]) -> list[dict]:

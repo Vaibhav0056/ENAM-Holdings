@@ -44,7 +44,7 @@ TASK_TIERS = {
     "classify": "cheap", "one_liner": "cheap", "results_extract": "cheap", "mgmt_extract": "cheap",
     "governance_extract": "cheap", "promise_extract": "cheap", "actuals_extract": "cheap", "facts_extract": "cheap",
     "qa_extract": "cheap", "risk_extract": "cheap", "thesis_impact": "cheap", "dodge_label": "cheap",
-    "deep_extract": "cheap", "copilot_step": "cheap", "probe": "cheap",
+    "deep_extract": "cheap", "copilot_step": "cheap", "probe": "cheap", "bio_extract": "cheap",
     # strong: synthesis over verified JSON only
     "synthesis": "strong", "devils_advocate": "strong", "thesis_draft": "strong", "deep_explain": "strong",
     "copilot_answer": "strong",

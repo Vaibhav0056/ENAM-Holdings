@@ -117,6 +117,25 @@ An "Ask about HAL…" bar answers questions using only that company's sources, w
 
 **Stack:** Python, FastAPI, Postgres (Neon), Gemini models behind one router, an installable web app with Web Push, hosted on Render.
 
+### Architecture overview: specialised agents
+
+FINN is not one large prompt. Each part of the job is handled by a **specialised agent** with one responsibility, its own versioned prompt (`finn/llm/prompts/`), a strict output schema, and the cheapest model tier that can do the job. Every agent calls the model only through the **model router** (`finn/llm/router.py`). The router is the single entry point: it maps each task to a tier, caches on a sha256 of model, prompt and inputs, enforces a timeout, falls back to the next model and records why, and logs tokens, cost and latency for every call. All arithmetic stays in plain Python outside the agents.
+
+| Agent | What it does | Tier |
+|---|---|---|
+| **Filing triage** (`classify`, `one_liner`) | Types every new exchange filing and writes its one-line summary; keyword rules decide first, the model only labels what they can't | cheap |
+| **Results reader** (`results_extract`) | Reads the P&L table from the results PDF, with page and quote; a deterministic parser and BSE's own figures cross-check it | cheap |
+| **People agent** (`mgmt_extract`, `bio_extract`) | Who joined or left, which role, effective date and stated reason; then a short web-searched background of each senior person with sources | cheap |
+| **Governance agent** (`governance_extract`) | Flags auditor changes, pledges, related-party deals and regulatory actions, each with its quote | cheap |
+| **Thesis guardian** (`thesis_impact`, `thesis_draft`) | Judges whether a filing supports, threatens or doesn't touch a holding's thesis, and drafts a thesis from management's own claims | cheap / strong |
+| **Promise extractor** (`promise_extract`, `actuals_extract`, `facts_extract`) | Pulls every forward-looking promise and the later reported actuals from earnings calls and annual reports | cheap |
+| **Research analyst** (`synthesis`) | Writes the verdict, bull and bear cases from the verified ledger JSON only | strong |
+| **Devil's advocate** (`devils_advocate`) | Writes the strongest counter-argument to the research verdict, in parallel with the analyst | strong |
+| **Deep-dive agents** (`deep_extract`, `dodge_label`, `deep_explain`) | Cash quality, balance sheet, dodge detector, worry map, fine print and the other deep dives | cheap / strong |
+| **Copilot** (`copilot_step`, `copilot_answer`) | A tool-using agent: plans which of FINN's own documents to search, then answers with a citation on every sentence, or "Not in sources" | cheap / strong |
+
+Around the agents, deterministic code does the rest: the **ingest** chain (BSE → NSE → fallbacks, circuit breakers), the **alert engine** (volume, price and filing rules), and the **verifier**, which drops any quote that doesn't match its page and any number the sources don't contain.
+
 ## 6. Demo portfolio
 
 20 NSE holdings across banks and financials, IT, consumer, industrials, defence, electronics, pharma/healthcare and auto, plus research-only companies to test Pull on stocks you don't own.

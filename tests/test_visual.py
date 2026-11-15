@@ -35,3 +35,14 @@ def test_every_icon_the_ui_references_is_in_the_sprite():
 def test_shell_makes_no_external_requests():
     html = (ROOT / "static/index.html").read_text(encoding="utf-8")
     assert not re.findall(r'(?:src|href)="https?://', html)
+
+
+def test_web_bio_trims_to_sentences_and_fails_soft(monkeypatch):
+    from finn.enrich import mgmt
+    long = "First sentence about the person. " * 20
+    assert mgmt._sentences(long).endswith(".") and len(mgmt._sentences(long)) <= 420
+    monkeypatch.setattr(mgmt, "_tavily_bio", lambda *a: None)
+    monkeypatch.setattr(mgmt, "_gemini_bio", lambda *a: None)
+    assert mgmt.web_bio("A Person", "Some Co", "CFO", "resigned") is None     # no source: no bio, no error
+    monkeypatch.setattr(mgmt, "_tavily_bio", lambda *a: {"text": "Bio.", "url": "u", "sources": []})
+    assert mgmt.web_bio("A Person", "Some Co")["text"] == "Bio."

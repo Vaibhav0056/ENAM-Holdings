@@ -107,8 +107,8 @@ def run(use_llm: bool = True, limit: int | None = None) -> dict:
         for fid, people in found.items():
             f_row = by_id[fid]
             for p in people:
-                if p.get("direction") == "appointed" and p.get("senior"):
-                    p["web_bio"] = mgmt.web_bio(p["name"], f_row["company"])
+                if p.get("senior") and p.get("name"):          # incoming and outgoing
+                    p["web_bio"] = mgmt.web_bio(p["name"], f_row["company"], p.get("role") or "", p.get("direction") or "")
             flags = mgmt.governance_flags(people) + governance.rule_flags("mgmt_change", f_row["subject"], f_row["body"])
             payload = {"kind": "mgmt_change", "ok": bool(people), "people": people, "governance_flags": flags,
                        "pdf_pages": len(f_row["pages"]), "source": people[0].get("source") if people else None}

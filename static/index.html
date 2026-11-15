@@ -196,7 +196,7 @@
                             <span class="dir" :class="isIn(p) ? 'in' : 'out'" x-text="isIn(p) ? 'IN' : 'OUT'"></span>
                             <span class="avatar" aria-hidden="true" x-text="initials(p.name)"></span>
                             <div class="grow"><div class="small trunc" style="font-weight:600" x-text="p.name"></div>
-                              <div class="xs t2 trunc" x-text="(p.role || 'Role not in filing') + (p.effective_date ? ' · effective ' + p.effective_date : '')"></div></div>
+                              <div class="xs t2 trunc" x-text="(p.role || 'Role not in filing') + (p.effective_date ? ' · effective ' + p.effective_date : '')"></div><div class="xs clamp2 mt4" x-show="p.web_bio" x-text="p.web_bio?.text"></div></div>
                           </div>
                         </template>
                       </div>
@@ -959,7 +959,10 @@
                     <div class="grow"><div class="small" style="font-weight:600" x-text="p.name"></div><div class="xs t2" x-text="(p.role || 'Role not in filing') + (p.effective_date ? ' · effective ' + p.effective_date : '')"></div></div></div>
                   <div class="quote" x-show="p.profile_quote" x-text="p.profile_quote"></div>
                   <div class="quote" x-show="p.reason_quote" x-text="'Reason given: ' + p.reason_quote"></div>
-                  <template x-if="p.web_bio"><div class="xs mt4">Bio: <span x-text="p.web_bio.text"></span> <a :href="p.web_bio.url" target="_blank" rel="noopener">Bio source</a></div></template>
+                  <template x-if="p.web_bio"><div class="bio mt8"><div class="xs t2 keep" style="font-weight:600">Background (web search)</div>
+                    <p class="small mt4" x-text="p.web_bio.text"></p>
+                    <div class="row wrap mt4"><template x-for="(src, _s) in (p.web_bio.sources || [{title: 'Source', url: p.web_bio.url}])" :key="_s">
+                      <a class="chip" :href="src.url" target="_blank" rel="noopener"><span x-text="src.title"></span><svg class="i s"><use href="/static/icons.svg#external-link"/></svg></a></template></div></div></template>
                   <button class="cite" x-show="p.page" @click="openEvidence(docOf(cardDetail), p.page, p.quote)" x-text="'Filing, page ' + p.page + ' →'"></button></div></template></div>
             </template>
             <template x-if="flags(cardDetail).length">
