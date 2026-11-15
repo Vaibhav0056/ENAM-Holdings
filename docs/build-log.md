@@ -561,3 +561,26 @@ for a warning or low confidence (step 4).
 Late fix: a feature-flag state named `flags` shadowed the card's `flags()` method (caught by the golden path); removing a company that is a configured research peer now keeps it tracked as a peer.
 
 Tests: 239 passed.
+
+## Final fix pass, step 7: deploy readiness
+
+**Built.**
+- `render.yaml` now uses Render's native Python runtime (no Docker): `buildCommand: pip install -r requirements.txt`,
+  `startCommand: sh scripts/start.sh` (migrate on Neon's direct endpoint, idempotent seed, then
+  `uvicorn api:app --host 0.0.0.0 --port $PORT`), region Singapore, health check `/health` (touches no database),
+  `PYTHON_VERSION` 3.11.9. Secrets are `sync: false`; the placeholder `mailto:admin@example.com` push subject became a
+  secret too. The Dockerfile stays as an optional alternative (Docker is not installed here, so `docker build` is
+  still unverified).
+- `DEMO_SNAPSHOT` checked as a last resort: `scripts/export_snapshot.py --check` wrote `data/demo_snapshot.json`
+  (1.3 MB: 20 holdings, 59 alerts, 5 research reports) and passed; a second server with an unreachable database
+  answered `/digest`, holdings, alerts, a holding page and a research report from it (HTTP 200, `X-FINN-Snapshot`
+  header, 5-30 ms).
+- **Lighthouse was not run here**: `npx lighthouse` (an npm download) was not permitted in this environment. To run
+  it in Chrome DevTools (Mobile):
+  1. Start FINN (`python tasks.py serve`, or the Render URL) and open it in Chrome in an incognito window (no
+     extensions), at `/#today`.
+  2. DevTools (F12) → Lighthouse tab → Mode: Navigation; Device: Mobile; Categories: Performance, Accessibility
+     (Best practices and SEO optional) → Analyze page load.
+  3. Repeat for `/#holding/POLYCAB` and `/#research/POLYCAB`.
+  4. Targets: Performance ≥ 90, Accessibility ≥ 95. Send the scores and the failing audits (or the exported JSON);
+     the fixes go in a follow-up commit.

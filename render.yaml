@@ -1,15 +1,27 @@
-# Render Blueprint: one Docker web service in Singapore (close to Neon ap-southeast-1 and to Indian users).
-# Free plan: the instance sleeps when idle; .github/workflows/daily.yml pings /health every 10 minutes and runs the
-# daily ingest + pipeline itself against Neon, so the web instance never runs long jobs.
+# Render Blueprint: one web service on Render's native Python runtime, in Singapore (close to Neon ap-southeast-1
+# and to Indian users). The Dockerfile in the repo is an optional alternative; this blueprint does not use it.
+#
+# Free plan: the instance sleeps when idle. The web service never runs long jobs: GitHub Actions
+# (.github/workflows/ingest.yml) runs ingest -> pipeline -> alerts at 08:00, 16:30, 19:00 and 22:00 IST against Neon,
+# precomputes research after the 22:00 run, and pings /health every 10 minutes. cron-job.org can also trigger a
+# refresh with POST /tasks/ingest and the header X-FINN-Task-Token.
+#
+# scripts/start.sh migrates (Neon's direct endpoint), seeds idempotently, then runs
+# `uvicorn api:app --host 0.0.0.0 --port $PORT`; if the database is unreachable the app still starts and serves
+# data/demo_snapshot.json (DEMO_SNAPSHOT) for the main screens.
 services:
   - type: web
     name: finn
-    runtime: docker
+    runtime: python
     region: singapore
     plan: free
-    healthCheckPath: /health
+    buildCommand: pip install -r requirements.txt
+    startCommand: sh scripts/start.sh
+    healthCheckPath: /health          # answers without touching the database
     autoDeploy: true
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
       - key: DATABASE_URL            # Neon pooled connection string (production branch)
         sync: false
       - key: DATABASE_URL_UNPOOLED   # Neon direct connection string (migrations)
@@ -24,15 +36,19 @@ services:
         value: gemini-embedding-2
       - key: MAX_COST_PER_REPORT_USD
         value: "0.05"
-      - key: VAPID_PUBLIC_KEY
+      - key: LLM_TIMEOUT_S
+        value: "60"
+      - key: VAPID_PUBLIC_KEY        # web push ships off (feature flag web_push); set these to turn it on
         sync: false
       - key: VAPID_PRIVATE_KEY
         sync: false
-      - key: VAPID_SUBJECT
-        value: mailto:admin@example.com
+      - key: VAPID_SUBJECT           # mailto: address for the push service
+        sync: false
       - key: TAVILY_API_KEY
         sync: false
-      - key: FINN_TASK_TOKEN
+      - key: FINN_TASK_TOKEN         # for POST /tasks/ingest (cron-job.org)
+        sync: false
+      - key: FINN_FLAGS              # optional, e.g. "web_push=1"
         sync: false
       - key: APP_TZ
         value: Asia/Kolkata
