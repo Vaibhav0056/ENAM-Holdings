@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FINN</title>
 <meta name="description" content="FINN: has anything happened that changes why I own this?">
-<meta name="theme-color" content="#0B0E13" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0A0C0B" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#F7F8FA" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/static/icons/icon-192.png">
@@ -105,7 +105,7 @@
   <main>
     <!-- ===== network states ===== -->
     <div class="mt12" x-show="net.waking || net.error" x-cloak>
-      <div class="notice" x-show="net.waking" role="status"><div class="row"><span class="spin"></span><span>Waking FINN up… the first request after a quiet spell takes up to 30 s.</span></div></div>
+      <div class="wake" x-show="net.waking" x-transition.opacity role="status" aria-label="Waking FINN up"><div class="mark-finn"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 32 L18 8 H25 L13 32 Z M19 32 L31 8 H38 L26 32 Z" fill="var(--accent)"/></svg>FINN</div></div>
       <div class="notice err" x-show="net.error && !net.waking" role="alert"><div class="row"><svg class="i s down"><use href="#i-alert"/></svg>
         <span class="grow" x-text="'Couldn\'t load: ' + net.error"></span><button class="btn quiet" @click="retry()">Retry</button></div></div>
     </div>
@@ -345,7 +345,7 @@
               <div class="eyebrow gal-h">Empty, caught up, error, stale, waking</div>
               <div class="card empty"><div class="mark"><svg class="i"><use href="#i-check"/></svg></div><h3>You're caught up</h3><p x-text="nextEvent()"></p></div>
               <div class="card empty mt12"><div class="mark n"><svg class="i"><use href="#i-bell"/></svg></div><h3>No alerts in this window</h3><p x-text="rulesLine()"></p></div>
-              <div class="notice mt12"><div class="row"><span class="spin"></span><span>Waking FINN up… the first request after a quiet spell takes up to 30 s.</span></div></div>
+              <div class="card mt12" style="display:grid;place-items:center;padding:24px"><div class="wake" style="position:static;background:none"><div class="mark-finn"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 32 L18 8 H25 L13 32 Z M19 32 L31 8 H38 L26 32 Z" fill="var(--accent)"/></svg>FINN</div></div></div>
               <div class="notice err"><div class="row"><svg class="i s down"><use href="#i-alert"/></svg><span class="grow">Couldn't load: 503</span><button class="btn quiet">Retry</button></div></div>
               <div class="notice warn">Showing the last copy: the server didn't answer just now.</div>
               <div class="row mt12"><span class="badge outline">Data updated 3h ago</span><span class="badge watch">Data updated 2d ago</span><span class="xs t2">freshness pill: amber only after 26h on a trading day</span></div>
@@ -706,7 +706,7 @@
                 <!-- two-period bars: cash quality / balance sheet -->
                 <template x-if="['cash_quality', 'balance_sheet'].includes(deep.data.recipe)">
                   <div>
-                    <p class="xs t2 mt4" x-text="deep.data.report + ' · ' + deep.data.basis + ' · ₹ crore'"></p>
+                    <p class="xs t2 keep mt4" x-text="deep.data.report + ' · ' + deep.data.basis + ' · ₹ crore'"></p>
                     <dl class="kv mt12"><template x-for="[k, v] in deepRows(deep.data.current)" :key="k">
                       <div style="display:contents"><dt x-text="label(k)"></dt><dd :class="v == null && 't2'" x-text="fmt(v)"></dd></div></template></dl>
                     <template x-for="(c, _k) in deep.data.current.checks || []" :key="_k"><div class="notice warn mt8" x-text="c"></div></template>
@@ -739,7 +739,7 @@
                 <!-- language diff -->
                 <template x-if="deep.data.recipe === 'language_diff'">
                   <div>
-                    <p class="xs t2 mt4" x-text="deep.data.older + ' → ' + deep.data.newer"></p>
+                    <p class="xs t2 keep mt4" x-text="deep.data.older + ' → ' + deep.data.newer"></p>
                     <div class="eyebrow mt12 up">Said now, not before</div>
                     <template x-for="(x, _k) in deep.data.new.slice(0, 3)" :key="_k"><div><div class="diff-new" x-text="clip(x.text, 220)"></div>
                       <button class="cite" @click="openEvidence(x.document_id, x.page, x.text)" x-text="x.call + ', page ' + x.page + ' →'"></button></div></template>
@@ -1039,7 +1039,7 @@
           <div>
             <h2 class="mt4" x-text="(evidence.title || 'Document') + ' · page ' + evidence.page"></h2>
             <div class="quote" x-show="evidence.quote" x-text="'“' + evidence.quote + '”'"></div>
-            <p class="xs t2" x-text="quoteOnPage() ? 'Quote found on this page ✓' : 'Quote not matched verbatim on this page: read the page text below.'"></p>
+            <p class="xs t2 keep" x-text="quoteOnPage() ? 'Quote found on this page ✓' : 'Quote not matched verbatim on this page: read the page text below.'"></p>
             <div class="page-text" x-html="highlight(evidence.text, evidence.quote)"></div>
             <a class="btn primary block mt12" :href="evidence.url + '#page=' + evidence.page" target="_blank" rel="noopener" x-show="evidence.url"><svg class="i s"><use href="#i-file"/></svg><span x-text="'Open PDF at page ' + evidence.page"></span></a>
           </div>

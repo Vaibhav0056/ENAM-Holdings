@@ -223,7 +223,7 @@
       + `<div class="ct-svg mt8">${render(spec)}</div>`
       + `<div class="inset mt8 xs ct-tip" hidden role="status" aria-live="polite"><span class="ct-tiptext"></span> <button class="cite ct-src" hidden></button> <a class="cite ct-link" hidden>Open filing →</a></div>`
       + table
-      + `<div class="row mt8"><span class="xs t2 grow">${esc(spec.note || "")}</span>`
+      + `<div class="row mt8"><span class="xs t2 grow"></span>`
       + (spec.table ? `<button type="button" class="btn quiet ct-toggle" aria-pressed="false">View as table</button>` : "") + `</div>`;
     el.replaceChildren(fig);
     const tip = fig.querySelector(".ct-tip"), src = fig.querySelector(".ct-src"), link = fig.querySelector(".ct-link");

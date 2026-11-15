@@ -344,12 +344,12 @@ function finn() {
     holdingStatus() { return this.holding?.timeline?.[0]?.status || "intact"; },
     lastPrice() { return this.holding?.prices?.at(-1)?.close ?? null; },
     holdingDay() {
-      const s = this.hc?.price?.x, p = this.holding?.prices || [];
-      if (s?.length) return `${this.dm(s[0])} – ${this.dm(s.at(-1))}`;
+      const p = this.holding?.prices || [];
       return p.length > 1 && p.at(-2).close ? +(100 * (p.at(-1).close / p.at(-2).close - 1)).toFixed(2) : null;
     },
     priceRange() {
-      const p = this.holding?.prices || [];
+      const s = this.hc?.price?.x, p = this.holding?.prices || [];
+      if (s?.length) return `${this.dm(s[0])} – ${this.dm(s.at(-1))}`;
       return p.length ? `${this.dm(p[0].date)} – ${this.dm(p.at(-1).date)}` : "";
     },
     kpi(m) { return KPI_LABEL[m] || m; },

@@ -3,12 +3,12 @@
    Colour carries meaning only: up/down = deltas and Intact/At risk, watch = Watch / low confidence,
    accent = links, active and primary. No shadows, no gradients: surfaces and 1px hairlines. */
 :root {
-  --bg: #0B0E13; --surface: #12161D; --surface-2: #1A2029; --border: #242B36;
-  --text: #E8ECF1; --text-2: #9AA4B2;
-  --accent: #2DD4BF; --accent-ink: #2DD4BF; --on-accent: #06201C;
+  --bg: #0A0C0B; --surface: #131716; --surface-2: #1B201F; --border: #232A28;
+  --text: #F2F5F3; --text-2: #9AA5A0;
+  --accent: #3DDC84; --accent-ink: #3DDC84; --on-accent: #04210F;
   --up: #22C55E; --down: #F43F5E; --watch: #F59E0B; --snooze: #64748B;
-  --r-card: 14px; --r-chip: 999px; --r-sheet: 20px; --r-s: 10px;
-  --pad: 16px; --cpad: 12px;
+  --r-card: 16px; --r-chip: 999px; --r-sheet: 20px; --r-s: 10px;
+  --pad: 16px; --cpad: 14px;
   --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --ease: cubic-bezier(.2, .8, .2, 1); --t: 180ms;
@@ -18,7 +18,7 @@
   :root:not([data-theme="dark"]) {
     --bg: #F7F8FA; --surface: #FFFFFF; --surface-2: #F0F2F5; --border: #DDE1E7;
     --text: #14181F; --text-2: #5B6573;
-    --accent: #0F9F8C; --accent-ink: #0B7465; --on-accent: #06201C;
+    --accent: #16A34A; --accent-ink: #15803D; --on-accent: #FFFFFF;
     --up: #15803D; --down: #BE123C; --watch: #B45309; --snooze: #64748B;
     color-scheme: light;
   }
@@ -26,7 +26,7 @@
 :root[data-theme="light"] {
   --bg: #F7F8FA; --surface: #FFFFFF; --surface-2: #F0F2F5; --border: #DDE1E7;
   --text: #14181F; --text-2: #5B6573;
-  --accent: #0F9F8C; --accent-ink: #0B7465; --on-accent: #06201C;
+  --accent: #16A34A; --accent-ink: #15803D; --on-accent: #FFFFFF;
   --up: #15803D; --down: #BE123C; --watch: #B45309; --snooze: #64748B;
   color-scheme: light;
 }
@@ -48,7 +48,7 @@ h1, h2, h3, p { margin: 0; }
 .i.s { width: 16px; height: 16px; }
 .t2 { color: var(--text-2); } .up { color: var(--up); } .down { color: var(--down); } .watch { color: var(--watch); }
 .acc { color: var(--accent-ink); }
-.eyebrow { font-size: 11px; line-height: 14px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); font-weight: 500; }
+.eyebrow { font-size: 15px; line-height: 20px; letter-spacing: 0; color: var(--text); font-weight: 700; }
 .small { font-size: 13px; line-height: 18px; } .xs { font-size: 12px; line-height: 16px; }
 .row { display: flex; align-items: center; gap: 8px; min-width: 0; } .wrap { flex-wrap: wrap; } .grow { flex: 1; min-width: 0; }
 .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -367,5 +367,19 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 
-@media (max-width: 380px) { .pulse { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 440px) { .pulse { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .strip { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+
+/* ---------- clean pass: section titles carry the screen; helper captions are dropped ---------- */
+p.xs.t2:not(.keep), .section-h .xs.t2, .fchart .row .xs.t2.grow { display: none; }
+h1 { font-weight: 800; letter-spacing: -.02em; }
+
+/* ---------- waking: the FINN mark breathes while the server wakes ---------- */
+.wake { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: var(--bg); }
+.wake .mark-finn { display: flex; align-items: center; gap: 10px; color: var(--text); font: 800 34px/1 var(--font);
+                   letter-spacing: .02em; animation: wake 1.4s var(--ease) infinite; }
+.wake .mark-finn svg { width: 40px; height: 40px; }
+@keyframes wake { 0%, 100% { opacity: .45; transform: scale(.96); } 50% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .wake .mark-finn { animation: none; } }
+.count { font-family: var(--font); font-variant-numeric: tabular-nums; }
+header .eyebrow, .top .eyebrow { font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-2); }
