@@ -83,7 +83,7 @@ def announcements_age() -> timedelta | None:
 
 
 _fresh_cache: dict = {}
-FRESH_TTL_S = 60
+FRESH_TTL_S = 90                  # the feed warmer refreshes it every 50 s
 
 
 def freshness() -> dict:

@@ -102,8 +102,19 @@ async def golden(page: Page, base: str) -> list[dict]:
     await step("Results card", A + ".openCardSheet(" + A + ".digest.attention.find(c => c.type === 'results' && c.payload && c.payload.ok))",
                A + ".cardDetail && document.querySelector('.sheet')")
     await step("Evidence", "(() => { const c = " + A + ".cardDetail, r = c.payload.table.find(r => r.found && r.page); "
-               + A + ".openEvidence(c.document_id, r.page, r.quote); })()", A + ".evidence && (" + A + ".evidence.text || " + A + ".evidence.error)")
+               + A + ".openEvidence(" + A + ".docOf(c), r.page, r.quote); })()", A + ".evidence && (" + A + ".evidence.text || " + A + ".evidence.error)")
     await step("Why am I seeing this", A + ".sheet = 'card'; " + A + ".openWhy(" + A + ".cardDetail)", A + ".sheet === 'why' && document.querySelector('.factor')")
+    # a review must stick: the undo toast once called its own undo on every re-render (a function-valued x-show)
+    await page.js(A + ".sheet = null")
+    cid = await page.js(A + ".digest.attention.find(c => !c.reviewed).id")
+    await step("Mark reviewed", f"{A}.review({A}.digest.attention.find(c => c.id === {cid}))",
+               f"{A}.digest.attention.find(c => c.id === {cid}).reviewed")
+    await asyncio.sleep(1.5)
+    stuck = await page.js(f"{A}.digest.attention.find(c => c.id === {cid}).reviewed")
+    server = await page.js(f"fetch('/api/v2/cards/{cid}').then(r => r.json()).then(c => c.reviewed)")
+    steps.append({"step": "Review still applied 1.5 s later (page and server)", "s": 1.5, "limit": None,
+                  "ok": bool(stuck and server), **({} if stuck and server else {"error": f"page {stuck}, server {server}"})})
+    await page.js(f"{A}.review({A}.digest.attention.find(c => c.id === {cid}), true)")     # leave the data as found
     await step("Holding", A + ".sheet = null; location.hash = '#holding/POLYCAB'",
                A + ".holding && " + A + ".holding.symbol === 'POLYCAB' && " + A + ".hc && document.querySelector('.chartbox')")
     await step("Research", "location.hash = '#research/POLYCAB'", A + ".rq.report && " + A + ".rc")

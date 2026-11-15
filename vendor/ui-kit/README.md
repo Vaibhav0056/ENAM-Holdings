@@ -2,7 +2,7 @@
 
 A curated set of free components for FINN's stack (HTML + Tailwind + Alpine.js). They're **raw building blocks**: restyle everything with the tokens in `docs/UI_BRIEF.md`. Never ship them with their default look.
 
-Put this folder at `vendor/ui-kit/` in the FINN repo.
+**What is kept in this repo:** this mapping and the three licences (`licenses/`). The raw snippet folders named below were used as reference during the UI pass and then removed to keep the repo small; FINN's implementation of each pattern lives in `static/app.css` (component classes on the teal tokens) and `static/index.html`, in plain CSS rather than Tailwind (see `docs/UI_BRIEF.md` §10).
 
 | Folder | Source | Licence | Notes |
 |---|---|---|---|

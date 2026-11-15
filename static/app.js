@@ -295,17 +295,22 @@ function finn() {
 
     // ---------- card sheet + evidence ----------
     openCardSheet(c) {
-      if (c.id > 0) return this.openCard(c.id);
-      this.cardDetail = c; this.sheet = "card";
+      // open at once with what the feed already has; the full detail (people, flags, document) fills in after
+      this.cardDetail = c; this.sheet = "card"; this.evidence = null;
+      if (c.id > 0) this.openCard(c.id, true);
     },
-    async openCard(id) {
-      this.sheet = "card"; this.cardDetail = null; this.evidence = null;
-      try { this.cardDetail = await this.api(`/api/v2/cards/${id}`); } catch (e) { this.sheet = null; this.net.error = null; this.say("Card not found"); }
+    async openCard(id, quiet = false) {
+      if (!quiet) { this.sheet = "card"; this.cardDetail = null; this.evidence = null; }
+      try {
+        const d = await this.api(`/api/v2/cards/${id}`);
+        if (this.sheet === "card" && (!this.cardDetail || this.cardDetail.id === id)) this.cardDetail = d;
+      } catch (e) { this.net.error = null; if (!quiet) { this.sheet = null; this.say("Card not found"); } }
     },
     closeSheet() {
       this.sheet = null; this.evidence = null;
       if (location.hash.startsWith("#card/")) history.replaceState(null, "", "#today");
     },
+    docOf(c) { return c?.document_id || c?.payload?.document_id || null; },   // feed cards carry it in the payload
     async openEvidence(docId, page, quote) {
       if (!docId || !page) return this.say("That page isn't stored for this source.");
       if (this.sheet && this.sheet !== "evidence") this.prevSheet = this.sheet;
@@ -339,7 +344,8 @@ function finn() {
     holdingStatus() { return this.holding?.timeline?.[0]?.status || "intact"; },
     lastPrice() { return this.holding?.prices?.at(-1)?.close ?? null; },
     holdingDay() {
-      const p = this.holding?.prices || [];
+      const s = this.hc?.price?.x, p = this.holding?.prices || [];
+      if (s?.length) return `${this.dm(s[0])} – ${this.dm(s.at(-1))}`;
       return p.length > 1 && p.at(-2).close ? +(100 * (p.at(-1).close / p.at(-2).close - 1)).toFixed(2) : null;
     },
     priceRange() {
@@ -431,8 +437,8 @@ function finn() {
     credLine() {
       const c = this.rq.report.credibility, vg = c.vagueness_pct != null ? ` · vagueness ${c.vagueness_pct}%` : "";
       return c.score != null
-        ? `credibility out of 100<br><span style="color:var(--text)">measured ${c.measured} of ${c.total}</span>${vg}`
-        : `not scored: fewer than ${c.min_measured} promises have matured<br><span style="color:var(--text)">measured ${c.measured} of ${c.total}</span>${vg}`;
+        ? `credibility out of 100<br><span style="color:var(--text)">${c.measured} of ${c.total} promises matured</span>${vg}`
+        : `needs ${c.min_measured} matured promises to score<br><span style="color:var(--text)">${c.measured} of ${c.total} promises matured so far</span>`;
     },
     strongEvidence(l) { return !!(l.actual || (l.also_said_in && l.also_said_in.length)); },
     actualLine(l) {
@@ -669,11 +675,16 @@ function finn() {
     },
     async removeHolding(h) {
       if (!confirm(`Remove ${h.symbol} from the portfolio? Its history is kept; adding it again restores it.`)) return;
+      const before = this.holdings;
+      if (this.pf.job?.symbol === h.symbol) {        // stop its add-job poller (it would re-list it) and close the card
+        clearInterval(this._pfT);
+        if (!this.pf.job.done) this.pf.job = { ...this.pf.job, done: true, error: "Removed while it was being added; onboarding stopped" };
+      }
+      this.holdings = (this.holdings || []).filter((x) => x.symbol !== h.symbol);     // optimistic
       try {
         await this.api(`/api/v2/portfolio/${h.symbol}`, { method: "DELETE" });
-        this.holdings = (this.holdings || []).filter((x) => x.symbol !== h.symbol);
         this.say(`${h.symbol} removed`, () => { this.pf.symbol = h.symbol; this.addHolding(); });
-      } catch (e) { this.say(this.net.error); this.net.error = null; }
+      } catch (e) { this.holdings = before; this.say(`Couldn't remove ${h.symbol}: ${this.net.error}`); this.net.error = null; }
     },
     async loadRules() { try { this.rules = (await this.api("/api/v2/rules")).rules; } catch (e) {} },
     async saveRule(r) {

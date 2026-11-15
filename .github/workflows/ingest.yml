@@ -51,4 +51,6 @@ jobs:
       # after the 22:00 IST run: up to 6 research reports a night (free-tier quota), resuming where it stopped
       - if: github.event.schedule == '30 16 * * *'
         run: python -m finn.precompute --limit 6
+      - if: github.event.schedule == '30 16 * * *'
+        run: python -m finn.precompute --showcase
       - run: python scripts/export_snapshot.py --check

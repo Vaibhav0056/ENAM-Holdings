@@ -108,7 +108,7 @@
   // ---- stacked bars (verdicts) ----
   const VERDICT = { delivered: "var(--up)", partial: "var(--watch)", missed: "var(--down)", pending: "color-mix(in srgb, var(--text-2) 55%, var(--surface-2))", unverifiable: "var(--border)" };
   function stacked(spec) {
-    const H = 170, top = 14, bot = 140, n = spec.x.length;
+    const n = spec.x.length, H = n > 24 && (spec.events || []).length ? 186 : 170, top = 14, bot = 140;
     const totals = spec.x.map((_, i) => spec.series.reduce((a, s) => a + (s.values[i] || 0), 0));
     const L = scale(totals, true, top, bot);
     let g = `<line class="grid" x1="0" x2="${W}" y1="${L.y(0)}" y2="${L.y(0)}"/>`;
@@ -158,7 +158,7 @@
       g += text(pts[hiI].x, pts[hiI].y - 6, "high " + fmt(s.values[hiI], s.unit), pts[hiI].x > W - 60 ? "end" : pts[hiI].x < 60 ? "start" : "middle", "lbl");
       const last = pts.filter(Boolean).pop();
       g += `<circle cx="${last.x.toFixed(1)}" cy="${last.y.toFixed(1)}" r="2.5" class="dot"/>`;
-      g += text(18, H - 14, short(spec.x[0]), "start") + text(W - 18, H - 14, short(spec.x[n - 1]), "end");
+      g += text(18, H - 4, short(spec.x[0]), "start") + text(W - 18, H - 4, short(spec.x[n - 1]), "end");
       (spec.events || []).forEach((e, k) => {
         const x = xpos(n, e.i), y = bot + 8 + (k % 2) * 7;
         const c = { results: "var(--accent)", mgmt: "var(--watch)", governance: "var(--down)" }[e.kind] || "var(--text-2)";

@@ -1,6 +1,8 @@
 """v2 HTTP routes (Postgres). Mounted into api.py; the Step 1-8 routes keep serving until the UI moves over."""
 from __future__ import annotations
 
+import re
+
 import time
 from collections import defaultdict, deque
 
@@ -142,12 +144,18 @@ def alerts_list(limit: int = 100):
         older = s.scalar(_select(func.count()).select_from(Alert).where(Alert.status == "active", Alert.read.is_(False),
                                                                        Alert.triggered_on < week))
         return (unread, older), [{"id": a.id, "kind": kind, "symbol": sym, "date": a.triggered_on.isoformat(),
-                         "title": a.title, "line": a.line.split(" · also: ")[0], "link": a.deep_link,
+                         "title": a.title, "line": _flat(a.line.split(" · also: ")[0]), "link": a.deep_link,
                          "filing_id": a.filing_id, "read": a.read, "also": (a.detail or {}).get("also") or [],
                          "created_at": to_ist(a.created_at).isoformat()} for a, kind, sym in rows]
     (unread, older), items = read_session_run(q)
     # The badge counts unread alerts from the last 7 days; older unread ones stay listed under their dates.
     return {"alerts": items, "unread": unread, "unread_older": older}
+
+
+
+def _flat(text: str) -> str:
+    """'Director (designated as Executive Director))' reads badly: fold one nested bracket into the outer one."""
+    return re.sub(r"\(([^()]*)\(([^()]*)\)\)", lambda m: f"({m[1].strip()}, {m[2]})", text or "")
 
 
 @router.post("/api/v2/alerts/{alert_id}/read")

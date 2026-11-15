@@ -64,7 +64,7 @@ def test_hit_rate_and_drift_from_a_report():
            "drift": [{"metric": "capex", "horizon": "FY27", "mid_unit": "₹ crore",
                       "steps": [{"from": "Q1 FY27", "to": "Q2 FY27", "change": "raised", "before_mid": 1400.0, "after_mid": 1600.0}]}]}
     h = charts.hit_rate_chart(rep)
-    assert h["x"] == ["Q1 FY27", "Q2 FY27"] and h["title"].startswith("1 of 2 measurable promises delivered; 2 still pending")
+    assert h["x"] == ["Q1 FY27", "Q2 FY27"] and h["title"].startswith("1 of 2 matured promises delivered; 2 not yet due")
     d = charts.drift_chart(rep)
     assert d["kind"] == "step" and d["series"][0]["values"] == [1400.0, 1600.0] and "raised" in d["title"]
 

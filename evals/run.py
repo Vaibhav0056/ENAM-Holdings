@@ -27,7 +27,7 @@ def main() -> int:
     rows.append(("results (10 hand-read statements)", f"exact match ({r['cells']} cells)",
                  f"{r['exact_match']:.0%}" if r["exact_match"] is not None else "n/a", "≥ 90%", (r["exact_match"] or 0) >= 0.9))
     rows.append(("results (10 hand-read statements)", "unit errors", str(r["unit_errors"]), "0", r["unit_errors"] == 0))
-    rows.append(("results (10 hand-read statements)", "scanned PDFs shown as not extracted", r["scanned_pdfs_abstained"],
+    rows.append(("results (10 hand-read statements)", "scanned PDFs: no FINN-read figures shown", r["scanned_pdfs_abstained"],
                  "all", r["scanned_pdfs_abstained"].split("/")[0] == r["scanned_pdfs_abstained"].split("/")[1]))
     g = guidance_eval.run(verbose=False)
     if "error" in g:

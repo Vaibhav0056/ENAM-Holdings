@@ -33,7 +33,9 @@ def run(verbose: bool = True) -> dict:
         p = live.get(g["filing_id"], {})
         if g.get("status") == "unparseable":
             abstain_total += 1
-            honest_abstentions += int(not p.get("ok"))
+            # honest = FINN shows none of its own figures from a scan: either nothing, or BSE's own figures,
+            # labelled as BSE's (step 4 of the final pass)
+            honest_abstentions += int(not p.get("ok") or bool(p.get("from_bse_summary")))
             continue
         if p.get("basis") and g.get("basis") and p["basis"] != g["basis"]:
             basis_mismatch.append((g["symbol"], g["basis"], p["basis"]))
@@ -60,7 +62,7 @@ def run(verbose: bool = True) -> dict:
     if verbose:
         print(f"Results eval: {out['filings']} filings, {cells} cells")
         print(f"  exact match {out['exact_match']:.1%} (target ≥ 90%)   unit errors {unit_errors} (target 0)")
-        print(f"  scanned PDFs that honestly show no numbers: {out['scanned_pdfs_abstained']}")
+        print(f"  scanned PDFs showing no figures read by FINN: {out['scanned_pdfs_abstained']}")
         for b in basis_mismatch:
             print("  basis differs from gold:", b)
         for m in misses:

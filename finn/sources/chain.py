@@ -315,10 +315,10 @@ health_cache: dict = {}
 
 
 def health() -> list[dict]:
-    """Per-source status, cached for 30 s (an ingest run clears it when it finishes)."""
+    """Per-source status, cached for 90 s (the feed warmer refreshes it every 50 s; an ingest run clears it)."""
     import time as _t
     hit = health_cache.get("v")
-    if hit and _t.time() - hit[0] < 30:
+    if hit and _t.time() - hit[0] < 90:
         return hit[1]
     out = _health()
     health_cache["v"] = (_t.time(), out)

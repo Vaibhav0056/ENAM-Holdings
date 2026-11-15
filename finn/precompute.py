@@ -7,6 +7,7 @@ the 22:00 IST ingest (GitHub Actions), or by hand:
     python -m finn.precompute                # holdings first, then the large caps below
     python -m finn.precompute --limit 3      # at most 3 reports this run
     python -m finn.precompute --deep POLYCAB # all deep dives for one company
+    python -m finn.precompute --showcase     # deep dives for the showcase set (cached ones return at once)
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ from sqlalchemy import select
 
 log = logging.getLogger("finn.precompute")
 MAX_AGE = timedelta(days=7)
+SHOWCASE = ["BAJFINANCE", "DIXON", "CAMS", "POLYCAB", "DMART", "SUNPHARMA"]   # docs/build-log.md, step 6
 LARGE_CAPS = ["RELIANCE", "INFY", "ICICIBANK", "HINDUNILVR", "BHARTIARTL", "ITC", "SBIN", "KOTAKBANK", "AXISBANK", "ULTRACEMCO"]
 
 
@@ -105,6 +107,9 @@ def deep_all(symbol: str) -> dict:
 
 def main(argv: list[str]) -> int:
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(name)s %(message)s")
+    if "--showcase" in argv:
+        print(json.dumps({s: deep_all(s) for s in SHOWCASE}, indent=1))
+        return 0
     if "--deep" in argv:
         print(json.dumps(deep_all(argv[argv.index("--deep") + 1].upper()), indent=1))
         return 0

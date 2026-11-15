@@ -305,9 +305,11 @@ def price_chart(company_id: int, symbol: str, days: int = 365) -> dict | None:
         events.append({"i": i, "kind": {"results": "results", "mgmt_change": "mgmt", "governance": "governance"}[typ],
                        "label": (head or typ)[:90], "link": f"#card/{fid}", "date": d.isoformat()})
     chg = _pct(vals[-1], vals[0])
+    counts = [(sum(e['kind'] == k for e in events), n) for k, n in
+              (("results", "results (R)"), ("mgmt", "management (M)"), ("governance", "governance (G)"))]
+    marked = [f"{c} {n}" for c, n in counts if c]
     title = (f"{symbol}: {'up' if chg >= 0 else 'down'} {abs(chg):.1f}% since {px[0][0]:%d %b %Y}"
-             f"; {sum(e['kind'] == 'results' for e in events)} results, {sum(e['kind'] == 'mgmt' for e in events)} management"
-             f" and {sum(e['kind'] == 'governance' for e in events)} governance filings marked")
+             + (f"; filings marked: {', '.join(marked)}" if marked else ""))
     series = [{"name": "Close", "values": vals, "as": "line", "axis": "left", "unit": "₹"}]
     monthly = [i for i in range(len(xs)) if i == 0 or xs[i][:7] != xs[i - 1][:7]] + [len(xs) - 1]
     return {"id": f"price-{symbol}", "kind": "price", "title": title, "unit": "₹", "x": xs, "series": series,
@@ -336,8 +338,10 @@ def hit_rate_chart(report: dict) -> dict | None:
                "verdict": v} for v, name in order]
     measured = sum(by[k][v] for k in keys for v in ("delivered", "partial", "missed"))
     delivered = sum(by[k]["delivered"] for k in keys)
-    title = (f"{delivered} of {measured} measurable promises delivered" if measured else
-             "No promise has reached its deadline yet") + f"; {sum(by[k]['pending'] for k in keys)} still pending"
+    pending = sum(by[k]['pending'] for k in keys)
+    vague = sum(by[k]['unverifiable'] for k in keys)
+    title = (f"{delivered} of {measured} matured promises delivered" if measured else
+             "No promise has reached its deadline yet") + f"; {pending} not yet due, {vague} too vague to check"
     return {"id": f"hits-{report.get('symbol')}", "kind": "stacked", "title": title, "unit": "promises", "x": keys,
             "series": series, "summary": f"{title}. " + "; ".join(
                 f"{k}: " + ", ".join(f"{by[k][v]} {name.lower()}" for v, name in order if by[k][v]) for k in keys),

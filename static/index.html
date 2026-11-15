@@ -411,7 +411,7 @@
             <div class="row"><span class="eyebrow grow">Thesis</span>
               <span class="badge" :class="holdingStatus()"><svg class="i" x-show="holdingStatus()==='intact'"><use href="#i-check"/></svg>
                 <svg class="i" x-show="holdingStatus()!=='intact'"><use href="#i-alert"/></svg><span x-text="status(holdingStatus())"></span></span></div>
-            <p class="xs t2 mt4" x-show="holding.timeline[0]?.reason" x-text="holding.timeline[0]?.reason"></p>
+            <p class="xs t2 mt4" x-show="holding.timeline[0]?.reason" x-text="'Why: ' + clip(holding.timeline[0]?.reason, 90)"></p>
             <template x-if="!editing && holding.thesis">
               <div>
                 <p class="mt8" x-text="holding.thesis.statement"></p>
@@ -551,7 +551,7 @@
         <button class="btn primary" type="submit">Research</button>
       </form>
       <div class="strip" x-show="recent.length || holdings">
-        <template x-for="s in recent" :key="'r' + s"><a class="chip" :href="'#research/' + s"><svg class="i s"><use href="#i-clock"/></svg><span x-text="s"></span></a></template>
+        <template x-for="s in recent.filter((x) => x !== param)" :key="'r' + s"><a class="chip" :href="'#research/' + s"><svg class="i s"><use href="#i-clock"/></svg><span x-text="s"></span></a></template>
         <template x-for="h in (param ? [] : (holdings || []).filter(h => !recent.includes(h.symbol)).slice(0, 8))" :key="'h' + h.symbol"><a class="chip" :href="'#research/' + h.symbol" x-text="h.symbol"></a></template>
       </div>
       <template x-if="!param">
@@ -590,7 +590,7 @@
             <div class="eyebrow">Management credibility</div>
             <div class="row mt8" style="align-items:flex-end; gap:12px">
               <div class="score" x-show="rq.report.credibility.score != null" x-text="rq.report.credibility.score"></div>
-              <div class="score" style="font-size:22px; white-space:nowrap" x-show="rq.report.credibility.score == null">Not scored</div>
+              <h3 style="white-space:nowrap; margin:0" x-show="rq.report.credibility.score == null">Not scored</h3>
               <div class="small t2" style="padding-bottom:4px" x-html="credLine()"></div>
             </div>
             <template x-if="rc?.hit_rate"><div class="mt12" x-init="FinnCharts.mount($el, rc.hit_rate)"></div></template>
@@ -971,7 +971,7 @@
                       <svg class="i s up" style="margin-top:1px"><use href="#i-check"/></svg><span class="t2" x-text="k"></span></div></template></div>
                 </template>
                 <div class="row wrap mt8"><template x-for="r in resultRows(cardDetail).filter(r => r.quote)" :key="'q' + r.metric">
-                  <button class="cite" @click="openEvidence(cardDetail.document_id, r.page, r.quote)" x-text="metricName(r.metric) + ' · p.' + r.page"></button></template></div>
+                  <button class="cite" @click="openEvidence(docOf(cardDetail), r.page, r.quote)" x-text="metricName(r.metric) + ' · p.' + r.page"></button></template></div>
               </div>
             </template>
             <template x-if="cardDetail.payload?.results_day?.comparisons?.length">
@@ -990,14 +990,14 @@
                   <div class="quote" x-show="p.profile_quote" x-text="p.profile_quote"></div>
                   <div class="quote" x-show="p.reason_quote" x-text="'Reason given: ' + p.reason_quote"></div>
                   <template x-if="p.web_bio"><div class="xs mt4">Bio: <span x-text="p.web_bio.text"></span> <a :href="p.web_bio.url" target="_blank" rel="noopener">Bio source</a></div></template>
-                  <button class="cite" x-show="p.page" @click="openEvidence(cardDetail.document_id, p.page, p.quote)" x-text="'Filing, page ' + p.page + ' →'"></button></div></template></div>
+                  <button class="cite" x-show="p.page" @click="openEvidence(docOf(cardDetail), p.page, p.quote)" x-text="'Filing, page ' + p.page + ' →'"></button></div></template></div>
             </template>
             <template x-if="flags(cardDetail).length">
               <div class="mt12"><div class="eyebrow">Governance flags</div>
                 <template x-for="(f, _k) in flags(cardDetail)" :key="_k"><div class="small mt8">
                   <span class="badge" :class="f.severity === 'high' ? 'gov' : 'watch'" x-text="f.kind.replace(/_/g, ' ')"></span> <span x-text="f.summary"></span>
                   <div class="quote" x-show="f.quote" x-text="clip(f.quote, 260)"></div>
-                  <button class="cite" x-show="f.page" @click="openEvidence(cardDetail.document_id, f.page, f.quote)" x-text="'Filing, page ' + f.page + ' →'"></button></div></template></div>
+                  <button class="cite" x-show="f.page" @click="openEvidence(docOf(cardDetail), f.page, f.quote)" x-text="'Filing, page ' + f.page + ' →'"></button></div></template></div>
             </template>
             <template x-if="cardDetail.one_liner"><div class="mt12"><div class="eyebrow">Summary</div><p class="small mt4" x-text="cardDetail.one_liner"></p></div></template>
 
@@ -1180,7 +1180,7 @@
   <!-- toast -->
   <template x-if="toast">
     <div class="toast" role="status" aria-live="polite"><span x-text="toast"></span>
-      <button class="btn quiet" style="min-height:36px" x-show="toastUndo" @click="runUndo()">Undo</button></div>
+      <button class="btn quiet" style="min-height:36px" x-show="!!toastUndo" @click="runUndo()">Undo</button></div>
   </template>
 
   <!-- bottom tabs -->

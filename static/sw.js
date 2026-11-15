@@ -3,7 +3,7 @@
      (stale-while-revalidate), so the shell paints in well under 300 ms on repeat visits.
    - API data is never cached: stale financial data is worse than none. The page shows its own "stale" notice.
    - Web Push display + click-through to the alert's card. */
-const SHELL = "finn-shell-v5";
+const SHELL = "finn-shell-v7";
 const SHELL_URLS = ["/", "/static/app.css", "/static/app.js", "/static/charts.js", "/manifest.json", "/static/icons/icon-192.png",
                     "/static/vendor/alpine-3.14.8.min.js"];
 
