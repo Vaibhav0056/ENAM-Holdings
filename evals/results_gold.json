@@ -1,5 +1,5 @@
 {
- "about": "Hand-read from each results PDF's statement page (pdfplumber text, read independently of the extractor; scripts/show_results_rows.py prints the rows). Values exactly as printed, in the printed unit. Consolidated wherever the filing has it. label_source: claude-provisional; please spot-check against the PDFs.",
+ "about": "Hand-read from each results PDF's statement page (pdfplumber text, read independently of the extractor). Values exactly as printed, in the printed unit. Consolidated wherever the filing has it. label_source: claude-provisional; please spot-check against the PDFs.",
  "label_source": "claude-provisional",
  "filings": [
   {

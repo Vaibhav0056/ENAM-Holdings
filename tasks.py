@@ -3,8 +3,6 @@
   setup       migrate the database to the latest schema, then seed companies + alert rules
   migrate     alembic upgrade head
   seed        seed companies (data/companies.csv) and default alert rules
-  validate    re-validate the 25 tickers on yfinance + BSE (rewrites data/companies.csv)
-  probes      run every source probe and save the raw shapes to docs/probes/
   ingest      prices, filings, calendar, document links           (Phase 1)
   pipeline    classify -> score -> enrich -> thesis -> alerts -> notify (Phase 2+)
   serve       run the API + PWA on http://localhost:8000
@@ -44,20 +42,6 @@ def setup():
     seed()
 
 
-def validate():
-    run(PY, "scripts/validate_tickers.py")
-
-
-def probes():
-    out = ROOT / "docs" / "probes"
-    out.mkdir(parents=True, exist_ok=True)
-    for name, script, args in [("neon.txt", "scripts/probe_neon.py", []), ("bse.json", "scripts/probe_bse.py", []),
-                               ("yfinance.json", "scripts/probe_yfinance.py", []),
-                               ("screener.json", "scripts/probe_screener_docs.py", ["DIVISLAB", "CAMS", "KAYNES"]),
-                               ("gemini.txt", "scripts/probe_gemini.py", []), ("tavily.json", "scripts/probe_tavily.py", [])]:
-        print(f"-- {script} -> docs/probes/{name}", flush=True)
-        with (out / name).open("w", encoding="utf-8") as f:
-            subprocess.call([PY, script, *args], cwd=ROOT, env=ENV, stdout=f, stderr=subprocess.STDOUT)
 
 
 def ingest():
@@ -81,7 +65,7 @@ def evals():
     run(PY, "-m", "evals.run")
 
 
-TASKS = {f.__name__: f for f in (setup, migrate, seed, validate, probes, ingest, pipeline, serve, test, evals)}
+TASKS = {f.__name__: f for f in (setup, migrate, seed, ingest, pipeline, serve, test, evals)}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in TASKS:

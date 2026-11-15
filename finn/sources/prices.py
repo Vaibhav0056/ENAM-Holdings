@@ -1,6 +1,6 @@
 """Daily bars from yfinance for every company plus the NIFTY 50 index (market leg for relative moves).
 
-Probed (docs/probes/yfinance.json): download() returns MultiIndex columns (field, ticker) and naive dates.
+Note: download() returns MultiIndex columns (field, ticker) and naive dates.
 Both raw close and adjusted close are stored: alerts use adjusted prices so dividends and splits don't look like moves.
 """
 from __future__ import annotations

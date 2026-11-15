@@ -21,7 +21,7 @@ from sqlalchemy import select
 
 log = logging.getLogger("finn.precompute")
 MAX_AGE = timedelta(days=7)
-SHOWCASE = ["BAJFINANCE", "DIXON", "CAMS", "POLYCAB", "DMART", "SUNPHARMA"]   # docs/build-log.md, step 6
+SHOWCASE = ["BAJFINANCE", "DIXON", "CAMS", "POLYCAB", "DMART", "SUNPHARMA"]   # the demo showcase, rebuilt nightly
 LARGE_CAPS = ["RELIANCE", "INFY", "ICICIBANK", "HINDUNILVR", "BHARTIARTL", "ITC", "SBIN", "KOTAKBANK", "AXISBANK", "ULTRACEMCO"]
 
 

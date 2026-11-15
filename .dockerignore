@@ -11,6 +11,5 @@ node_modules
 data/pdfs
 data/*.sqlite
 data/*.log
-docs/probes
 evals/copilot_results.json
 tests

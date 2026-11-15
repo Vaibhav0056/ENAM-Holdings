@@ -1,9 +1,0 @@
-connect+first query s: 1.45
-version: PostgreSQL 18.6 (ac70818) on aarch64-unknown-linux-gnu
-database: neondb
-available extensions: [('pg_trgm', '1.6'), ('vector', '0.8.6')]
-vector installed: 0.8.6
-tsvector: False
-vector op: 1.0
-existing tables: ['alembic_version', 'actuals', 'alerts', 'alert_rules', 'enrichments', 'extractions', 'feedback', 'companies', 'llm_cache', 'llm_calls', 'llm_quota', 'push_subscriptions', 'user_state', 'calendar_events', 'documents', 'ingest_runs', 'prices', 'reports', 'theses', 'journal', 'promises', 'research_jobs', 'thesis_status', 'ledger_rows', 'pages', 'chunks', 'filings']
-warm query s: 0.303

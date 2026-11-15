@@ -1,4 +1,4 @@
-/* FINN · teal style (docs/UI_BRIEF.md §3, docs/ui/reference-teal.html).
+/* FINN · teal style.
    Tokens once, on :root. Component classes restyle Pines / HyperUI / TailAdmin patterns (MIT, vendor/ui-kit).
    Colour carries meaning only: up/down = deltas and Intact/At risk, watch = Watch / low confidence,
    accent = links, active and primary. No shadows, no gradients: surfaces and 1px hairlines. */

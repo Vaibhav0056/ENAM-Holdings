@@ -1,4 +1,4 @@
-"""Catalysts calendar from BSE (probed: docs/probes/bse.json).
+"""Catalysts calendar from BSE.
 
 - resultCalendar(from, to) -> scrip_Code, meeting_date "11 Nov 2026": the board meeting that approves results.
 - actions(from, to) -> scrip_code, Purpose, Ex_date, RD_Date: dividends, bonus, splits, buybacks, AGM book closures.

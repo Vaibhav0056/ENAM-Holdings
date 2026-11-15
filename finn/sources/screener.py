@@ -1,4 +1,4 @@
-"""Document links from screener.in's Documents section (probed: docs/probes/screener.json).
+"""Document links from screener.in's Documents section.
 
 Only links are taken from screener.in; every PDF itself is a primary source (BSE or the company's own site).
 `.concalls li` rows carry a "Transcript" link; `.annual-reports li a` link annual reports. BSE's

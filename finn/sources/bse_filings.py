@@ -1,4 +1,4 @@
-"""BSE corporate announcements via the `bse` library (probed: docs/probes/bse.json).
+"""BSE corporate announcements via the `bse` library.
 
 announcements(scripcode, from_date, to_date, page_no) -> {"Table": rows, "Table1": [{"ROWCNT": n}]}.
 DissemDT is IST wall-clock time without a zone; it is stored as UTC.

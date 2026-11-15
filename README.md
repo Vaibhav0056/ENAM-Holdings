@@ -72,7 +72,11 @@ Measured locally (India → Neon Singapore, free Gemini tier), November 2026.
 | Cold research report, 5 unseen tickers | 67-102 s (4 of 5 under 90 s; the slow one shows "taking longer than usual") |
 | One cold research report | 14-20 model calls, ≈ $0.024-0.032 at list price (the free tier bills $0) |
 | A scheduled ingest run | ~105 s (BSE for 25 companies, prices, events, pipeline) |
-| Lighthouse (mobile) | not re-measured after this UI pass; steps in `docs/build-log.md`, step 7 |
+| Lighthouse (mobile) | not re-measured after this UI pass (see below) |
+
+**Running Lighthouse.** Start FINN, open it in a Chrome incognito window at `/#today`, then DevTools (F12) → Lighthouse →
+Mode: Navigation, Device: Mobile, Categories: Performance and Accessibility → Analyze page load. Repeat for
+`/#holding/POLYCAB` and `/#research/POLYCAB`. Targets: Performance ≥ 90, Accessibility ≥ 95.
 
 ## Decisions and trade-offs
 
@@ -152,5 +156,4 @@ finn/llm/              router (fallbacks, cache, budget) + versioned prompts
 static/                PWA: index.html, app.js, charts.js, app.css, sw.js, vendor/alpine
 evals/                 labelled sets and scorers
 tests/                 unit tests, fixtures, e2e golden path
-docs/                  build log, UI brief and quality checklist, UI screenshots
 ```
