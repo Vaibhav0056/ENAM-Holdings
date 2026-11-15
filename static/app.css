@@ -406,4 +406,5 @@ header .eyebrow, .top .eyebrow { font-size: 12px; line-height: 16px; font-weight
 .lnk, .go { display: inline-flex; align-items: center; gap: 4px; }
 .tile .dot { top: 42px; right: 8px; } .tile .s { padding-right: 10px; }
 .bio { border-left: 2px solid var(--accent); padding-left: 10px; }
+.card.tap { cursor: pointer; } .card.tap:hover { background: var(--surface-2); } .card.tap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .person.tap { cursor: pointer; border-radius: var(--r-s); } .person.tap:hover { background: var(--surface-2); }

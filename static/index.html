@@ -150,7 +150,9 @@
                 <div class="swipe" x-init="gesture($el, c)">
                   <div class="reveal r"><span class="row"><svg class="i s"><use href="/static/icons.svg#check"/></svg>Reviewed</span></div>
                   <div class="reveal l"><span class="row">Snooze until tomorrow<svg class="i s"><use href="/static/icons.svg#clock"/></svg></span></div>
-                  <article class="card" :class="c.reviewed && 'reviewed'" @contextmenu.prevent="openMenu(c)">
+                  <article class="card tap" :class="c.reviewed && 'reviewed'" @contextmenu.prevent="openMenu(c)"
+                           role="button" tabindex="0" :aria-label="'Open ' + c.symbol + ': ' + headline(c)"
+                           @click="openCardSheet(c)" @keydown.enter.self="openCardSheet(c)" @keydown.space.self.prevent="openCardSheet(c)">
                     <div class="meta">
                       <span class="sym" x-text="c.symbol"></span>
                       <span class="badge gov" x-show="isGov(c)">GOVERNANCE</span>
@@ -192,7 +194,7 @@
                     <template x-if="c.payload?.people?.length">
                       <div>
                         <template x-for="(p, _k) in c.payload.people.slice(0, 2)" :key="_k">
-                          <div class="person tap" role="button" tabindex="0" @click="openCardSheet(c)" @keydown.enter="openCardSheet(c)"
+                          <div class="person tap" role="button" tabindex="0" @click.stop="openCardSheet(c)" @keydown.enter.stop="openCardSheet(c)"
                                :aria-label="'More about ' + p.name">
                             <span class="dir" :class="isIn(p) ? 'in' : 'out'" x-text="isIn(p) ? 'IN' : 'OUT'"></span>
                             <span class="avatar" aria-hidden="true" x-text="initials(p.name)"></span>
@@ -219,10 +221,10 @@
                     <p class="oneliner clamp2" x-show="showOneLiner(c)" x-text="c.one_liner"></p>
 
                     <div class="foot">
-                      <button class="lnk" @click="openCardSheet(c)"><svg class="i s"><use href="/static/icons.svg#quote"/></svg>Evidence</button>
-                      <a class="mut" :href="c.pdf_url" target="_blank" rel="noopener" x-show="c.pdf_url">Filing<svg class="i s"><use href="/static/icons.svg#external-link"/></svg></a>
-                      <button class="mut" @click="openMenu(c)" aria-label="More actions"><svg class="i"><use href="/static/icons.svg#i-more"/></svg></button>
-                      <button class="go" @click="nav('#research/' + c.symbol)">Dig deeper<svg class="i s"><use href="/static/icons.svg#arrow-right"/></svg></button>
+                      <button class="lnk" @click.stop="openCardSheet(c)"><svg class="i s"><use href="/static/icons.svg#quote"/></svg>Evidence</button>
+                      <a class="mut" :href="c.pdf_url" target="_blank" rel="noopener" x-show="c.pdf_url" @click.stop>Filing<svg class="i s"><use href="/static/icons.svg#external-link"/></svg></a>
+                      <button class="mut" @click.stop="openMenu(c)" aria-label="More actions"><svg class="i"><use href="/static/icons.svg#i-more"/></svg></button>
+                      <button class="go" @click.stop="nav('#research/' + c.symbol)">Dig deeper<svg class="i s"><use href="/static/icons.svg#arrow-right"/></svg></button>
                     </div>
                   </article>
                 </div>
