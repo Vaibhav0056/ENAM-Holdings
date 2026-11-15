@@ -2,6 +2,8 @@
 evidence pages and user state. Reads use the fast read path."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
@@ -35,7 +37,7 @@ def holdings():
                                     Enrichment.reviewed_at.is_(None)).group_by(Filing.company_id)).all())
         last = defaultdict(list)
         for cid, c in s.execute(select(Price.company_id, Price.adj_close)
-                                .where(Price.date >= datetime.now().date() - timedelta(days=10)).order_by(Price.date)):
+                                .where(Price.date >= datetime.now().date() - timedelta(days=30)).order_by(Price.date)):
             if cid:
                 last[cid].append(c)
         out = []
@@ -45,11 +47,29 @@ def holdings():
                         "status": st.status if st else "intact", "reason": st.reason if st else None,
                         "close": px[-1] if px else None,
                         "day_pct": round((px[-1] / px[-2] - 1) * 100, 2) if len(px) >= 2 and px[-2] else None,
-                        "unreviewed_attention_7d": att.get(c.id, 0)})
+                        "unreviewed_attention_7d": att.get(c.id, 0),
+                        "spark": [round(x, 2) for x in px if x is not None]})
         order = {"at_risk": 0, "watch": 1, "intact": 2}
         out.sort(key=lambda h: (order.get(h["status"], 3), -h["unreviewed_attention_7d"], h["symbol"]))
         return out
     return {"holdings": read_session_run(q)}
+
+
+LOGO_DIR = Path(__file__).resolve().parent.parent / "static" / "logos"
+LOGO_EXT = (".svg", ".png", ".webp")
+
+
+@router.get("/api/v2/logos")
+def logos():
+    """Bundled company logos (static/logos/<SYMBOL>.svg|png|webp). The UI shows a monogram for every other symbol."""
+    files = {}
+    try:
+        for f in sorted(LOGO_DIR.iterdir()):
+            if f.suffix.lower() in LOGO_EXT and f.stem.upper() not in files:
+                files[f.stem.upper()] = f"/static/logos/{f.name}"
+    except OSError:
+        pass
+    return {"files": files}
 
 
 _holding_cache: dict[str, tuple[float, dict]] = {}

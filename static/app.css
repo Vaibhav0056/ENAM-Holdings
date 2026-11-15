@@ -44,7 +44,7 @@ button:disabled { opacity: .5; cursor: default; }
 h1, h2, h3, p { margin: 0; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .i.s { width: 16px; height: 16px; }
 .t2 { color: var(--text-2); } .up { color: var(--up); } .down { color: var(--down); } .watch { color: var(--watch); }
 .acc { color: var(--accent-ink); }
@@ -383,3 +383,25 @@ h1 { font-weight: 800; letter-spacing: -.02em; }
 @media (prefers-reduced-motion: reduce) { .wake .mark-finn { animation: none; } }
 .count { font-family: var(--font); font-variant-numeric: tabular-nums; }
 header .eyebrow, .top .eyebrow { font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-2); }
+
+/* ---------- visual polish: logos, sparklines, delta bars, credibility ring ---------- */
+.i.l { width: 24px; height: 24px; }
+.logo { flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; overflow: hidden;
+        font: 700 11px/1 var(--font); letter-spacing: .02em; }
+.logo.sm { width: 24px; height: 24px; border-radius: 7px; font-size: 10px; }
+.logo img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
+.tile .logo + .grow .s { display: block; }
+.mspark { display: block; flex: none; overflow: visible; }
+.mspark path { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.mspark path.up { stroke: var(--up); } .mspark path.down { stroke: var(--down); }
+.tile .mspark { width: 100%; height: 18px; margin-top: 6px; }
+.li .mspark { width: 56px; height: 20px; margin: 4px 0 0 auto; }
+.tile-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.tile .s { margin-top: 6px; }
+.dbar { display: inline-block; height: 6px; border-radius: 2px; background: currentColor; opacity: .7; margin-right: 4px; vertical-align: 1px; }
+.ring { flex: none; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 3.2; }
+.ring-bg { stroke: var(--surface-2); } .ring-fg { stroke: var(--accent); stroke-linecap: round; }
+.badge .i.s, .lnk .i.s, .go .i.s { width: 16px; height: 16px; }
+.lnk, .go { display: inline-flex; align-items: center; gap: 4px; }
+.tile .dot { top: 42px; right: 8px; } .tile .s { padding-right: 10px; }

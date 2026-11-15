@@ -34,7 +34,7 @@ function finn() {
     win: store("finn.window") || "24h", custom: { from: "", to: "" }, pick: false,
     digest: null, catalysts: [], catalystsLoaded: false, routineOpen: false, worthAll: false,
     holdings: null, holding: null, editing: false, draft: null, appState: null,
-    alerts: null, unread: 0, unreadOlder: 0, rules: null, alertsAll: false,
+    logos: {}, alerts: null, unread: 0, unreadOlder: 0, rules: null, alertsAll: false,
     rq: { ticker: "", job: null, report: null, stage: null, progress: 0, stages: [], error: null, open: {}, st: {}, dur: {}, t0: 0 },
     rtab: "ledger", recent: store("finn.recent") || [], tick: Date.now(),
     sheet: null, prevSheet: null, cardDetail: null, evidence: null, whyCard: null, menuCard: null,
@@ -52,6 +52,7 @@ function finn() {
     init() {
       const q = new URLSearchParams(location.search).get("theme");
       if (q === "light" || q === "dark") this.theme = q; else this.applyTheme();
+      this.loadLogos();
       window.addEventListener("hashchange", () => this.go());
       window.addEventListener("finn-evidence", (e) => this.openEvidence(e.detail.document_id, e.detail.page, e.detail.quote));
       this.api("/api/v2/flags").then((f) => (this.featureFlags = f)).catch(() => { this.net.error = null; });
@@ -334,6 +335,7 @@ function finn() {
     },
 
     // ---------- Holdings ----------
+    loadLogos() { fetch("/api/v2/logos").then((r) => (r.ok ? r.json() : {})).then((d) => { this.logos = d.files || {}; }).catch(() => {}); },
     async loadHoldings() { try { this.holdings = (await this.api("/api/v2/holdings")).holdings; } catch (e) {} },
     async loadHolding(sym) {
       this.holding = null; this.editing = false; this.hc = null;
@@ -607,7 +609,43 @@ function finn() {
       }
       return g;
     },
-    alertIcon(k) { return { volume_spike: "#i-vol", price_move: "#i-trend", announcement_type: "#i-file", new_promise: "#i-list", peer_read_across: "#i-users" }[k] || "#i-bell"; },
+    alertIcon(a) {
+      const t = (a.title || "").split(": ").slice(1).join(": "), k = a.kind || "";
+      if (k === "volume_spike") return this.ic("activity");
+      if (k === "price_move") return this.ic(/ down /.test(" " + t + " ") ? "trending-down" : "trending-up");
+      if (k === "peer_read_across") return this.ic("git-compare");
+      if (k.includes("promise")) return this.ic("flag");
+      if (/insolven/i.test(t)) return this.ic("alert-triangle");
+      return this.ic({ Results: "bar-chart-3", "Management change": "user-round", "Mgmt change": "user-round",
+                       Governance: "scale", "M&A": "handshake" }[t] || "file-text");
+    },
+    ic(n) { return "/static/icons.svg#" + n; },
+    statusIcon(s) { return this.ic({ intact: "shield-check", watch: "eye", at_risk: "shield-alert" }[s] || "shield-check"); },
+    verdictIcon(v) { return this.ic({ delivered: "check", partial: "minus", missed: "x", pending: "clock", unverifiable: "help-circle" }[v] || "help-circle"); },
+    // company logos: a bundled file from static/logos/ when one exists, else a monogram tile
+    mono(sym) { return String(sym || "?").replace(/[^A-Z0-9]/gi, "").slice(0, 2).toUpperCase() || "?"; },
+    logoSrc(sym) { return (this.logos || {})[String(sym || "").toUpperCase()] || null; },
+    logoStyle(sym) {
+      if (this.logoSrc(sym)) return "background:#F2F4F3";
+      let x = 0; for (const ch of String(sym || "")) x = (x * 31 + ch.charCodeAt(0)) >>> 0;
+      return `background:hsl(${x % 360} 30% 30%);color:#fff`;
+    },
+    nameOf(sym) { return (this.holdings || []).find((h) => h.symbol === sym)?.name || sym; },
+    // 30-day sparkline path; nothing is drawn below 5 points
+    sparkPath(v, w, hgt) {
+      v = (v || []).filter((x) => x != null); if (v.length < 5) return "";
+      const lo = Math.min(...v), hi = Math.max(...v), r = hi - lo || 1;
+      return v.map((y, i) => (i ? "L" : "M") + (i * (w - 2) / (v.length - 1) + 1).toFixed(1) + " " + (hgt - 1 - (y - lo) / r * (hgt - 2)).toFixed(1)).join(" ");
+    },
+    sparkCls(v) { v = v || []; return v.length && v.at(-1) >= v[0] ? "up" : "down"; },
+    sparkLabel(sym, v) { v = v || []; if (v.length < 5) return ""; const c = (v.at(-1) / v[0] - 1) * 100;
+      return `${sym} 30-day price trend: ${c >= 0 ? "up" : "down"} ${Math.abs(c).toFixed(1)}%`; },
+    // tiny QoQ / YoY bars, scaled to the largest change on the same card (decoration; the number stays as text)
+    dbar(c, v) {
+      if (v == null) return "display:none";
+      const m = Math.max(1, ...this.resultRows(c).flatMap((r) => [Math.abs(r.qoq || 0), Math.abs(r.yoy || 0)]));
+      return `width:${Math.max(2, Math.round(16 * Math.abs(v) / m))}px`;
+    },
     async openAlert(a) {
       if (!a.read) {
         a.read = true;
