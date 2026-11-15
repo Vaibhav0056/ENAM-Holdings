@@ -41,6 +41,8 @@ def lookup(path: str, query: dict) -> dict | None:
         return d["catalysts"]
     if path.startswith("/api/v2/research/") and path.count("/") == 4:
         return d["research"].get(path.rsplit("/", 1)[-1].upper())
+    if path == "/api/v2/journal":
+        return {"entries": []}
     return None
 
 

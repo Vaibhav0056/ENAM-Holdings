@@ -142,9 +142,23 @@ def _last_checked():
 _warmer_started = False
 
 
+FULL_REWARM_S = 1800.0   # rebuild at least this often even if nothing changed, so rolling windows don't drift far
+
+
+def _fingerprint():
+    """A few bytes that change whenever the feed would: a new filing, or an enrichment written or reviewed."""
+    from sqlalchemy import func
+    with session() as s:
+        return s.scalar(select(func.max(Filing.id))), s.scalar(select(func.max(Enrichment.updated_at)))
+
+
 def start_warmer(interval: float = 50.0):
     """Keep the standard windows precomputed in this process, so a request almost never pays for a query
-    (the feed's p95 target is 300 ms and one Neon round trip from India is ~85 ms)."""
+    (the feed's p95 target is 300 ms and one Neon round trip from India is ~85 ms).
+
+    Network transfer: each cycle runs one tiny fingerprint query. The full rebuild (four feed windows plus every
+    holding's page and charts) runs only when the fingerprint changes or every FULL_REWARM_S; otherwise the cached
+    windows are just kept alive. Rebuilding every 50 s used up Neon's 5 GB/month free transfer."""
     global _warmer_started
     if _warmer_started:
         return
@@ -152,7 +166,27 @@ def start_warmer(interval: float = 50.0):
 
     def loop():
         import logging
+        last_fp, last_full = None, float("-inf")
         while True:
+            try:
+                fp = _fingerprint()
+            except Exception as e:  # noqa: BLE001
+                logging.getLogger("finn.digest").warning("warm-up check failed: %s", e)
+                time.sleep(interval)
+                continue
+            with _lock:
+                have_all = all(("preset", None, False, w) in _cache for w in PRESETS)
+                if fp == last_fp and have_all and time.monotonic() - last_full < FULL_REWARM_S:
+                    now = time.monotonic()
+                    for k in [k for k in _cache if k[0] == "preset"]:
+                        _cache[k] = (now, _cache[k][1])
+                    fresh = True
+                else:
+                    fresh = False
+            if fresh:
+                time.sleep(interval)
+                continue
+            last_fp, last_full = fp, time.monotonic()
             for w in ("24h", "3d", "7d", "30d"):
                 try:
                     with _lock:
