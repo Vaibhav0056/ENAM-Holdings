@@ -192,11 +192,12 @@
                     <template x-if="c.payload?.people?.length">
                       <div>
                         <template x-for="(p, _k) in c.payload.people.slice(0, 2)" :key="_k">
-                          <div class="person">
+                          <div class="person tap" role="button" tabindex="0" @click="openCardSheet(c)" @keydown.enter="openCardSheet(c)"
+                               :aria-label="'More about ' + p.name">
                             <span class="dir" :class="isIn(p) ? 'in' : 'out'" x-text="isIn(p) ? 'IN' : 'OUT'"></span>
                             <span class="avatar" aria-hidden="true" x-text="initials(p.name)"></span>
                             <div class="grow"><div class="small trunc" style="font-weight:600" x-text="p.name"></div>
-                              <div class="xs t2 trunc" x-text="(p.role || 'Role not in filing') + (p.effective_date ? ' · effective ' + p.effective_date : '')"></div><div class="xs clamp2 mt4" x-show="p.web_bio" x-text="p.web_bio?.text"></div></div>
+                              <div class="xs t2 trunc" x-text="(p.role || 'Role not in filing') + (p.effective_date ? ' · effective ' + p.effective_date : '')"></div><div class="xs clamp2 mt4" x-show="p.web_bio" x-text="p.web_bio?.text"></div><div class="xs acc mt4" style="font-weight:600" x-show="p.web_bio">Read full background →</div></div>
                           </div>
                         </template>
                       </div>

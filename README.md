@@ -32,6 +32,35 @@ FINN is built around one idea: **a holding is a thesis, and a filing is evidence
 5. **Documents are data, not instructions.** Text inside a filing can never change FINN's behaviour.
 6. **Fail soft.** If a source is down, FINN shows the last good copy with a clear notice instead of an error.
 
+### System architecture at a glance
+
+```
+ Filings (BSE/NSE) · Prices · Earnings calls · Annual reports
+                          │
+                          ▼
+   Ingest: fallback chain per source, circuit breakers, validate, never delete
+                          │
+                          ▼
+   Specialised agents, all through one model router
+   triage · results · people (+ web bio) · governance · thesis · promises
+   analyst · devil's advocate · deep dives · copilot
+                          │
+                          ▼
+   Verify: quote matches its page, every number is in the sources
+                          │
+                          ▼
+   Python computes: QoQ/YoY, margins, credibility, guidance drift, alert rules
+                          │
+                          ▼
+   You: Today feed · Alerts + push · Research · Ask
+```
+
+- **One way in for data:** every source has a fallback chain and a circuit breaker; rows are validated and never deleted.
+- **One way to the model:** every agent goes through the router (tier per task, cache, timeout, fallback, cost log).
+- **Small, single-purpose agents:** each reads one kind of document and returns a strict schema; cheap models read, a strong model only writes over verified data.
+- **Verify before showing:** quotes must match their page, numbers must appear in the sources, or the item is dropped.
+- **Code computes, agents describe:** every figure on screen is calculated in Python, never by a model.
+
 ## 3. Push: FINN watches for you
 
 ### Today: an inbox you can finish
