@@ -1,5 +1,5 @@
 # Render Blueprint: one web service on Render's native Python runtime, in Singapore (close to Neon ap-southeast-1
-# and to Indian users). The Dockerfile in the repo is an optional alternative; this blueprint does not use it.
+# and to Indian users).
 #
 # Free plan: the instance sleeps when idle. The web service never runs long jobs: GitHub Actions
 # (.github/workflows/ingest.yml) runs ingest -> pipeline -> alerts at 08:00, 16:30, 19:00 and 22:00 IST against Neon,
