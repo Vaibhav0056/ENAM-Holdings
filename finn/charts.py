@@ -482,7 +482,27 @@ def company(symbol: str) -> Company | None:
     return read_session_run(q)
 
 
+_bundle_cache: dict[str, tuple[float, dict]] = {}
+BUNDLE_TTL_S = 900
+
+
+def invalidate() -> None:
+    """Called at the end of every pipeline run: new filings or prices change the charts."""
+    _bundle_cache.clear()
+
+
 def holding_bundle(symbol: str) -> dict:
+    import time as _t
+    hit = _bundle_cache.get(symbol.upper())
+    if hit and _t.time() - hit[0] < BUNDLE_TTL_S:
+        return hit[1]
+    out = _holding_bundle(symbol)
+    if out:
+        _bundle_cache[symbol.upper()] = (_t.time(), out)
+    return out
+
+
+def _holding_bundle(symbol: str) -> dict:
     from .models import Thesis
     c = company(symbol)
     if not c:

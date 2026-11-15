@@ -311,7 +311,21 @@ def snapshot_step(companies) -> dict:
     return {"refreshed": len(due) - len(failed), "failed": failed[:20]}
 
 
+health_cache: dict = {}
+
+
 def health() -> list[dict]:
+    """Per-source status, cached for 30 s (an ingest run clears it when it finishes)."""
+    import time as _t
+    hit = health_cache.get("v")
+    if hit and _t.time() - hit[0] < 30:
+        return hit[1]
+    out = _health()
+    health_cache["v"] = (_t.time(), out)
+    return out
+
+
+def _health() -> list[dict]:
     with session() as s:
         def iso(x):
             return aware(x).isoformat(timespec="seconds") if x else None

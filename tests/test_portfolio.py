@@ -24,7 +24,7 @@ def test_invalid_tickers_are_rejected_with_a_reason(pf):
     portfolio, onboarded = pf
     job = portfolio.add("NOTREAL")
     assert job["done"] and "not on NSE's list" in job["error"] and onboarded == []
-    assert "Enter an NSE symbol" in portfolio.add("bad symbol!")["error"]
+    assert "Enter an NSE symbol" in portfolio.add("bad symbol!")["error"]       # rejected before any network call
 
 
 def test_add_saves_the_holding_and_starts_onboarding(pf):
@@ -83,3 +83,51 @@ def test_ingest_skips_removed_companies(sqldb):
         s.add_all([Company(nse_symbol="AAA", name="A", is_portfolio=True, status="ok"),
                    Company(nse_symbol="BBB", name="B", is_portfolio=False, status="removed")])
     assert [c.nse_symbol for c in ingest.companies()] == ["AAA"]
+
+
+
+def test_removing_during_onboarding_stops_it(sqldb, monkeypatch):
+    """Run 1 of the golden path: a research peer added, then removed while its ticker was still being checked; the
+    check finished afterwards and made it a holding again."""
+    from finn import portfolio
+    from finn.database import session
+    from finn.models import Company
+    portfolio.JOBS.clear()
+    with session() as s:
+        s.add(Company(nse_symbol="HAVELLS", name="Havells", is_portfolio=False, status="ok"))
+
+    def validate_while_user_removes(sym):
+        portfolio.remove(sym)                         # the user taps remove before the check returns
+        return {"symbol": sym, "name": "Havells", "isin": "INE0", "yahoo_symbol": f"{sym}.NS", "bse_code": None}
+    monkeypatch.setattr(portfolio, "validate", validate_while_user_removes)
+    monkeypatch.setattr("threading.Thread.start", lambda self: self._target(*self._args))
+    job = portfolio.add("HAVELLS")
+    assert job["done"] and "Removed" in job["error"]
+    with session() as s:
+        c = s.query(Company).filter_by(nse_symbol="HAVELLS").one()
+        assert not c.is_portfolio and c.status == "removed"     # stays removed
+
+
+def test_feature_flags_defaults_and_overrides(monkeypatch):
+    from finn import flags
+    monkeypatch.delenv("FINN_FLAGS", raising=False)
+    f = flags.all_flags()
+    assert f["charts"] and f["research"] and not f["web_push"] and not f["audio_brief"]
+    monkeypatch.setenv("FINN_FLAGS", "web_push=1, copilot=0, nonsense=1")
+    f = flags.all_flags()
+    assert f["web_push"] and not f["copilot"] and "nonsense" not in f
+    assert {r["feature"] for r in flags.table()} == set(flags.FEATURES)
+
+
+
+def test_removing_a_research_peer_keeps_it_tracked(sqldb):
+    from finn import portfolio
+    from finn.database import session
+    from finn.models import Company
+    with session() as s:
+        s.add(Company(id=1, nse_symbol="POLYCAB", name="Polycab", is_portfolio=True))
+        s.add(Company(id=2, nse_symbol="HAVELLS", name="Havells", is_portfolio=True, peer_of=1))
+    portfolio.remove("HAVELLS")
+    with session() as s:
+        h = s.get(Company, 2)
+        assert not h.is_portfolio and h.status == "ok"          # still ingested as POLYCAB's peer

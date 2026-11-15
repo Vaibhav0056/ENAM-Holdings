@@ -82,7 +82,21 @@ def announcements_age() -> timedelta | None:
     return datetime.now(timezone.utc) - last if last else None
 
 
+_fresh_cache: dict = {}
+FRESH_TTL_S = 60
+
+
 def freshness() -> dict:
+    """Cached for a minute (it only changes when a run finishes, which clears it)."""
+    hit = _fresh_cache.get("v")
+    if hit and time.time() - hit[0] < FRESH_TTL_S:
+        return hit[1]
+    out = _freshness()
+    _fresh_cache["v"] = (time.time(), out)
+    return out
+
+
+def _freshness() -> dict:
     """'Data updated Xh ago': the last time any announcement source succeeded. Amber (stale) only when that is more
     than 26 h ago on a trading day; quiet weekends and holidays are not stale."""
     from .fiscal import IST, is_trading_day
@@ -135,6 +149,9 @@ def run(days: int = LOOKBACK_DAYS, trigger: str = "manual", pipeline: bool = Tru
         finally:
             out["seconds"] = round(time.time() - t0, 1)
             state.update(running=False, last=out)
+            _fresh_cache.clear()
+            from .sources import chain as _chain
+            _chain.health_cache.clear()
         return out
 
 

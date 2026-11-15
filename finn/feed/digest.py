@@ -161,6 +161,13 @@ def start_warmer(interval: float = 50.0):
                     digest(w)
                 except Exception as e:  # noqa: BLE001 - a failed warm-up just means the next request queries
                     logging.getLogger("finn.digest").warning("warm-up failed for %s: %s", w, e)
+            try:   # each holding's page and charts, so the first tap on a holding is never a cold query
+                from .. import charts, web_ui
+                for h in web_ui.holdings()["holdings"]:
+                    web_ui.holding(h["symbol"])
+                    charts.holding_bundle(h["symbol"])
+            except Exception as e:  # noqa: BLE001
+                logging.getLogger("finn.digest").warning("holding warm-up failed: %s", e)
             time.sleep(interval)
     threading.Thread(target=loop, daemon=True, name="digest-warmer").start()
 

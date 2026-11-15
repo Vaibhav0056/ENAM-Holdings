@@ -29,7 +29,7 @@ from ..models import Chunk, Company, Document, LLMCall, Page, Report
 from . import maths
 
 log = logging.getLogger("finn.deep")
-TTL = timedelta(hours=24)
+TTL = timedelta(days=float(__import__('os').getenv('REPORT_TTL_DAYS', '7')))   # same inputs as the report: quarterly
 RECIPES = ["cash_quality", "language_diff", "hedge_meter", "dodge_detector", "balance_sheet", "worry_map",
            "fine_print", "peer_compare"]
 TITLES = {"cash_quality": "Cash quality", "language_diff": "Language diff", "hedge_meter": "Hedge-meter",
@@ -38,7 +38,11 @@ TITLES = {"cash_quality": "Cash quality", "language_diff": "Language diff", "hed
 
 
 class NeedsResearch(RuntimeError):
-    pass
+    """A deep dive that this company's documents cannot support yet (a designed state, not an error). `research`
+    lists symbols whose research report would make it possible."""
+    def __init__(self, message: str, research: list[str] | None = None):
+        super().__init__(message)
+        self.research = research or []
 
 
 # ---------- documents ----------
@@ -367,7 +371,8 @@ def peer_compare(c: Company, budget: str) -> dict:
     a, b = cached_report(c.nse_symbol), cached_report(peer_sym)
     missing = [s for s, r in ((c.nse_symbol, a), (peer_sym, b)) if not r]
     if missing:
-        raise NeedsResearch(f"open the research for {' and '.join(missing)} first (reports are compared, not re-read)")
+        raise NeedsResearch(f"Peer compare reads both companies' research reports; {' and '.join(missing)} "
+                            f"{'has' if len(missing) == 1 else 'have'} none yet", research=list(missing))
     return {**maths.compare_ledgers(a, b), "peer": peer_sym}
 
 

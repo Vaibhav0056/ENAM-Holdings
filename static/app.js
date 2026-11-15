@@ -45,6 +45,7 @@ function finn() {
     gal: { digest: null, sw: true, sl: 2.0, tab: "Ledger" },
     hc: null, rc: null, ac: {}, gc: null,           // chart specs: holding, research, alerts, gallery
     pf: { symbol: "", busy: false, job: null },      // add-a-holding form and its onboarding job
+    featureFlags: null,                             // GET /api/v2/flags (finn/flags.py)
     ruleTypes: ["results", "mgmt_change", "governance", "m_and_a", "fundraise", "order_win", "credit_rating", "litigation_regulatory", "insider_pledge"],
     deepRecipes: DEEP,
 
@@ -53,9 +54,12 @@ function finn() {
       if (q === "light" || q === "dark") this.theme = q; else this.applyTheme();
       window.addEventListener("hashchange", () => this.go());
       window.addEventListener("finn-evidence", (e) => this.openEvidence(e.detail.document_id, e.detail.page, e.detail.quote));
+      this.api("/api/v2/flags").then((f) => (this.featureFlags = f)).catch(() => { this.net.error = null; });
       this.go();
       this.loadAlerts(true);
       setInterval(() => { if (this.rq.job && !this.rq.report) this.tick = Date.now(); }, 1000);
+      // warm the browser's number and date formatters once, while idle, so the first chart is not the one to pay
+      (window.requestIdleCallback || setTimeout)(() => { try { (1234.5).toLocaleString("en-IN"); new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short" }); window.FinnCharts && FinnCharts.render({ kind: "spark", x: ["a", "b"], series: [{ name: "w", values: [1, 2], as: "line", unit: "" }] }); } catch (e) {} });
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("/sw.js").catch(() => {});
         navigator.serviceWorker.addEventListener("message", (e) => {
@@ -63,6 +67,9 @@ function finn() {
         });
       }
     },
+
+    // until the flags arrive, assume only the features that ship off are off (no flash of a hidden feature)
+    flag(name) { return this.featureFlags ? !!this.featureFlags[name] : !["audio_brief", "web_push"].includes(name); },
 
     // ---------- plumbing ----------
     async api(path, opts = {}) {
@@ -325,7 +332,8 @@ function finn() {
     async loadHoldings() { try { this.holdings = (await this.api("/api/v2/holdings")).holdings; } catch (e) {} },
     async loadHolding(sym) {
       this.holding = null; this.editing = false; this.hc = null;
-      this.api(`/api/v2/charts/holding/${sym}`).then((c) => { if (this.param === sym) this.hc = c; }).catch(() => { this.net.error = null; });
+      if (this.flag("charts")) this.api(`/api/v2/charts/holding/${sym}`).then((c) => { if (this.param === sym) this.hc = c; }).catch(() => { this.net.error = null; });
+      else this.hc = { kpis: [] };
       try { this.holding = await this.api(`/api/v2/holdings/${sym}`); this.loadJournal(sym); } catch (e) {}
     },
     holdingStatus() { return this.holding?.timeline?.[0]?.status || "intact"; },
@@ -451,6 +459,7 @@ function finn() {
     deep: { recipe: null, data: null, loading: false, error: null },
     async loadResearchCharts(sym) {
       this.rc = null;
+      if (!this.flag("charts")) return;
       try { this.rc = await this.api(`/api/v2/charts/research/${sym}`); } catch (e) { this.net.error = null; }
     },
     async openDeep(recipe) {
@@ -472,6 +481,7 @@ function finn() {
     deepName(r) { return (DEEP.find(([k]) => k === r) || [0, r])[1]; },
     deepFinding() {
       const d = this.deep.data, c = d.current || {};
+      if (d.unavailable) return "";
       switch (d.recipe) {
         case "results": return d.finding || "No verified results figures yet";
         case "cash_quality": return `Free cash flow ${this.cr(c.fcf)}` + (c.ocf_to_pat != null ? ` · OCF/PAT ${c.ocf_to_pat}` : "") + ` (${d.report})`;
@@ -625,7 +635,7 @@ function finn() {
                     : "Set thresholds in Settings.";
     },
     pushBanner() {
-      if (this.push.state === "on") return false;
+      if (this.push.state === "on" || !this.flag("web_push")) return false;
       if (this.isIOS && !this.standalone) return true;
       return this.push.supported && typeof Notification !== "undefined" && Notification.permission !== "granted";
     },

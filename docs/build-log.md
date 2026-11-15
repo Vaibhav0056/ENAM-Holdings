@@ -475,3 +475,89 @@ dives, company-wide-only guidance band, every kind rendered in Node without NaN 
 
 Tests: test_portfolio.py (invalid tickers rejected with a reason, add + onboarding started, remove keeps history,
 re-add restores, re-seeding never undoes a Settings change, ingest skips removed companies).
+
+
+## Final fix pass, step 6: demo hardening
+
+**Showcase report (15 Nov 2026).** Of the 27 companies, the holdings with a verified latest results card *and* a
+credibility score on 3 or more measured promises: BAJFINANCE (69, 6 measured), DIXON (60, 6), CAMS (100, 3).
+Proposed showcase: those three; POLYCAB (every deep dive with real findings, the management-target band, the unit
+bug caught); DMART and SUNPHARMA (8 of 8 quarters of verified results; Sun Pharma's consolidated statement recovered
+from OCR damage). Deep dives precomputed for BAJFINANCE: 7 of 8 (peer compare needs CHOLAFIN's report, and says so); DIXON and CAMS were still building at commit time (see step 8).
+
+**Precompute.** `python -m finn.precompute` builds research reports in priority order (holdings, then 10 large caps),
+skips reports younger than 7 days and stops cleanly when every model is out of today's free-tier quota; the next
+run carries on. GitHub Actions runs it after the 22:00 IST ingest, 6 reports a night. Built today: APOLLOHOSP,
+ASIANPAINT, CAMS, DEEPAKNTR, DIXON, DMART (67-190 s each, cold). The remaining 11 holdings and the large caps follow
+on later nights: the free tier cannot do all 35 in one day (CHEAP_MODEL ran out of its daily quota mid-afternoon;
+both strong models answered 503 "high demand" most of the day). Research and deep-dive caches now last 7 days
+(their inputs, transcripts and annual reports, change quarterly), not 24 h.
+
+**Cold research on 5 tickers FINN had never seen:**
+
+| Ticker | Total | Verdict stage | Model calls (failed) | Outcome |
+|---|---|---|---|---|
+| NESTLEIND | 102.2 s | 18.3 s | 14 (10 rate-limited) | complete; over 90 s, so the designed "taking longer than usual" state shows |
+| BRITANNIA | 77.7 s | 4.7 s | 20 (1) | complete; credibility 67 on 3 measured promises |
+| HCLTECH | 66.5 s | 6.5 s | 18 (3) | complete |
+| CIPLA | 77.6 s | 8.5 s | 20 (2) | complete |
+| VOLTAS | 75.6 s | 5.3 s | 20 (0) | complete |
+
+4 of 5 under 90 s; none showed an error. Synthesis ran on the cheap tier for all five (strong models out of quota or
+busy), which each receipt states.
+
+**Designed states instead of errors.**
+- A build over 90 s: "Taking longer than usual: the free model tier is busy right now. The report keeps building on
+  the server; you can leave and reopen it later, and the stages done so far are kept."
+- Transcripts that could not be read: "6 of 8 earnings-call transcripts could not be read (the publisher's website
+  refused the download); the ledger uses the 2 that could, and the annual reports." (APOLLOHOSP: its own website
+  answers 403 to transcript downloads.)
+- Raw errors never reach the page: report notes, source reasons, failed-job messages, copilot errors and deep-dive
+  failures all go through one `plain()` mapping ("the model service took too long to answer", "today's free model
+  quota is used up", ...). Before: "Counter-argument unavailable: devils_advocate: all strong-tier models failed:
+  504 DEADLINE_EXCEEDED. {'error': ..." and "403 Client Error: Forbidden for url: https://www.apollohospi..." were
+  on screen.
+- A deep dive the company's documents cannot support (no transcripts, one annual report, a peer without research)
+  returns its reason with what would unlock it ("Build HAVELLS research"), not HTTP 409.
+
+**Golden path** (`tests/e2e/golden_path.py`, Chrome over the DevTools protocol at 390 px): Today → results card →
+evidence → "Why am I seeing this?" → holding → research (POLYCAB) → all 9 deep dives → a copilot question → alerts →
+settings → add a company → remove it. Fails on any console error or uncaught exception and on any interaction over
+1 s (the copilot's model answer is timed but not limited; the sheet must open within 1 s). **5 of 5 runs passed**,
+slowest limited step 0.57-0.85 s, 0 console errors; copilot answers 3.4-5.2 s (warm), 79 s on the first, cold
+question; slowest chart render 7 ms.
+
+Getting there fixed real bugs:
+1. Alpine "Cannot read properties of undefined (reading 'after')" on Today and the card sheet: lists keyed by display
+   text (notes, checks, flags, people, catalysts...) had duplicate keys; 29 such lists now key by position.
+2. A race: removing a company while its ticker was still being checked let the check finish and make it a holding
+   again. Removal now cancels the onboarding job, which checks before every write (test reproduces the race).
+3. Adding a company held the request for ~6 s (NSE list, Yahoo, BSE list); the check now runs as the job's first
+   stage and the request returns at once.
+4. A null guard on the alerts list; `/health/data` (0.8-1.0 s), the holding page (0.65-0.74 s) and the chart
+   bundles now come from short caches cleared by every pipeline run (and by a thesis edit), and the feed warmer
+   pre-fills every holding's page and charts, so a first tap is never a cold query.
+5. The first page load in a fresh browser installs the service worker and fetches fonts; that is what Lighthouse
+   measures, so the golden path lets it settle before timing interactions, and the app warms its number and date
+   formatters at idle.
+
+**Feature flags** (`finn/flags.py`, `GET /api/v2/flags`, override with `FINN_FLAGS="web_push=1,copilot=0"`):
+
+| Flag | Default | Why |
+|---|---|---|
+| charts | on | golden-path tested; render < 50 ms |
+| research | on | golden-path tested; 7-day cache; precomputed |
+| deep_dives | on | golden-path tested on POLYCAB |
+| copilot | on | golden-path tested; answers are model calls and can take tens of seconds cold on the free tier |
+| portfolio_edit | on | golden-path tested, incl. removal during onboarding |
+| replay | on | API checked (2 s); its own button and loading state |
+| journal, card_feedback | on | unit-tested |
+| audio_brief | **off** | uses each device's speech engine; pronunciation of rupee figures not verified on real devices |
+| web_push | **off** | needs an installed PWA on a real phone; not verified end to end here (alerts still appear in the Alerts tab) |
+
+Placeholder data: none left in the app; the gallery renders real cards and real charts. "Verify" badges appear only
+for a warning or low confidence (step 4).
+
+Late fix: a feature-flag state named `flags` shadowed the card's `flags()` method (caught by the golden path); removing a company that is a configured research peer now keeps it tracked as a peer.
+
+Tests: 239 passed.

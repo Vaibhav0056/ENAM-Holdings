@@ -21,6 +21,9 @@ def run(rescore_all: bool = False) -> dict:
     try:
         from .feed import digest
         digest.invalidate()
+        from . import charts, web_ui
+        charts.invalidate()
+        web_ui.invalidate()
     except Exception:  # noqa: BLE001
         pass
     out["seconds"] = round(time.time() - t0, 1)

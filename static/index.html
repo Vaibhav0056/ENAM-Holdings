@@ -67,7 +67,7 @@
         </div>
         <div class="row" style="margin-top:2px">
           <h1 class="grow">Today</h1>
-          <button class="pillbtn" @click="toggleBrief()" :aria-pressed="speaking" :aria-label="speaking ? 'Stop the audio brief' : 'Play a 60-second audio brief'">
+          <button class="pillbtn" x-show="flag('audio_brief')" @click="toggleBrief()" :aria-pressed="speaking" :aria-label="speaking ? 'Stop the audio brief' : 'Play a 60-second audio brief'">
             <svg class="i s"><use :href="speaking ? '#i-stop' : '#i-play'"/></svg><span x-text="speaking ? 'Stop' : 'Brief'"></span></button>
           <div class="dd" @click.outside="pick=false" @keydown.escape="pick=false">
             <button class="pillbtn fill" @click="pick=!pick" :aria-expanded="pick" aria-haspopup="menu" aria-label="Time window">
@@ -143,7 +143,7 @@
           </div>
           <!-- week-ahead strip -->
           <div class="strip" aria-label="Week ahead">
-            <template x-for="c in catalysts" :key="c.date + c.symbol + c.title">
+            <template x-for="(c, _k) in catalysts" :key="_k">
               <a class="chip" :href="'#holding/' + c.symbol"><b x-text="c.symbol"></b><span class="trunc" style="max-width:180px" x-text="c.title"></span><span x-text="'· ' + weekday(c.date)"></span></a>
             </template>
             <span class="chip" x-show="catalystsLoaded && !catalysts.length">No dated events in sources for the next 7 days</span>
@@ -223,7 +223,7 @@
                     <!-- management change: IN / OUT -->
                     <template x-if="c.payload?.people?.length">
                       <div>
-                        <template x-for="p in c.payload.people.slice(0, 2)" :key="p.name">
+                        <template x-for="(p, _k) in c.payload.people.slice(0, 2)" :key="_k">
                           <div class="person">
                             <span class="dir" :class="isIn(p) ? 'in' : 'out'" x-text="isIn(p) ? 'IN' : 'OUT'"></span>
                             <span class="avatar" aria-hidden="true" x-text="initials(p.name)"></span>
@@ -236,7 +236,7 @@
                     <!-- governance flags -->
                     <template x-if="!c.payload?.people?.length && flags(c).length">
                       <div class="mt8">
-                        <template x-for="f in flags(c).slice(0, 2)" :key="f.kind + f.summary">
+                        <template x-for="(f, _k) in flags(c).slice(0, 2)" :key="_k">
                           <div class="small"><span x-text="f.summary || f.kind.replace(/_/g, ' ')"></span>
                             <span class="t2" x-show="f.quote" x-text="' “' + clip(f.quote, 110) + '” · filing p.' + f.page"></span></div>
                         </template>
@@ -299,7 +299,7 @@
           <template x-if="route==='today'">
             <div class="row wrap mt16" style="justify-content:center">
               <button class="btn quiet small" x-show="snoozedCount()" @click="clearSnooze()" x-text="snoozedCount() + ' snoozed until tomorrow · show'"></button>
-              <button class="btn quiet small" @click="sheet='replay'"><svg class="i s"><use href="#i-replay"/></svg>Replay a past date</button>
+              <button class="btn quiet small" x-show="flag('replay')" @click="sheet='replay'"><svg class="i s"><use href="#i-replay"/></svg>Replay a past date</button>
               <button class="btn quiet small" @click="markChecked()">Mark as my last check</button>
             </div>
           </template>
@@ -420,7 +420,7 @@
                 <div class="eyebrow mt16">Numbers to watch</div>
                 <template x-if="holding.thesis.kpis.length">
                   <div class="mt8">
-                    <template x-for="k in holding.thesis.kpis" :key="k.metric + k.op + k.threshold">
+                    <template x-for="(k, _k) in holding.thesis.kpis" :key="_k">
                       <div class="kpi">
                         <div class="row small"><span class="grow" x-text="kpi(k.metric) + ' ' + (k.op === '>=' ? '≥' : '≤') + ' ' + k.threshold + '%'"></span>
                           <span class="num" :class="kpiRow(k)?.breached ? 'down' : kpiRow(k) ? 'up' : 't2'" x-text="kpiRow(k) ? kpiRow(k).value.toFixed(1) + '%' : 'Not in sources'"></span>
@@ -433,7 +433,7 @@
                 </template>
                 <p class="small t2 mt8" x-show="!holding.thesis.kpis.length">No checkable numbers yet: management gave no company-wide numeric targets. Add your own with Edit.</p>
                 <div class="eyebrow mt16">What would break it</div>
-                <template x-for="b in holding.thesis.breakers" :key="b.text"><p class="small mt4" x-text="'• ' + b.text"></p></template>
+                <template x-for="(b, _k) in holding.thesis.breakers" :key="_k"><p class="small mt4" x-text="'• ' + b.text"></p></template>
                 <p class="small t2 mt4" x-show="!holding.thesis.breakers.length">Not set.</p>
                 <button class="btn block mt12" @click="startEdit()"><svg class="i s"><use href="#i-pen"/></svg>Edit thesis</button>
               </div>
@@ -501,14 +501,14 @@
           <!-- coming up -->
           <div class="card mt12" x-show="holding.catalysts.length">
             <div class="eyebrow">Coming up</div>
-            <template x-for="e in holding.catalysts" :key="e.date + e.title"><div class="row small mt8"><span class="num t2" style="width:84px" x-text="day(e.date)"></span><span class="grow" x-text="e.title"></span></div></template>
+            <template x-for="(e, _k) in holding.catalysts" :key="_k"><div class="row small mt8"><span class="num t2" style="width:84px" x-text="day(e.date)"></span><span class="grow" x-text="e.title"></span></div></template>
           </div>
 
           <!-- status timeline -->
           <div class="card mt12" x-show="holding.timeline.length">
             <div class="eyebrow">Status timeline</div>
             <ul class="tl mt12">
-              <template x-for="t in holding.timeline.slice(0, 6)" :key="t.at">
+              <template x-for="(t, _k) in holding.timeline.slice(0, 6)" :key="_k">
                 <li><span class="node" :class="t.status"></span>
                   <div class="small"><b x-text="status(t.status)"></b> <span class="t2" x-text="'· ' + day(t.at)"></span></div>
                   <div class="xs t2 clamp2" x-text="t.reason"></div></li>
@@ -566,6 +566,9 @@
       <template x-if="param && !rq.report && !rq.error">
         <div class="card mt16">
           <div class="row"><span class="eyebrow grow" x-text="'Reading ' + param"></span><span class="xs t2 num" x-text="rqElapsed()"></span></div>
+          <div class="notice mt8" x-show="rq.t0 && tick - rq.t0 > 90000" role="status">Taking longer than usual: the free
+            model tier is busy right now. The report keeps building on the server; you can leave and reopen it later,
+            and the stages done so far are kept.</div>
           <ul class="steps mt8">
             <template x-for="(s, i) in (rq.stages.length ? rq.stages : ['Finding documents'])" :key="s">
               <li :class="stageState(s)"><span class="n"><template x-if="stageState(s)==='done'"><span>✓</span></template>
@@ -592,7 +595,7 @@
             </div>
             <template x-if="rc?.hit_rate"><div class="mt12" x-init="FinnCharts.mount($el, rc.hit_rate)"></div></template>
             <div class="row wrap mt12"><template x-for="[v, n] in verdictCounts()" :key="v"><span class="badge" :class="v" x-text="verdict(v) + ' ' + n"></span></template></div>
-            <template x-for="n in rq.report.notes" :key="n"><div class="notice warn mt8" x-text="n"></div></template>
+            <template x-for="(n, _k) in rq.report.notes" :key="_k"><div class="notice warn mt8" x-text="n"></div></template>
             <template x-if="rq.report.synthesis.credibility.length"><p class="small mt12" x-text="rq.report.synthesis.credibility[0].text"></p></template>
           </div>
 
@@ -600,7 +603,7 @@
           <div class="tabs-seg mt16" role="tablist" aria-label="Report sections">
             <button role="tab" :aria-selected="rtab==='ledger'" @click="rtab='ledger'">Ledger</button>
             <button role="tab" :aria-selected="rtab==='bull'" @click="rtab='bull'">Bull | Bear</button>
-            <button role="tab" :aria-selected="rtab==='deep'" @click="rtab='deep'">Go deeper</button>
+            <button role="tab" :aria-selected="rtab==='deep'" @click="rtab='deep'" x-show="flag('deep_dives')">Go deeper</button>
           </div>
 
           <!-- ledger -->
@@ -635,7 +638,7 @@
                 <template x-if="rc?.drift"><div class="mt8" x-init="FinnCharts.mount($el, rc.drift)"></div></template>
                 <template x-for="d in rq.report.drift.slice(0, 5)" :key="d.id">
                   <div class="small mt8"><b x-text="d.metric"></b> <span class="t2" x-text="d.horizon ? '(' + d.horizon + ')' : ''"></span>
-                    <template x-for="s in d.steps" :key="s.from + s.to"><div class="xs t2"><span class="badge" :class="s.change === 'raised' ? 'up' : s.change === 'cut' ? 'down' : 'outline'" x-text="s.change"></span>
+                    <template x-for="(s, _k) in d.steps" :key="_k"><div class="xs t2"><span class="badge" :class="s.change === 'raised' ? 'up' : s.change === 'cut' ? 'down' : 'outline'" x-text="s.change"></span>
                       <span x-text="' ' + s.before + ' → ' + s.after + ' (' + s.from + ' → ' + s.to + ')'"></span></div></template>
                     <span class="badge watch" x-show="d.dropped">No longer repeated</span></div>
                 </template>
@@ -649,12 +652,12 @@
                 <p class="small mt8" x-show="rq.report.snapshot.what_it_does" x-text="rq.report.snapshot.what_it_does?.text"></p>
                 <template x-if="segs().length">
                   <div><div class="segbar" role="img" :aria-label="segs().map(s => s.name + ' ' + s.share_pct + '%').join(', ')">
-                    <template x-for="s in segs()" :key="s.name"><span :style="'flex:' + s.share_pct"></span></template></div>
-                    <template x-for="s in segs()" :key="'l' + s.name"><div class="row xs mt4"><span class="grow trunc" x-text="s.name"></span><span class="num t2" x-text="s.share_pct + '%'"></span>
+                    <template x-for="(s, _k) in segs()" :key="_k"><span :style="'flex:' + s.share_pct"></span></template></div>
+                    <template x-for="(s, _k) in segs()" :key="_k"><div class="row xs mt4"><span class="grow trunc" x-text="s.name"></span><span class="num t2" x-text="s.share_pct + '%'"></span>
                       <button class="cite" style="min-height:24px" @click="openEvidence(s.doc_id, s.page, s.quote)" x-text="'p.' + s.page"></button></div></template></div>
                 </template>
                 <template x-if="rq.report.snapshot.risks?.length"><div class="mt12"><div class="eyebrow">Risks they name</div>
-                  <template x-for="r in rq.report.snapshot.risks.slice(0, 3)" :key="r.text"><p class="small t2 mt4" x-text="'• ' + r.text"></p></template></div></template>
+                  <template x-for="(r, _k) in rq.report.snapshot.risks.slice(0, 3)" :key="_k"><p class="small t2 mt4" x-text="'• ' + r.text"></p></template></div></template>
               </div>
             </template>
           </div>
@@ -664,24 +667,24 @@
             <div class="cols2 mt12">
               <div class="card"><div class="eyebrow up">Bull</div>
                 <template x-for="(b, i) in rq.report.synthesis.bull" :key="'b' + i"><p class="mt8"><span x-text="b.text"></span>
-                  <template x-for="e in (b.evidence || []).slice(0, 3)" :key="e"><sup class="ref" role="button" tabindex="0" @click="refOpen(e)" @keydown.enter="refOpen(e)" x-text="e"></sup></template></p></template>
+                  <template x-for="(e, _k) in (b.evidence || []).slice(0, 3)" :key="_k"><sup class="ref" role="button" tabindex="0" @click="refOpen(e)" @keydown.enter="refOpen(e)" x-text="e"></sup></template></p></template>
                 <p class="small t2 mt8" x-show="!rq.report.synthesis.bull.length">Not in sources.</p></div>
               <div class="card"><div class="eyebrow down">Bear</div>
                 <template x-for="(b, i) in rq.report.synthesis.bear" :key="'r' + i"><p class="mt8"><span x-text="b.text"></span>
-                  <template x-for="e in (b.evidence || []).slice(0, 3)" :key="e"><sup class="ref" role="button" tabindex="0" @click="refOpen(e)" @keydown.enter="refOpen(e)" x-text="e"></sup></template></p></template>
+                  <template x-for="(e, _k) in (b.evidence || []).slice(0, 3)" :key="_k"><sup class="ref" role="button" tabindex="0" @click="refOpen(e)" @keydown.enter="refOpen(e)" x-text="e"></sup></template></p></template>
                 <p class="small t2 mt8" x-show="!rq.report.synthesis.bear.length">Not in sources.</p></div>
             </div>
             <template x-if="rq.report.synthesis.devils_advocate.length">
               <div class="card mt12"><div class="eyebrow">Strongest counter-argument</div>
                 <template x-for="(b, i) in rq.report.synthesis.devils_advocate" :key="'d' + i"><p class="small mt8"><span x-text="b.text"></span>
-                  <template x-for="e in (b.evidence || []).slice(0, 3)" :key="e"><sup class="ref" role="button" tabindex="0" @click="refOpen(e)" @keydown.enter="refOpen(e)" x-text="e"></sup></template></p></template></div>
+                  <template x-for="(e, _k) in (b.evidence || []).slice(0, 3)" :key="_k"><sup class="ref" role="button" tabindex="0" @click="refOpen(e)" @keydown.enter="refOpen(e)" x-text="e"></sup></template></p></template></div>
             </template>
           </div>
 
           <!-- go deeper -->
           <div x-show="rtab==='deep'" role="tabpanel">
             <div class="deeps mt12">
-              <template x-for="[id, name] in deepRecipes" :key="id">
+              <template x-for="[id, name] in (flag('deep_dives') ? deepRecipes : [])" :key="id">
                 <button :aria-pressed="deep.recipe === id" @click="openDeep(id)">Go deeper ▸<b x-text="name"></b></button>
               </template>
             </div>
@@ -693,7 +696,12 @@
             <template x-if="deep.data">
               <div class="card mt12">
                 <div class="eyebrow" x-text="deepName(deep.data.recipe)"></div>
-                <p class="mt8" style="font-weight:600" x-text="deepFinding()"></p>
+                <template x-if="deep.data.unavailable">
+                  <div class="mt8"><p class="small t2" x-text="deep.data.unavailable + '.'"></p>
+                    <template x-for="sym in (deep.data.research || [])" :key="sym">
+                      <a class="btn mt8" :href="'#research/' + sym" x-text="'Build ' + sym + ' research'"></a></template></div>
+                </template>
+                <p class="mt8" style="font-weight:600" x-show="!deep.data.unavailable" x-text="deepFinding()"></p>
                 <template x-for="sp in (deep.data.charts || [])" :key="sp.id"><div class="mt12" x-init="FinnCharts.mount($el, sp)"></div></template>
                 <!-- two-period bars: cash quality / balance sheet -->
                 <template x-if="['cash_quality', 'balance_sheet'].includes(deep.data.recipe)">
@@ -701,7 +709,7 @@
                     <p class="xs t2 mt4" x-text="deep.data.report + ' · ' + deep.data.basis + ' · ₹ crore'"></p>
                     <dl class="kv mt12"><template x-for="[k, v] in deepRows(deep.data.current)" :key="k">
                       <div style="display:contents"><dt x-text="label(k)"></dt><dd :class="v == null && 't2'" x-text="fmt(v)"></dd></div></template></dl>
-                    <template x-for="c in deep.data.current.checks || []" :key="c"><div class="notice warn mt8" x-text="c"></div></template>
+                    <template x-for="(c, _k) in deep.data.current.checks || []" :key="_k"><div class="notice warn mt8" x-text="c"></div></template>
                     <div class="eyebrow mt12">Evidence</div>
                     <template x-for="[k, e] in Object.entries(deep.data.evidence?.current || {}).slice(0, 6)" :key="k">
                       <div class="row xs mt4"><span class="grow t2 trunc" x-text="label(k) + ': ' + e.as_printed"></span>
@@ -722,7 +730,7 @@
                       <div class="segbar" style="height:6px"><span :style="'flex:' + c.answered + '; background:var(--up)'"></span><span :style="'flex:' + c.partial + '; background:var(--watch)'"></span>
                         <span :style="'flex:' + c.deflected + '; background:var(--down)'"></span></div></div></template>
                     <div class="eyebrow mt12">Evidence</div>
-                    <template x-for="x in deep.data.flagged.slice(0, 4)" :key="x.question"><div class="mt8">
+                    <template x-for="(x, _k) in deep.data.flagged.slice(0, 4)" :key="_k"><div class="mt8">
                       <div class="xs"><span class="badge" :class="x.label === 'deflected' ? 'missed' : 'partial'" x-text="x.label"></span> <span class="t2" x-text="x.analyst + ' asked: ' + clip(x.question, 140)"></span></div>
                       <div class="quote" x-text="'“' + x.evidence + '”'"></div>
                       <button class="cite" @click="openEvidence(x.document_id, x.page, x.evidence)" x-text="(x.answered_by || 'Management') + ', ' + x.call + ', page ' + x.page + ' →'"></button></div></template>
@@ -733,10 +741,10 @@
                   <div>
                     <p class="xs t2 mt4" x-text="deep.data.older + ' → ' + deep.data.newer"></p>
                     <div class="eyebrow mt12 up">Said now, not before</div>
-                    <template x-for="x in deep.data.new.slice(0, 3)" :key="x.text"><div><div class="diff-new" x-text="clip(x.text, 220)"></div>
+                    <template x-for="(x, _k) in deep.data.new.slice(0, 3)" :key="_k"><div><div class="diff-new" x-text="clip(x.text, 220)"></div>
                       <button class="cite" @click="openEvidence(x.document_id, x.page, x.text)" x-text="x.call + ', page ' + x.page + ' →'"></button></div></template>
                     <div class="eyebrow mt12 down">Said before, not now</div>
-                    <template x-for="x in deep.data.dropped.slice(0, 3)" :key="x.text"><div><div class="diff-old" x-text="clip(x.text, 220)"></div>
+                    <template x-for="(x, _k) in deep.data.dropped.slice(0, 3)" :key="_k"><div><div class="diff-old" x-text="clip(x.text, 220)"></div>
                       <button class="cite" @click="openEvidence(x.document_id, x.page, x.text)" x-text="x.call + ', page ' + x.page + ' →'"></button></div></template>
                   </div>
                 </template>
@@ -749,7 +757,7 @@
                       <dt>New key audit matters</dt><dd x-text="deep.data.new_key_audit_matters.length"></dd>
                       <dt>Qualifications / emphasis</dt><dd x-text="deep.data.qualifications_or_emphasis.length"></dd></dl>
                     <template x-for="y in deep.data.years" :key="y.period"><details class="mt8 small"><summary class="t2" x-text="y.report + ': ' + y.items.length + ' items'"></summary>
-                      <template x-for="i in y.items" :key="i.kind + i.title + i.page"><div class="row xs mt4"><span class="grow t2" x-text="i.kind.replace(/_/g, ' ') + ': ' + i.title"></span>
+                      <template x-for="(i, _k) in y.items" :key="_k"><div class="row xs mt4"><span class="grow t2" x-text="i.kind.replace(/_/g, ' ') + ': ' + i.title"></span>
                         <button class="cite" @click="openEvidence(i.document_id, i.page, i.quote)" x-text="'p.' + i.page"></button></div></template></details></template>
                   </div>
                 </template>
@@ -766,7 +774,7 @@
                       </tbody></table>
                   </div>
                 </template>
-                <p class="receipt mt12" x-text="(deep.data.cached ? 'cached · ' : '') + deep.data.receipt.llm_calls + ' model calls · ' + deep.data.receipt.seconds + ' s' + (deep.data.method ? ' · ' + deep.data.method : '')"></p>
+                <p class="receipt mt12" x-show="deep.data.receipt" x-text="!deep.data.receipt ? '' : (deep.data.cached ? 'cached · ' : '') + deep.data.receipt.llm_calls + ' model calls · ' + deep.data.receipt.seconds + ' s' + (deep.data.method ? ' · ' + deep.data.method : '')"></p>
               </div>
             </template>
           </div>
@@ -832,7 +840,7 @@
           </div>
         </div>
       </template>
-      <button class="btn block mt12" x-show="(alerts || []).length > 30 && !alertsAll" @click="alertsAll = true" x-text="'Show ' + (alerts.length - 30) + ' older alerts'"></button>
+      <button class="btn block mt12" x-show="(alerts || []).length > 30 && !alertsAll" @click="alertsAll = true" x-text="'Show ' + ((alerts || []).length - 30) + ' older alerts'"></button>
     </section>
 
     <!-- ===================== Settings ===================== -->
@@ -857,15 +865,15 @@
         <button class="btn block mt8" @click="runPipeline()">Check for new alerts now</button>
       </div>
 
-      <div class="section-h"><span class="eyebrow">Notifications</span></div>
-      <div class="card">
+      <div class="section-h" x-show="flag('web_push')"><span class="eyebrow">Notifications</span></div>
+      <div class="card" x-show="flag('web_push')">
         <p class="small t2" x-show="isIOS && !standalone">On iPhone, web notifications work once FINN is on your Home Screen: Share → Add to Home Screen, open FINN from the icon, then enable here.</p>
         <div class="row"><button class="btn primary grow" @click="enablePush()">Enable notifications</button><button class="btn" @click="testPush()">Send a test</button></div>
         <p class="small mt8" x-show="push.msg" x-text="push.msg"></p>
       </div>
 
       <div class="section-h"><span class="eyebrow">Portfolio</span><span class="xs t2" x-text="(holdings || []).length + ' holdings'"></span></div>
-      <form class="search" @submit.prevent="addHolding()">
+      <form class="search" x-show="flag('portfolio_edit')" @submit.prevent="addHolding()">
         <label class="sr" for="addsym">NSE symbol to add</label>
         <input id="addsym" type="search" x-model="pf.symbol" placeholder="Add a holding, e.g. HAVELLS" autocapitalize="characters" autocomplete="off" enterkeyhint="go">
         <button class="btn primary" type="submit" :disabled="pf.busy">Add</button>
@@ -880,7 +888,7 @@
                 <template x-if="pfStage(i)==='now'"><span class="spin"></span></template><template x-if="!pfStage(i)"><span x-text="i + 1"></span></template></span><span x-text="s"></span></li>
             </template>
           </ul>
-          <template x-for="l in pf.job.log" :key="l"><p class="xs t2 mt4" x-text="l"></p></template>
+          <template x-for="(l, _k) in pf.job.log" :key="_k"><p class="xs t2 mt4" x-text="l"></p></template>
           <div class="notice warn mt8" x-show="pf.job.error" x-text="pf.job.error"></div>
           <a class="btn quiet mt8" style="padding-left:0" x-show="pf.job.done && !pf.job.error" :href="'#holding/' + pf.job.symbol">Open the holding →</a>
         </div>
@@ -890,7 +898,7 @@
           <div class="row" style="padding-right:4px">
             <a class="li grow" :href="'#holding/' + h.symbol" style="align-items:center"><b class="small" style="width:96px" x-text="h.symbol"></b><span class="grow xs t2 trunc" x-text="h.name"></span>
               <span class="badge" :class="h.status" x-text="status(h.status)"></span></a>
-            <button class="ibtn" style="margin:0" @click="removeHolding(h)" :aria-label="'Remove ' + h.symbol + ' from the portfolio'"><svg class="i s"><use href="#i-x"/></svg></button>
+            <button class="ibtn" style="margin:0" x-show="flag('portfolio_edit')" @click="removeHolding(h)" :aria-label="'Remove ' + h.symbol + ' from the portfolio'"><svg class="i s"><use href="#i-x"/></svg></button>
           </div>
         </template>
       </div>
@@ -956,10 +964,10 @@
                 <p class="tbl-note" x-show="cardDetail.payload.table.some(r => r.derived)">* EBITDA derived: PBT + finance costs + depreciation − other income.</p>
                 <div class="row wrap mt8"><span class="badge" :class="cardDetail.payload.confidence === 'high' || !cardDetail.payload.confidence ? 'delivered' : 'verify'" x-text="'Confidence ' + (cardDetail.payload.confidence || 'high')"></span>
                   <span class="xs t2" x-text="cardDetail.payload.source"></span></div>
-                <template x-for="n in cardDetail.payload.notes || []" :key="n"><div class="notice warn mt8" x-text="'Verify: ' + n"></div></template>
+                <template x-for="(n, _k) in cardDetail.payload.notes || []" :key="_k"><div class="notice warn mt8" x-text="'Verify: ' + n"></div></template>
                 <template x-if="(cardDetail.payload.checks || []).length">
                   <div class="mt8"><div class="eyebrow">How these figures were checked</div>
-                    <template x-for="k in cardDetail.payload.checks" :key="k"><div class="row xs mt4" style="align-items:flex-start">
+                    <template x-for="(k, _k) in cardDetail.payload.checks" :key="_k"><div class="row xs mt4" style="align-items:flex-start">
                       <svg class="i s up" style="margin-top:1px"><use href="#i-check"/></svg><span class="t2" x-text="k"></span></div></template></div>
                 </template>
                 <div class="row wrap mt8"><template x-for="r in resultRows(cardDetail).filter(r => r.quote)" :key="'q' + r.metric">
@@ -968,7 +976,7 @@
             </template>
             <template x-if="cardDetail.payload?.results_day?.comparisons?.length">
               <div class="mt12"><div class="eyebrow">Against management's own guidance</div>
-                <template x-for="x in cardDetail.payload.results_day.comparisons" :key="x.metric + x.promised"><div class="small mt8">
+                <template x-for="(x, _k) in cardDetail.payload.results_day.comparisons" :key="_k"><div class="small mt8">
                   <b x-text="x.metric"></b>: promised <span x-text="x.promised"></span> <span class="t2" x-text="'(' + (x.said_in || '') + ')'"></span> → <span class="num" x-text="x.delivered + (x.delivered_unit || '%')"></span>
                   <span class="badge" :class="cmpCls(x.verdict)" x-text="x.verdict"></span></div></template></div>
             </template>
@@ -976,7 +984,7 @@
               <div class="notice warn mt12" x-text="'Figures not shown: ' + cardDetail.payload.reason"></div></template>
             <template x-if="cardDetail.payload?.people?.length">
               <div class="mt12"><div class="eyebrow">People</div>
-                <template x-for="p in cardDetail.payload.people" :key="p.name"><div class="mt8">
+                <template x-for="(p, _k) in cardDetail.payload.people" :key="_k"><div class="mt8">
                   <div class="person" style="margin-top:0"><span class="dir" :class="isIn(p) ? 'in' : 'out'" x-text="isIn(p) ? 'IN' : 'OUT'"></span><span class="avatar" x-text="initials(p.name)"></span>
                     <div class="grow"><div class="small" style="font-weight:600" x-text="p.name"></div><div class="xs t2" x-text="(p.role || 'Role not in filing') + (p.effective_date ? ' · effective ' + p.effective_date : '')"></div></div></div>
                   <div class="quote" x-show="p.profile_quote" x-text="p.profile_quote"></div>
@@ -986,7 +994,7 @@
             </template>
             <template x-if="flags(cardDetail).length">
               <div class="mt12"><div class="eyebrow">Governance flags</div>
-                <template x-for="f in flags(cardDetail)" :key="f.kind + f.summary"><div class="small mt8">
+                <template x-for="(f, _k) in flags(cardDetail)" :key="_k"><div class="small mt8">
                   <span class="badge" :class="f.severity === 'high' ? 'gov' : 'watch'" x-text="f.kind.replace(/_/g, ' ')"></span> <span x-text="f.summary"></span>
                   <div class="quote" x-show="f.quote" x-text="clip(f.quote, 260)"></div>
                   <button class="cite" x-show="f.page" @click="openEvidence(cardDetail.document_id, f.page, f.quote)" x-text="'Filing, page ' + f.page + ' →'"></button></div></template></div>
@@ -997,14 +1005,14 @@
 
             <template x-if="cardDetail.id > 0">
               <div class="mt8">
-                <div class="eyebrow">Was this useful?</div>
-                <div class="row wrap mt8">
+                <div class="eyebrow" x-show="flag('card_feedback')">Was this useful?</div>
+                <div class="row wrap mt8" x-show="flag('card_feedback')">
                   <button class="chip" @click="sendFeedback(cardDetail, 'useful')"><svg class="i s"><use href="#i-up"/></svg>Useful</button>
                   <button class="chip" @click="sendFeedback(cardDetail, 'not_useful')"><svg class="i s"><use href="#i-dn"/></svg>Not useful</button>
                   <button class="chip" @click="sendFeedback(cardDetail, 'higher')"><svg class="i s"><use href="#i-raise"/></svg>Should be higher</button>
                 </div>
-                <label class="f" for="jr">Decision journal: acting on this?</label>
-                <div class="row"><input id="jr" type="text" x-model="jr.reason" placeholder="One line: what you're doing and why">
+                <label class="f" for="jr" x-show="flag('journal')">Decision journal: acting on this?</label>
+                <div class="row" x-show="flag('journal')"><input id="jr" type="text" x-model="jr.reason" placeholder="One line: what you're doing and why">
                   <button class="btn" @click="saveJournal(cardDetail)" :disabled="jr.reason.trim().length < 3">Save</button></div>
               </div>
             </template>
@@ -1057,7 +1065,7 @@
         </div>
         <div class="inset mt16 small num" x-text="'Score ' + Number(whyCard.why?.score ?? 0).toFixed(2) + ' → ' + bucketName(whyCard.bucket)"></div>
         <p class="xs t2 mt8">Needs attention ≥ 0.70 · Worth a look ≥ 0.30 · otherwise routine. Score is capped at 1.</p>
-        <template x-for="r in whyCard.why?.reasons || []" :key="r"><p class="small mt4" x-text="'• ' + r"></p></template>
+        <template x-for="(r, _k) in whyCard.why?.reasons || []" :key="_k"><p class="small mt4" x-text="'• ' + r"></p></template>
         <p class="xs t2 mt8" x-text="whyCard.why?.formula"></p>
         <button class="btn block mt12" @click="sheet = prevSheet; prevSheet = null">Close</button>
       </div>
@@ -1124,7 +1132,7 @@
   </template>
 
   <!-- copilot -->
-  <button class="copilot-bar" x-show="(route==='holding' && holding) || (route==='research' && param)" x-cloak @click="openCopilot()" :aria-label="'Ask about ' + copilotSymbol()">
+  <button class="copilot-bar" x-show="flag('copilot') && ((route==='holding' && holding) || (route==='research' && param))" x-cloak @click="openCopilot()" :aria-label="'Ask about ' + copilotSymbol()">
     <svg class="i s"><use href="#i-search"/></svg><span x-text="'Ask about ' + (copilotSymbol() || 'your portfolio') + '…'"></span>
   </button>
   <template x-if="sheet === 'copilot'">
@@ -1137,7 +1145,7 @@
             <button class="ibtn" @click="sheet = null" aria-label="Close"><svg class="i s"><use href="#i-x"/></svg></button></div>
           <template x-if="!cp.answer && !cp.busy && !cp.steps.length">
             <div class="mt12"><div class="eyebrow">Try</div>
-              <div class="row wrap mt8"><template x-for="s in suggestions()" :key="s"><button class="chip" style="white-space:normal; text-align:left; padding:6px 12px" @click="cp.q = s; askCopilot(s)" x-text="s"></button></template></div>
+              <div class="row wrap mt8"><template x-for="(s, _k) in suggestions()" :key="_k"><button class="chip" style="white-space:normal; text-align:left; padding:6px 12px" @click="cp.q = s; askCopilot(s)" x-text="s"></button></template></div>
               <p class="xs t2 mt12">Answers come only from your filings, call transcripts and annual reports, each sentence with its source.</p></div>
           </template>
           <template x-if="cp.q && (cp.busy || cp.answer)"><p class="small mt12" style="font-weight:600" x-text="cp.q"></p></template>
@@ -1152,7 +1160,7 @@
               <div class="row"><span class="eyebrow grow">Answer</span>
                 <span class="badge" :class="cp.answer.not_in_sources ? 'outline' : 'delivered'" x-text="cp.answer.not_in_sources ? 'Not in sources' : cp.answer.evidence.length + ' sources'"></span></div>
               <template x-for="(s, i) in cp.answer.answer" :key="i"><p class="small mt8"><span x-text="s.text"></span>
-                <template x-for="c in s.citations" :key="c"><sup class="ref" role="button" tabindex="0" @click="citeOpen(c)" @keydown.enter="citeOpen(c)" x-text="c"></sup></template></p></template>
+                <template x-for="(c, _k) in s.citations" :key="_k"><sup class="ref" role="button" tabindex="0" @click="citeOpen(c)" @keydown.enter="citeOpen(c)" x-text="c"></sup></template></p></template>
               <template x-if="cp.answer.evidence.length"><div class="mt12"><div class="eyebrow">Evidence</div>
                 <template x-for="e in cp.answer.evidence" :key="e.id"><button class="li" style="padding:8px 0" @click="citeOpen(e.id)">
                   <span class="num xs acc" style="width:28px" x-text="e.id"></span><span class="grow xs t2 clamp2" x-text="e.text.slice(0, 200)"></span></button></template></div></template>

@@ -52,8 +52,27 @@ def holdings():
     return {"holdings": read_session_run(q)}
 
 
+_holding_cache: dict[str, tuple[float, dict]] = {}
+HOLDING_TTL_S = 600
+
+
+def invalidate() -> None:
+    """New data (a pipeline run) or a thesis edit: the next holding request recomputes."""
+    _holding_cache.clear()
+
+
 @router.get("/api/v2/holdings/{symbol}")
 def holding(symbol: str):
+    import time as _t
+    hit = _holding_cache.get(symbol.upper())
+    if hit and _t.time() - hit[0] < HOLDING_TTL_S:
+        return hit[1]
+    out = _holding(symbol)
+    _holding_cache[symbol.upper()] = (_t.time(), out)
+    return out
+
+
+def _holding(symbol: str):
     from .research.engine import cached_report
 
     def q(s):
@@ -120,6 +139,7 @@ async def thesis_put(symbol: str, request: Request):
         t = s.get(Thesis, c.id) or Thesis(company_id=c.id)
         t.statement, t.kpis, t.breakers, t.source = statement, kpis, breakers, "user"
         s.merge(t)
+    invalidate()
     return {"ok": True, "status": guardian.statuses().get(symbol.upper())}
 
 
@@ -157,16 +177,31 @@ def document_page(doc_id: int, page_no: int):
 
 @router.get("/api/v2/deep/{symbol}/{recipe}")
 def deep_dive(symbol: str, recipe: str, force: bool = False):
-    """A deep dive: cached (< 24 h) results return at once; otherwise the recipe runs (a few seconds to a minute)."""
+    """A deep dive: cached (< 7 days) results return at once; otherwise the recipe runs (a few seconds to a minute)."""
     from .deep import engine as deep
     if recipe not in deep.RUNNERS:
         raise HTTPException(404, f"unknown deep dive; try one of {', '.join(deep.RECIPES)}")
     try:
         out = deep.run(symbol, recipe, force=force)
     except deep.NeedsResearch as e:
-        raise HTTPException(409, str(e))
+        # not available for this company yet: a designed state with the reason (and what would unlock it)
+        return {"recipe": recipe, "unavailable": str(e), "research": e.research, "charts": []}
+    except Exception as e:  # noqa: BLE001 - never a raw error on the page
+        import logging
+        from .research.engine import plain
+        logging.getLogger("finn.deep").exception("deep dive %s/%s failed", symbol, recipe)
+        return {"recipe": recipe, "unavailable": f"This deep dive couldn't run just now ({plain(e)}); try again in a few "
+                                                 "minutes", "research": [], "charts": []}
     from . import charts
     return {**out, "charts": charts.deep_charts(out)}
+
+
+# ---------- feature flags ----------
+
+@router.get("/api/v2/flags")
+def flags_get():
+    from . import flags
+    return flags.all_flags()
 
 
 # ---------- portfolio editing ----------
@@ -179,7 +214,7 @@ async def portfolio_add(request: Request):
     job = portfolio.add(body.get("symbol") or "")
     if job.get("done") and job.get("error") and job["stage"] == portfolio.STAGES[0]:
         raise HTTPException(400, job["error"])
-    return job
+    return job   # validation and onboarding continue in the background; poll /api/v2/portfolio/jobs/{symbol}
 
 
 @router.get("/api/v2/portfolio/jobs/{symbol}")
@@ -268,8 +303,11 @@ async def copilot_stream(q: str, symbol: str | None = None):
     def work():
         try:
             copilot.ask(q, symbol.upper() if symbol else None, emit=emit)
-        except Exception as e:  # noqa: BLE001
-            emit("error", {"error": str(e)[:200]})
+        except Exception as e:  # noqa: BLE001 - raw text to the log, a plain sentence to the page
+            import logging
+            from .research.engine import plain
+            logging.getLogger("finn.copilot").exception("copilot failed")
+            emit("error", {"error": f"The assistant couldn't answer: {plain(e)}. Try again in a minute."})
         finally:
             emit("end", {})
     threading.Thread(target=work, daemon=True).start()

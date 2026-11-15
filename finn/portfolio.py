@@ -35,6 +35,15 @@ class InvalidTicker(ValueError):
     pass
 
 
+class Cancelled(Exception):
+    """The company was removed while it was being onboarded."""
+
+
+def _check_cancel(job: dict) -> None:
+    if job.get("cancelled"):
+        raise Cancelled()
+
+
 def nse_listing(symbol: str) -> dict | None:
     """{symbol, name, isin} from NSE's official equity list (cached for a day)."""
     from .sources.chain import http
@@ -89,14 +98,28 @@ def add(symbol: str) -> dict:
         return job
     JOBS[sym] = job = {"symbol": sym, "stages": STAGES, "stage": STAGES[0], "done": False, "error": None,
                        "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "log": []}
+    if not re.fullmatch(r"[A-Z0-9&-]{1,20}", sym):
+        job.update(done=True, error="Enter an NSE symbol, e.g. HAVELLS")
+        return job
+    threading.Thread(target=_check_and_onboard, args=(sym,), daemon=True, name=f"onboard-{sym}").start()
+    return job
+
+
+def _check_and_onboard(sym: str) -> None:
+    """Stage 1 in the background (NSE list, Yahoo, BSE list take a few seconds), then the rest of onboarding."""
+    job = JOBS[sym]
     try:
         info = validate(sym)
+        _check_cancel(job)
+    except Cancelled:
+        job.update(done=True, error="Removed before it was added")
+        return
     except InvalidTicker as e:
         job.update(done=True, error=str(e))
-        return job
+        return
     except Exception as e:  # noqa: BLE001
         job.update(done=True, error=f"Couldn't check {sym} right now: {str(e)[:120]}")
-        return job
+        return
     with session() as s:
         c = s.scalar(select(Company).where(Company.nse_symbol == sym))
         if c is None:
@@ -108,14 +131,14 @@ def add(symbol: str) -> dict:
         else:
             c.is_portfolio, c.status = True, "ok"
             job["log"].append(f"Restored {c.name}: its history was kept")
-    threading.Thread(target=_onboard, args=(sym,), daemon=True, name=f"onboard-{sym}").start()
-    return job
+    _onboard(sym)
 
 
 def _onboard(sym: str) -> None:
     job = JOBS[sym]
 
     def stage(i, note=None):
+        _check_cancel(job)                      # removed in the meantime: stop before the next write
         job["stage"] = STAGES[i]
         if note:
             job["log"].append(note)
@@ -159,6 +182,8 @@ def _onboard(sym: str) -> None:
         job["log"].append(f"No thesis draft: {d['skipped']}" if d.get("skipped") else
                           f"Thesis drafted from management's own claims ({d.get('kpis', 0)} numbers to watch)")
         job.update(done=True, finished_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    except Cancelled:
+        job.update(done=True, error="Removed while it was being added; onboarding stopped")
     except Exception as e:  # noqa: BLE001 - the company stays added; the next scheduled run fills what failed
         log.exception("onboarding %s failed", sym)
         job.update(done=True, error=f"{job['stage']} failed: {str(e)[:160]}. The company is added; the next scheduled "
@@ -167,11 +192,16 @@ def _onboard(sym: str) -> None:
 
 def remove(symbol: str) -> dict:
     sym = (symbol or "").strip().upper()
+    job = JOBS.get(sym)
+    if job and not job.get("done"):
+        job["cancelled"] = True                 # an onboarding in flight must not re-add it afterwards
     with session() as s:
         c = s.scalar(select(Company).where(Company.nse_symbol == sym))
         if not c:
             raise InvalidTicker(f"{sym} is not a company FINN tracks")
-        c.is_portfolio, c.status = False, "removed"
+        # out of the portfolio either way; a configured research peer stays tracked (peer read-across), anything
+        # else stops being ingested
+        c.is_portfolio, c.status = False, ("ok" if c.peer_of else "removed")
     from .feed import digest
     digest.invalidate()
     return {"symbol": sym, "removed": True, "kept": "filings, cards, reports and alerts are kept; add it again to restore"}

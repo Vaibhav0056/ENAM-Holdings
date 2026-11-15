@@ -167,11 +167,11 @@ def test_freshness_amber_only_after_26h_on_trading_days(cos, monkeypatch):
     from finn import ingest
     monkeypatch.setattr(ingest, "announcements_age", lambda: timedelta(hours=30))
     monkeypatch.setattr("finn.fiscal.is_trading_day", lambda d: False)
-    assert ingest.freshness()["stale"] is False          # quiet weekend
+    assert ingest._freshness()["stale"] is False          # quiet weekend
     monkeypatch.setattr("finn.fiscal.is_trading_day", lambda d: True)
-    assert ingest.freshness()["stale"] is True
+    assert ingest._freshness()["stale"] is True
     monkeypatch.setattr(ingest, "announcements_age", lambda: timedelta(hours=20))
-    assert ingest.freshness()["stale"] is False
+    assert ingest._freshness()["stale"] is False
 
 
 def test_scheduler_slots():

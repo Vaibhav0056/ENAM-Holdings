@@ -121,3 +121,30 @@ def test_guidance_band_uses_only_a_company_wide_ebitda_target(co):
     spec = charts.guidance_band(1, "AAA")
     assert spec["threshold"]["value"] == 18.0 and "18–22% target (said Q1 FY27)" in spec["title"]
     assert "Not your thesis" in spec["note"] and spec["sources"][0][0]["page"] == 7
+
+
+def test_unavailable_deep_dive_is_a_designed_state_not_an_error(monkeypatch):
+    from fastapi.testclient import TestClient
+    import api
+    from finn.deep import engine as deep
+
+    def needs(symbol, recipe, force=False):
+        raise deep.NeedsResearch("Peer compare reads both companies' research reports; HAVELLS has none yet", research=["HAVELLS"])
+    monkeypatch.setattr(deep, "run", needs)
+    r = TestClient(api.app).get("/api/v2/deep/POLYCAB/peer_compare")
+    assert r.status_code == 200
+    assert r.json() == {"recipe": "peer_compare", "unavailable": "Peer compare reads both companies' research reports; "
+                        "HAVELLS has none yet", "research": ["HAVELLS"], "charts": []}
+
+
+
+def test_reports_never_show_raw_errors():
+    from finn.research.engine import present
+    rep = {"notes": ["Counter-argument unavailable: devils_advocate: all strong-tier models failed: 504 DEADLINE_EXCEEDED. {'error': 1}"],
+           "sources": [{"kind": "transcript", "status": "failed", "reason": "403 Client Error: Forbidden for url: https://x"},
+                       {"kind": "transcript", "status": "read"}, {"kind": "annual_report", "status": "read"}]}
+    out = present(rep)
+    text = " ".join(out["notes"]) + " " + " ".join(s.get("reason") or "" for s in out["sources"])
+    assert "504" not in text and "403" not in text and "{" not in text and "http" not in text
+    assert out["notes"][0].startswith("1 of 2 earnings-call transcripts could not be read (the publisher's website refused")
+    assert "the model service took too long to answer" in out["notes"][1]

@@ -10,7 +10,7 @@
   come from a management speaker. Matching, verdicts, credibility, vagueness and drift are Python (finn.research.ledger).
 - R4: one strong-tier synthesis (credibility read, bull, bear) and one devil's advocate over the verified JSON only;
   sentences with unsupported numbers or advice language are removed. A receipt records sources, time, calls and cost.
-Progress is written to research_jobs at each stage (polled or streamed over SSE). Reports are cached for 24 h.
+Progress is written to research_jobs at each stage (polled or streamed over SSE). Reports are cached for REPORT_TTL (7 days).
 """
 from __future__ import annotations
 
@@ -41,7 +41,8 @@ from .transcripts import is_management, management_text, split_turns
 log = logging.getLogger("finn.research")
 STAGES = ["Finding documents", "Fetching documents", "Reading transcripts", "Extracting promises and facts",
           "Verifying quotes", "Matching promises to results", "Writing the verdict", "Checking numbers"]
-REPORT_TTL = timedelta(hours=24)
+# Reports read transcripts and annual reports, which change quarterly; finn.precompute rebuilds them weekly.
+REPORT_TTL = timedelta(days=float(__import__('os').getenv('REPORT_TTL_DAYS', '7')))
 MAX_TRANSCRIPTS = 8
 MAX_ARS = 2
 CONCURRENCY = 6
@@ -567,7 +568,7 @@ _report_memo: dict[int, dict] = {}
 
 
 def cached_report(symbol: str) -> dict | None:
-    """Latest core report under 24 h old. One small read (id + timestamp) on the fast read path; the report body
+    """Latest core report younger than REPORT_TTL (7 days). One small read (id + timestamp) on the fast read path; the report body
     comes from an in-process memo keyed by report id, so a cached report costs about one round trip."""
     from ..database import read_session_run
 
@@ -585,7 +586,7 @@ def cached_report(symbol: str) -> dict | None:
         _report_memo[row.id] = read_session_run(body)
         if len(_report_memo) > 50:
             _report_memo.pop(next(iter(_report_memo)))
-    return _report_memo[row.id]
+    return present(_report_memo[row.id])
 
 
 _running: dict[str, str] = {}
@@ -593,7 +594,7 @@ _lock = threading.Lock()
 
 
 def start(symbol: str, force: bool = False) -> dict:
-    """Returns {job_id, cached}. A cached report (< 24 h) returns at once; a running job for the symbol is reused."""
+    """Returns {job_id, cached}. A cached report (< 7 days) returns at once; a running job for the symbol is reused."""
     symbol = symbol.upper().strip()
     if not force:
         hit = cached_report(symbol)
@@ -622,6 +623,59 @@ def start(symbol: str, force: bool = False) -> dict:
     return {"job_id": job_id, "cached": False}
 
 
+def plain(err: str | None) -> str:
+    """A raw error as one plain sentence for the page; the raw text stays in the logs and llm_calls."""
+    e = str(err or "")
+    low = e.lower()
+    if "403" in e or "forbidden" in low:
+        return "the publisher's website refused the download"
+    if "404" in e or "not found" in low:
+        return "the document is no longer at its link"
+    if "budget" in low or "cost cap" in low:
+        return "the per-report cost cap was reached"
+    if "per day" in low or "perday" in low or "quota" in low or "429" in e or "resource_exhausted" in low:
+        return "today's free model quota is used up"
+    if "504" in e or "deadline" in low or "timed out" in low or "timeout" in low:
+        return "the model service took too long to answer"
+    if "503" in e or "unavailable" in low or "high demand" in low:
+        return "the model service was busy"
+    if "scanned" in low or "no text layer" in low:
+        return "the PDF is a scan with no text layer"
+    return "an unexpected problem"
+
+
+_NOTE_PREFIX = ("Synthesis unavailable:", "Counter-argument unavailable:")
+
+
+def present(rep: dict) -> dict:
+    """The report as the page shows it: raw errors in notes and sources become plain sentences, and a report that
+    could not read most transcripts says so up front. Applied when serving, so stored reports benefit too."""
+    if not rep:
+        return rep
+    out = dict(rep)
+    notes = []
+    for n in rep.get("notes") or []:
+        pre = next((p for p in _NOTE_PREFIX if n.startswith(p)), None)
+        notes.append(f"{pre} {plain(n)}; rebuild the report later to fill it in." if pre else n)
+    srcs = []
+    for s in rep.get("sources") or []:
+        s = dict(s)
+        if s.get("status") == "failed" and s.get("reason"):
+            s["reason"] = plain(s["reason"])
+        srcs.append(s)
+    tr = [s for s in srcs if s.get("kind") == "transcript"]
+    tr_read = sum(1 for s in tr if s.get("status") == "read")
+    if tr and tr_read < len(tr):
+        why = next((s["reason"] for s in tr if s.get("status") == "failed" and s.get("reason")), "they could not be read")
+        msg = (f"{len(tr) - tr_read} of {len(tr)} earnings-call transcripts could not be read ({why}); "
+               + ("this report uses the annual reports only." if tr_read == 0 else
+                  f"the ledger uses the {tr_read} that could, and the annual reports."))
+        if msg not in notes:
+            notes.insert(0, msg)
+    out["notes"], out["sources"] = notes, srcs
+    return out
+
+
 def job(job_id: str) -> dict | None:
     with session() as s:
         j = s.get(ResearchJob, job_id)
@@ -631,7 +685,9 @@ def job(job_id: str) -> dict | None:
                "error": j.error, "stages": STAGES, "report_id": j.report_id}
         if j.report_id:
             rep = s.get(Report, j.report_id)
-            out["report"] = {"report_id": rep.id, **rep.data, "receipt": rep.receipt}
+            out["report"] = present({"report_id": rep.id, **rep.data, "receipt": rep.receipt})
+        if out["error"]:
+            out["error"] = f"Research didn't finish: {plain(out['error'])}. Try again in a few minutes."
         return out
 
 
