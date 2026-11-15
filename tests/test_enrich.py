@@ -213,3 +213,19 @@ def test_ocr_decimal_comma():
     assert parse_number("19,885,3") == 19885.3 and parse_number("115,086,5") == 115086.5
     assert parse_number("(4,478,6)") == -4478.6
     assert parse_number("12,345") == 12345.0 and parse_number("1,51,624") == 151624.0
+
+
+
+def test_revenue_only_other_basis_that_disagrees_does_not_crash():
+    snap = {"revenue": {"Q2 FY27": 1100.0}, "net_profit": {"Q2 FY27": 140.0}}
+    out = results.build(ROWS, "lakh", "consolidated", "t", "Q2 FY27", snapshot=snap,
+                        other={"basis": "standalone", "revenue": 1000.0, "pat": None, "page": 4})
+    assert "PAT not readable" in out["notes"][0]
+
+
+
+def test_implausible_other_basis_reading_is_never_quoted():
+    snap = {"revenue": {"Q2 FY27": 1100.0}, "net_profit": {"Q2 FY27": 140.0}}
+    out = results.build(ROWS, "lakh", "consolidated", "t", "Q2 FY27", snapshot=snap,
+                        other={"basis": "standalone", "revenue": 2.0, "pat": None, "page": 4})
+    assert "2.00" not in out["notes"][0] and "FINN's standalone reading" not in out["notes"][0]

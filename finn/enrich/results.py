@@ -133,6 +133,8 @@ def build(metrics: dict, unit: str, basis: str, source: str, period: str | None 
         notes.append("EBITDA or PBT larger than revenue")
     check = bse_check(norm, snapshot, period)
     bse_agrees = bool(check and check.get("match"))
+    if other and rev and not (0.05 <= abs(other.get("revenue") or 0) / abs(rev) <= 1.5):
+        other = None   # not plausibly this company's other statement (a misread): never quoted, never used
     if check and check.get("available") and rev:
         ratio = check["bse_revenue"] / rev if rev else 0
         scale = next((f for f in (10, 100, 1000, 1e5, 1e7, 0.1, 0.01, 0.001) if abs(ratio / f - 1) < 0.02), None)
@@ -164,7 +166,8 @@ def build(metrics: dict, unit: str, basis: str, source: str, period: str | None 
             else:
                 why = []
                 if other:
-                    why.append(f"FINN's {other['basis']} reading is revenue ₹{other['revenue']:,.2f} cr, PAT ₹{other['pat']:,.2f} cr")
+                    pat_txt = f"PAT ₹{other['pat']:,.2f} cr" if other.get("pat") is not None else "PAT not readable"
+                    why.append(f"FINN's {other['basis']} reading is revenue ₹{other['revenue']:,.2f} cr, {pat_txt}")
                 notes.append(f"differs from BSE's summary (BSE revenue ₹{check['bse_revenue']:,.2f} cr, PAT "
                              f"₹{(check.get('bse_net_profit') or 0):,.2f} cr" + ("; " + "; ".join(why) if why else "") + ")")
     if cross:
@@ -182,6 +185,8 @@ def build(metrics: dict, unit: str, basis: str, source: str, period: str | None 
     return {"ok": True, "kind": "results", "period": period, "basis": basis, "unit_reported": unit, "unit": "₹ crore",
             "confidence": conf, "notes": notes, "checks": checks, "source": source, "table": table, "bse_check": check,
             "pat_yoy": pat_row["yoy"] if pat_row else None,
+            # every line read for the current quarter, ₹ crore (feeds the margin bridge chart)
+            "lines": {m: v.get("current_quarter") for m, v in norm.items() if v.get("current_quarter") is not None},
             "tax_gap": None if tax_gap is None else round(tax_gap, 3)}
 
 

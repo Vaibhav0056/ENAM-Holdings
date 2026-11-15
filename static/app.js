@@ -13,7 +13,7 @@ const IMPACT_LABEL = { supports: "Supports thesis", watch: "Watch", threatens: "
 const VERDICT_LABEL = { delivered: "Delivered", partial: "Partial", missed: "Missed", pending: "Pending", unverifiable: "Unverifiable" };
 const KPI_LABEL = { revenue_growth_yoy: "Revenue growth YoY", ebitda_margin: "EBITDA margin", pat_growth_yoy: "PAT growth YoY", pat_margin: "PAT margin" };
 const WINDOWS = [["since_last", "Since last check"], ["24h", "24h"], ["3d", "3 days"], ["7d", "7 days"], ["30d", "30 days"]];
-const DEEP = [["cash_quality", "Cash quality"], ["balance_sheet", "Balance sheet"], ["language_diff", "Language diff"],
+const DEEP = [["results", "Results history"], ["cash_quality", "Cash quality"], ["balance_sheet", "Balance sheet"], ["language_diff", "Language diff"],
               ["hedge_meter", "Hedge-meter"], ["dodge_detector", "Dodge detector"], ["worry_map", "Worry map"],
               ["fine_print", "Fine print"], ["peer_compare", "Peer compare"]];
 const WAKING_MS = 2500;
@@ -43,6 +43,8 @@ function finn() {
     isIOS: /iphone|ipad|ipod/i.test(navigator.userAgent), standalone: matchMedia("(display-mode: standalone)").matches,
     toast: "", toastUndo: null,
     gal: { digest: null, sw: true, sl: 2.0, tab: "Ledger" },
+    hc: null, rc: null, ac: {}, gc: null,           // chart specs: holding, research, alerts, gallery
+    pf: { symbol: "", busy: false, job: null },      // add-a-holding form and its onboarding job
     ruleTypes: ["results", "mgmt_change", "governance", "m_and_a", "fundraise", "order_win", "credit_rating", "litigation_regulatory", "insider_pledge"],
     deepRecipes: DEEP,
 
@@ -50,6 +52,7 @@ function finn() {
       const q = new URLSearchParams(location.search).get("theme");
       if (q === "light" || q === "dark") this.theme = q; else this.applyTheme();
       window.addEventListener("hashchange", () => this.go());
+      window.addEventListener("finn-evidence", (e) => this.openEvidence(e.detail.document_id, e.detail.page, e.detail.quote));
       this.go();
       this.loadAlerts(true);
       setInterval(() => { if (this.rq.job && !this.rq.report) this.tick = Date.now(); }, 1000);
@@ -321,7 +324,8 @@ function finn() {
     // ---------- Holdings ----------
     async loadHoldings() { try { this.holdings = (await this.api("/api/v2/holdings")).holdings; } catch (e) {} },
     async loadHolding(sym) {
-      this.holding = null; this.editing = false;
+      this.holding = null; this.editing = false; this.hc = null;
+      this.api(`/api/v2/charts/holding/${sym}`).then((c) => { if (this.param === sym) this.hc = c; }).catch(() => { this.net.error = null; });
       try { this.holding = await this.api(`/api/v2/holdings/${sym}`); this.loadJournal(sym); } catch (e) {}
     },
     holdingStatus() { return this.holding?.timeline?.[0]?.status || "intact"; },
@@ -333,14 +337,6 @@ function finn() {
     priceRange() {
       const p = this.holding?.prices || [];
       return p.length ? `${this.dm(p[0].date)} – ${this.dm(p.at(-1).date)}` : "";
-    },
-    spark() {
-      const p = this.holding.prices, v = p.map((x) => x.close), lo = Math.min(...v), hi = Math.max(...v), W = 320, top = 16, bot = 62;
-      const X = (i) => (i / (v.length - 1)) * W, Y = (x) => bot - ((x - lo) / (hi - lo || 1)) * (bot - top);
-      const d = v.map((x, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(x).toFixed(1)}`).join(" ");
-      const hiI = v.indexOf(hi);
-      return { d, ex: X(v.length - 1), ey: Y(v.at(-1)), yMid: (top + bot) / 2, hx: X(hiI), hy: Y(hi),
-               hi: this.rupee(hi), firstLabel: this.dm(p[0].date), lastLabel: this.rupee(v.at(-1)) };
     },
     kpi(m) { return KPI_LABEL[m] || m; },
     kpiRow(k) { return (this.holding?.kpi_check?.rows || []).find((r) => r.metric === k.metric && r.op === k.op && r.threshold === Number(k.threshold)) || null; },
@@ -373,11 +369,11 @@ function finn() {
     },
     async openResearch(sym, force = false) {
       Object.assign(this.rq, { ticker: sym, job: null, report: null, stage: null, progress: 0, stages: [], error: null, open: {}, st: {}, dur: {}, t0: Date.now() });
-      this.rtab = "ledger"; Object.assign(this.deep, { recipe: null, data: null, error: null });
+      this.rtab = "ledger"; this.rc = null; Object.assign(this.deep, { recipe: null, data: null, error: null });
       this.recent = [sym, ...this.recent.filter((s) => s !== sym)].slice(0, 5); store("finn.recent", this.recent);
       try {
         const r = await this.api(`/api/v2/research/${sym}${force ? "?force=true" : ""}`, { method: "POST" });
-        if (r.cached) { this.rq.report = r.report; return; }
+        if (r.cached) { this.rq.report = r.report; this.loadResearchCharts(sym); return; }
         this.rq.job = r.job_id; this.follow(r.job_id);
       } catch (e) { this.rq.error = this.net.error; this.net.error = null; }
     },
@@ -391,7 +387,7 @@ function finn() {
     },
     follow(jobId) {
       const done = async () => {
-        try { const j = await this.api(`/api/v2/research/job/${jobId}`); if (j.report) this.rq.report = j.report; else this.rq.error = j.error; }
+        try { const j = await this.api(`/api/v2/research/job/${jobId}`); if (j.report) { this.rq.report = j.report; this.loadResearchCharts(j.report.symbol); } else this.rq.error = j.error; }
         catch (e) { this.rq.error = this.net.error; this.net.error = null; }
       };
       if (!window.EventSource) return this.poll(jobId);
@@ -438,45 +434,6 @@ function finn() {
       if (l.verdict === "unverifiable") return "Too vague to check";
       return l.horizon ? `Not yet due: ${l.horizon}` : "Not in sources";
     },
-    // generic inline-SVG line: values → path + labelled points on a 320-wide canvas
-    series(vals, o = {}) {
-      const v = vals.map(Number), W = 320, pad = 14, top = o.top ?? 14, bot = o.bot ?? 46;
-      const lo = o.min ?? Math.min(...v), hi = o.max ?? Math.max(...v);
-      const X = (i) => (v.length === 1 ? W / 2 : pad + (i / (v.length - 1)) * (W - 2 * pad));
-      const Y = (x) => bot - ((x - lo) / (hi - lo || 1)) * (bot - top);
-      const pts = v.map((x, i) => ({ x: X(i), y: Y(x), v: o.fmt ? o.fmt(x) : x,
-                                     anchor: v.length > 1 && i === 0 ? "start" : v.length > 1 && i === v.length - 1 ? "end" : "middle" }));
-      pts.forEach((p) => { if (p.anchor === "start") p.x = Math.max(p.x, 2); });
-      const d = o.step
-        ? pts.map((p, i) => (i ? `H${p.x.toFixed(1)} V${p.y.toFixed(1)}` : `M${p.x.toFixed(1)} ${p.y.toFixed(1)}`)).join(" ")
-        : pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
-      return { d, pts };
-    },
-    marks(pts, ly) {   // points + direct value labels + axis labels as SVG markup (Alpine can't x-for inside <svg>)
-      return pts.map((p) => `<circle cx="${p.x}" cy="${p.y}" r="2.5" fill="var(--accent)"/>` +
-        `<text x="${p.x}" y="${(p.y - 6).toFixed(1)}" text-anchor="${p.anchor}">${esc(p.v)}</text>` +
-        (p.label ? `<text x="${p.x}" y="${ly}" text-anchor="${p.anchor}">${esc(p.label)}</text>` : "")).join("");
-    },
-    hedge() {
-      const c = this.deep.data.calls, s = this.series(c.map((x) => x.per_1000_words), { top: 16, bot: 50 });
-      s.pts.forEach((p, i) => (p.label = i % 2 === 0 || i === c.length - 1 ? c[i].call.replace(" FY", "·") : ""));
-      return s;
-    },
-    trend() {
-      const t = this.rq.report.credibility.trend, s = this.series(t.map((x) => x.score), { min: 0, max: 100, top: 18, bot: 40 });
-      s.pts.forEach((p, i) => { p.v = t[i].score; p.label = t[i].said_in.replace(" FY", "·"); });
-      return s;
-    },
-    driftChart() {
-      const d = (this.rq.report?.drift || []).find((x) => x.steps.length && x.steps.every((s) => s.before_mid != null && s.after_mid != null));
-      if (!d) return null;
-      const vals = [d.steps[0].before_mid, ...d.steps.map((s) => s.after_mid)];
-      const labels = [d.steps[0].from, ...d.steps.map((s) => s.to)];
-      const unit = d.mid_unit === "₹ crore" ? " cr" : d.mid_unit === "%" ? "%" : "";
-      const s = this.series(vals, { step: true, top: 16, bot: 50, fmt: (x) => Number(x).toLocaleString("en-IN", { maximumFractionDigits: 1 }) + unit });
-      s.pts.forEach((p, i) => (p.label = (labels[i] || "").replace(" FY", "·")));
-      return { ...s, metric: d.metric };
-    },
     segs() { return (this.rq.report?.snapshot?.segments || []).filter((s) => s.share_pct > 0).sort((a, b) => b.share_pct - a.share_pct); },
     refOpen(id) {
       const r = this.rq.report || {};
@@ -492,8 +449,22 @@ function finn() {
 
     // ---------- deep dives ----------
     deep: { recipe: null, data: null, loading: false, error: null },
+    async loadResearchCharts(sym) {
+      this.rc = null;
+      try { this.rc = await this.api(`/api/v2/charts/research/${sym}`); } catch (e) { this.net.error = null; }
+    },
     async openDeep(recipe) {
       Object.assign(this.deep, { recipe, data: null, loading: true, error: null });
+      if (recipe === "results") {     // results history: the same verified quarter series as the holding page
+        try {
+          const t0 = performance.now(), c = await this.api(`/api/v2/charts/holding/${this.param}`);
+          this.deep.data = { recipe, charts: [c.results, c.bridge].filter(Boolean), finding: c.results?.title,
+                             receipt: { llm_calls: 0, seconds: +((performance.now() - t0) / 1000).toFixed(1) },
+                             method: "from FINN's verified results cards, computed in Python" };
+        } catch (e) { this.deep.error = this.net.error; this.net.error = null; }
+        finally { this.deep.loading = false; }
+        return;
+      }
       try { this.deep.data = await this.api(`/api/v2/deep/${this.param}/${recipe}`); }
       catch (e) { this.deep.error = this.net.error; this.net.error = null; }
       finally { this.deep.loading = false; }
@@ -502,6 +473,7 @@ function finn() {
     deepFinding() {
       const d = this.deep.data, c = d.current || {};
       switch (d.recipe) {
+        case "results": return d.finding || "No verified results figures yet";
         case "cash_quality": return `Free cash flow ${this.cr(c.fcf)}` + (c.ocf_to_pat != null ? ` · OCF/PAT ${c.ocf_to_pat}` : "") + ` (${d.report})`;
         case "balance_sheet": return c.net_debt == null ? "Net debt: not in sources" : (c.net_debt < 0 ? `Net cash ${this.cr(-c.net_debt)}` : `Net debt ${this.cr(c.net_debt)}`) + (c.interest_cover != null ? ` · interest cover ${c.interest_cover}×` : "");
         case "hedge_meter": return d.latest_vs_earlier_pct == null ? "Not enough calls to compare" : `Cautious language ${this.pct(d.latest_vs_earlier_pct)} on the latest call vs the earlier average`;
@@ -514,18 +486,6 @@ function finn() {
       return "";
     },
     deepRows(obj) { return Object.entries(obj || {}).filter(([, v]) => typeof v === "number" || v === null); },
-    pairBars() {
-      const d = this.deep.data, cur = d.current || {}, prev = d.previous || {};
-      const keys = Object.keys(cur).filter((k) => typeof cur[k] === "number" && !/_to_|days|cover|cycle|ratio|pct/.test(k));
-      const max = Math.max(1, ...keys.flatMap((k) => [Math.abs(cur[k]), Math.abs(prev[k] ?? 0)]));
-      return keys.slice(0, 5).map((k) => ({ k, cur: cur[k], prev: prev[k] ?? null, w: (Math.abs(cur[k]) / max) * 100,
-                                           pw: typeof prev[k] === "number" ? (Math.abs(prev[k]) / max) * 100 : null }));
-    },
-    heat(n) {
-      if (!n) return "";
-      const all = Object.values(this.deep.data.counts || {}).flatMap((o) => Object.values(o)), max = Math.max(1, ...all);
-      return `background: color-mix(in srgb, var(--accent) ${Math.round(8 + (n / max) * 50)}%, transparent)`;
-    },
     label(k) { return k.replace(/_/g, " ").replace(/\bocf\b/i, "OCF").replace(/\bfcf\b/i, "FCF").replace(/\bpat\b/i, "PAT").replace(/\bebitda\b/i, "EBITDA"); },
     fmt(v) { return v == null ? "Not in sources" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 2 }); },
 
@@ -641,6 +601,14 @@ function finn() {
       }
       if (a.link) location.hash = a.link.replace(/^\/?#?/, "#");
     },
+    async toggleAlertChart(a) {
+      if (this.ac[a.id]) { const c = { ...this.ac }; delete c[a.id]; this.ac = c; return; }
+      const id = a.kind === "volume_spike" ? a.id : (a.also || []).find((x) => x.kind === "volume_spike")?.alert_id;
+      try {
+        const r = await this.api(`/api/v2/charts/alert/${id}`);
+        if (r.volume) this.ac = { ...this.ac, [a.id]: r.volume }; else this.say("Not enough trading days stored for this chart.");
+      } catch (e) { this.net.error = null; this.say("Chart unavailable right now."); }
+    },
     async readAll() { await this.api("/api/v2/alerts/read_all", { method: "POST" }); (this.alerts || []).forEach((a) => (a.read = true)); this.unread = 0; this.unreadOlder = 0; },
     ruleChip(r) {
       const p = r.params, off = r.enabled ? "" : " · off";
@@ -663,6 +631,40 @@ function finn() {
     },
 
     // ---------- settings ----------
+    async addHolding() {
+      const sym = (this.pf.symbol || "").trim().toUpperCase();
+      if (!/^[A-Z0-9&-]{1,20}$/.test(sym)) return this.say("Enter an NSE symbol, e.g. HAVELLS");
+      if ((this.holdings || []).some((h) => h.symbol === sym)) return this.say(`${sym} is already a holding`);
+      this.pf.busy = true;
+      try {
+        this.pf.job = await this.api("/api/v2/portfolio", { method: "POST", body: JSON.stringify({ symbol: sym }) });
+        this.pf.symbol = "";
+        this.loadHoldings();
+        this.pollHolding(sym);
+      } catch (e) { this.say(this.net.error); this.net.error = null; }
+      finally { this.pf.busy = false; }
+    },
+    pollHolding(sym) {
+      clearInterval(this._pfT);
+      this._pfT = setInterval(async () => {
+        try { this.pf.job = await this.api(`/api/v2/portfolio/jobs/${sym}`); } catch (e) { this.net.error = null; }
+        if (!this.pf.job || this.pf.job.done) { clearInterval(this._pfT); this.loadHoldings(); }
+      }, 3000);
+    },
+    pfStage(i) {
+      const j = this.pf.job; if (!j) return "";
+      const cur = j.stages.indexOf(j.stage);
+      if (j.done && !j.error) return "done";
+      return i < cur ? "done" : i === cur ? (j.error ? "" : "now") : "";
+    },
+    async removeHolding(h) {
+      if (!confirm(`Remove ${h.symbol} from the portfolio? Its history is kept; adding it again restores it.`)) return;
+      try {
+        await this.api(`/api/v2/portfolio/${h.symbol}`, { method: "DELETE" });
+        this.holdings = (this.holdings || []).filter((x) => x.symbol !== h.symbol);
+        this.say(`${h.symbol} removed`, () => { this.pf.symbol = h.symbol; this.addHolding(); });
+      } catch (e) { this.say(this.net.error); this.net.error = null; }
+    },
     async loadRules() { try { this.rules = (await this.api("/api/v2/rules")).rules; } catch (e) {} },
     async saveRule(r) {
       try { await this.api(`/api/v2/rules/${r.kind}`, { method: "PUT", body: JSON.stringify({ params: r.params, enabled: r.enabled }) }); this.say("Rule saved"); }
@@ -711,8 +713,27 @@ function finn() {
     },
 
     // ---------- gallery: real cards, one per variant ----------
+    galleryCharts() {
+      const g = this.gc;
+      if (!g) return [];
+      return [g.holding?.results, g.holding?.bridge, ...(g.holding?.kpis || []), g.holding?.price, g.research?.hit_rate,
+              g.research?.drift, ...(g.deep || []), g.volume].filter(Boolean);
+    },
+    chartMs() { return (window.__finnChartMs || 0).toFixed(1); },
+    async loadGalleryCharts(sym = "POLYCAB") {
+      const get = (u) => this.api(u).catch(() => { this.net.error = null; return null; });
+      const [holding, research, cash, worry, hedge] = await Promise.all([
+        get(`/api/v2/charts/holding/${sym}`), get(`/api/v2/charts/research/${sym}`), get(`/api/v2/deep/${sym}/cash_quality`),
+        get(`/api/v2/deep/${sym}/worry_map`), get(`/api/v2/deep/${sym}/hedge_meter`)]);
+      const vol = (this.alerts || []).find((a) => a.kind === "volume_spike");
+      const volume = vol ? (await get(`/api/v2/charts/alert/${vol.id}`))?.volume : null;
+      this.gc = { symbol: sym, holding, research, volume,
+                  deep: [cash, worry, hedge].flatMap((d) => (d && d.charts) || []) };
+    },
     async loadGallery() {
       this.loadCatalysts(); if (!this.rules) this.loadRules();
+      if (!this.alerts) await this.loadAlerts(true);
+      if (!this.gc) this.loadGalleryCharts();
       if (!this.gal.digest) { try { this.gal.digest = await this.api("/digest?window=30d"); } catch (e) {} }
     },
     galleryPicks() {

@@ -31,6 +31,9 @@ def seed_companies(path: Path = COMPANIES_CSV) -> dict:
             c = by_sym.get(r["nse_symbol"])
             if c is None:
                 c = Company(nse_symbol=r["nse_symbol"], name=r["name"] or r["nse_symbol"])
+                # the CSV is the initial portfolio; after that, Settings (add / remove) owns is_portfolio, so
+                # re-seeding on every start never undoes a change made in the app
+                c.is_portfolio = r["is_portfolio"] == "True"
                 s.add(c)
                 by_sym[c.nse_symbol] = c
                 added += 1
@@ -41,7 +44,6 @@ def seed_companies(path: Path = COMPANIES_CSV) -> dict:
             c.isin = r["isin"] or None
             c.sector = r["sector"] or None
             c.industry = r["industry"] or None
-            c.is_portfolio = r["is_portfolio"] == "True"
             c.note = r["note"] or None
             c.validated_at = now
             if not c.name or c.name == c.nse_symbol:

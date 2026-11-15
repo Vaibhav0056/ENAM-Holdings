@@ -138,6 +138,26 @@ def run(days: int = LOOKBACK_DAYS, trigger: str = "manual", pipeline: bool = Tru
         return out
 
 
+def backfill_results(days: int = 365, pipeline: bool = True) -> dict:
+    """One-off: a year of results filings (BSE category 'Result') for every company. Four quarterly filings carry
+    eight distinct quarters (each prints the quarter, the one before and the year-ago quarter), which the 8-quarter
+    results chart needs. Polite: one BSE call per company. Then the pipeline extracts them like any filing."""
+    from .sources import bse_filings, chain
+    with run_lock() as got:
+        if not got:
+            return {"skipped": "another run holds the lock"}
+        cos = [c for c in companies() if c.bse_code]
+        rows, failed = bse_filings.fetch(cos, days, category="Result")
+        at = datetime.now(timezone.utc)
+        good = [r for r in rows if chain.valid_filing(r, {c.id for c in cos}, at)]
+        out = {"companies": len(cos), "rows": len(good), "added": chain.write_filings(good) if good else 0,
+               "failed": [c.nse_symbol for c in failed]}
+    if pipeline:
+        from . import pipeline as pl
+        out["pipeline"] = pl.run(rescore_all=False)
+    return out
+
+
 def probe() -> list[dict]:
     """One small request per source; never writes. Used by the GitHub probe job to test cloud IPs."""
     import tempfile
@@ -207,6 +227,9 @@ def main(argv: list[str]) -> int:
             print(f"{'OK  ' if r['ok'] else 'FAIL'} {r['source']:<24} {r['ms']:>6} ms  {r['detail']}")
             if r.get("refusal"):
                 print("      refusal:", json.dumps(r["refusal"]))
+        return 0
+    if "--backfill-results" in argv:
+        print(json.dumps(backfill_results(), indent=1, default=str))
         return 0
     if "--backfill" in argv:
         days = int(argv[argv.index("--backfill") + 1])

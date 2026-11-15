@@ -17,6 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="/static/app.css">
+<script defer src="/static/charts.js"></script>
 <script defer src="/static/app.js"></script>
 <script defer src="/static/vendor/alpine-3.14.8.min.js"></script>
 </head>
@@ -349,6 +350,10 @@
               <div class="notice warn">Showing the last copy: the server didn't answer just now.</div>
               <div class="row mt12"><span class="badge outline">Data updated 3h ago</span><span class="badge watch">Data updated 2d ago</span><span class="xs t2">freshness pill: amber only after 26h on a trading day</span></div>
 
+              <div class="eyebrow gal-h">Charts (live data)</div>
+              <p class="xs t2" x-text="gc ? 'Every chart below is computed in Python from FINN\'s verified data for ' + gc.symbol + '; slowest render ' + chartMs() + ' ms.' : 'Loading charts…'"></p>
+              <template x-for="sp in galleryCharts()" :key="sp.id"><div class="mt12" x-init="FinnCharts.mount($el, sp)"></div></template>
+
               <div class="eyebrow gal-h">Sheets and toast</div>
               <div class="row wrap">
                 <button class="btn" @click="openWhy(feedAttention()[0])" :disabled="!feedAttention().length">Why sheet</button>
@@ -397,16 +402,8 @@
               <span class="small num" :class="cls(holdingDay())" x-text="holdingDay() == null ? '' : arrow(holdingDay()) + '%'"></span>
               <span class="grow"></span><span class="xs t2" style="white-space:nowrap" x-text="priceRange()"></span>
             </div>
-            <template x-if="holding.prices.length > 1">
-              <svg class="spark chart" viewBox="0 0 320 76" role="img" :aria-label="'Price over ' + priceRange()">
-                <line class="grid" x1="0" x2="320" :y1="spark().yMid" :y2="spark().yMid" stroke-dasharray="2 4"/>
-                <path class="line" :d="spark().d"/>
-                <circle :cx="spark().ex" :cy="spark().ey" r="2.5" fill="var(--accent)"/>
-                <text x="0" y="74" x-text="spark().firstLabel"></text>
-                <text x="320" y="74" text-anchor="end" x-text="spark().lastLabel"></text>
-                <text :x="spark().hx" y="9" :text-anchor="spark().hx > 260 ? 'end' : spark().hx < 60 ? 'start' : 'middle'" x-text="'High ' + spark().hi"></text>
-              </svg>
-            </template>
+            <template x-if="hc?.price"><div class="mt12" x-init="FinnCharts.mount($el, hc.price)"></div></template>
+            <template x-if="!hc"><div class="sk mt12" style="height:150px"></div></template>
           </div>
 
           <!-- thesis -->
@@ -463,6 +460,22 @@
               </div>
             </template>
           </div>
+
+          <!-- charts from verified figures -->
+          <template x-if="hc">
+            <div>
+              <div class="section-h"><span class="eyebrow">Results, last 8 quarters</span></div>
+              <template x-if="hc.results"><div x-init="FinnCharts.mount($el, hc.results)"></div></template>
+              <p class="small t2" x-show="!hc.results">No verified results figures for this company yet.</p>
+              <template x-if="hc.bridge"><div class="mt12" x-init="FinnCharts.mount($el, hc.bridge)"></div></template>
+              <template x-if="hc.kpis.length">
+                <div>
+                  <div class="section-h"><span class="eyebrow" x-text="holding.thesis?.kpis?.length ? 'Thesis numbers by quarter' : 'Margin against management\'s own target'"></span></div>
+                  <template x-for="sp in hc.kpis" :key="sp.id"><div class="mt12" x-init="FinnCharts.mount($el, sp)"></div></template>
+                </div>
+              </template>
+            </div>
+          </template>
 
           <!-- credibility semicircle -->
           <a class="card mt12" style="display:block" :href="'#research/' + holding.symbol">
@@ -577,13 +590,7 @@
               <div class="score" style="font-size:22px; white-space:nowrap" x-show="rq.report.credibility.score == null">Not scored</div>
               <div class="small t2" style="padding-bottom:4px" x-html="credLine()"></div>
             </div>
-            <template x-if="rq.report.credibility.trend.length">
-              <svg class="chart mt12" viewBox="0 0 320 56" style="width:100%; display:block" role="img" aria-label="Credibility by quarter the promise was made">
-                <line class="grid" x1="0" x2="320" y1="18" y2="18" stroke-dasharray="2 4"/><line class="grid" x1="0" x2="320" y1="40" y2="40"/>
-                <path class="line" :d="trend().d" x-show="rq.report.credibility.trend.length > 1"/>
-                <g x-html="marks(trend().pts, 54)"></g>
-              </svg>
-            </template>
+            <template x-if="rc?.hit_rate"><div class="mt12" x-init="FinnCharts.mount($el, rc.hit_rate)"></div></template>
             <div class="row wrap mt12"><template x-for="[v, n] in verdictCounts()" :key="v"><span class="badge" :class="v" x-text="verdict(v) + ' ' + n"></span></template></div>
             <template x-for="n in rq.report.notes" :key="n"><div class="notice warn mt8" x-text="n"></div></template>
             <template x-if="rq.report.synthesis.credibility.length"><p class="small mt12" x-text="rq.report.synthesis.credibility[0].text"></p></template>
@@ -625,13 +632,7 @@
             <template x-if="rq.report.drift.length">
               <div class="card mt12">
                 <div class="eyebrow">Guidance drift</div>
-                <template x-if="driftChart()">
-                  <svg class="chart mt8" viewBox="0 0 320 70" style="width:100%; display:block" role="img" :aria-label="'How ' + driftChart().metric + ' guidance moved'">
-                    <line class="grid" x1="0" x2="320" y1="12" y2="12" stroke-dasharray="2 4"/><line class="grid" x1="0" x2="320" y1="50" y2="50"/>
-                    <path class="line" :d="driftChart().d"/>
-                    <g x-html="marks(driftChart().pts, 66)"></g>
-                  </svg>
-                </template>
+                <template x-if="rc?.drift"><div class="mt8" x-init="FinnCharts.mount($el, rc.drift)"></div></template>
                 <template x-for="d in rq.report.drift.slice(0, 5)" :key="d.id">
                   <div class="small mt8"><b x-text="d.metric"></b> <span class="t2" x-text="d.horizon ? '(' + d.horizon + ')' : ''"></span>
                     <template x-for="s in d.steps" :key="s.from + s.to"><div class="xs t2"><span class="badge" :class="s.change === 'raised' ? 'up' : s.change === 'cut' ? 'down' : 'outline'" x-text="s.change"></span>
@@ -693,16 +694,12 @@
               <div class="card mt12">
                 <div class="eyebrow" x-text="deepName(deep.data.recipe)"></div>
                 <p class="mt8" style="font-weight:600" x-text="deepFinding()"></p>
+                <template x-for="sp in (deep.data.charts || [])" :key="sp.id"><div class="mt12" x-init="FinnCharts.mount($el, sp)"></div></template>
                 <!-- two-period bars: cash quality / balance sheet -->
                 <template x-if="['cash_quality', 'balance_sheet'].includes(deep.data.recipe)">
                   <div>
                     <p class="xs t2 mt4" x-text="deep.data.report + ' · ' + deep.data.basis + ' · ₹ crore'"></p>
-                    <template x-for="b in pairBars()" :key="b.k">
-                      <div class="mt12"><div class="row xs"><span class="grow" x-text="label(b.k)"></span>
-                        <span class="num t2" x-text="b.prev == null ? '' : 'prev ' + fmt(b.prev)"></span><span class="num" x-text="fmt(b.cur)"></span></div>
-                        <div class="bar"><span :style="'width:' + b.w + '%; background:var(--accent)'"></span><i x-show="b.pw != null" :style="'left:' + b.pw + '%'"></i></div></div>
-                    </template>
-                    <dl class="kv mt12"><template x-for="[k, v] in deepRows(deep.data.current).filter(([k]) => !pairBars().some(b => b.k === k))" :key="k">
+                    <dl class="kv mt12"><template x-for="[k, v] in deepRows(deep.data.current)" :key="k">
                       <div style="display:contents"><dt x-text="label(k)"></dt><dd :class="v == null && 't2'" x-text="fmt(v)"></dd></div></template></dl>
                     <template x-for="c in deep.data.current.checks || []" :key="c"><div class="notice warn mt8" x-text="c"></div></template>
                     <div class="eyebrow mt12">Evidence</div>
@@ -714,11 +711,6 @@
                 <!-- hedge-meter: line per call -->
                 <template x-if="deep.data.recipe === 'hedge_meter'">
                   <div>
-                    <svg class="chart mt8" viewBox="0 0 320 70" style="width:100%; display:block" role="img" aria-label="Cautious phrases per 1,000 words, by call">
-                      <line class="grid" x1="0" x2="320" y1="16" y2="16" stroke-dasharray="2 4"/><line class="grid" x1="0" x2="320" y1="50" y2="50"/>
-                      <path class="line" :d="hedge().d"/>
-                      <g x-html="marks(hedge().pts, 66)"></g>
-                    </svg>
                     <p class="xs t2 mt8" x-text="'Per 1,000 words of management remarks. Top phrases on the latest call: ' + (deep.data.calls.at(-1)?.top || []).slice(0, 3).map(t => t[0] + ' ×' + t[1]).join(', ')"></p>
                   </div>
                 </template>
@@ -746,15 +738,6 @@
                     <div class="eyebrow mt12 down">Said before, not now</div>
                     <template x-for="x in deep.data.dropped.slice(0, 3)" :key="x.text"><div><div class="diff-old" x-text="clip(x.text, 220)"></div>
                       <button class="cite" @click="openEvidence(x.document_id, x.page, x.text)" x-text="x.call + ', page ' + x.page + ' →'"></button></div></template>
-                  </div>
-                </template>
-                <!-- worry map: heat grid -->
-                <template x-if="deep.data.recipe === 'worry_map'">
-                  <div class="scroll-x">
-                    <table class="tbl heat"><thead><tr><th>Topic</th><template x-for="q in deep.data.quarters" :key="q"><th x-text="q.replace(' FY', '·')"></th></template></tr></thead>
-                      <tbody><template x-for="t in deep.data.topics.slice(0, 8)" :key="t"><tr>
-                        <td x-text="t" :class="deep.data.rising.includes(t) && 'watch'"></td>
-                        <template x-for="q in deep.data.quarters" :key="t + q"><td><span :style="heat(deep.data.counts[t]?.[q])" x-text="deep.data.counts[t]?.[q] || ''"></span></td></template></tr></template></tbody></table>
                   </div>
                 </template>
                 <!-- fine print -->
@@ -829,13 +812,22 @@
           <div class="section-h"><span class="eyebrow" x-text="g.label"></span></div>
           <div class="list">
             <template x-for="a in g.items" :key="a.id">
-              <button class="li" @click="openAlert(a)">
-                <span class="alert-i"><svg class="i s"><use :href="alertIcon(a.kind)"/></svg></span>
-                <div class="grow"><div class="small" :class="!a.read && 'unread'" x-text="a.title"></div><div class="xs t2 mt4" x-text="a.line"></div>
-                  <div class="row wrap mt4" x-show="a.also?.length"><template x-for="x in (a.also || [])" :key="x.alert_id">
-                    <span class="badge outline" x-text="'Also: ' + x.title"></span></template></div></div>
-                <span class="dot" x-show="!a.read" aria-label="Unread"></span>
-              </button>
+              <div>
+                <button class="li" @click="openAlert(a)">
+                  <span class="alert-i"><svg class="i s"><use :href="alertIcon(a.kind)"/></svg></span>
+                  <div class="grow"><div class="small" :class="!a.read && 'unread'" x-text="a.title"></div><div class="xs t2 mt4" x-text="a.line"></div>
+                    <div class="row wrap mt4" x-show="a.also?.length"><template x-for="x in (a.also || [])" :key="x.alert_id">
+                      <span class="badge outline" x-text="'Also: ' + x.title"></span></template></div></div>
+                  <span class="dot" x-show="!a.read" aria-label="Unread"></span>
+                </button>
+                <template x-if="a.kind === 'volume_spike' || (a.also || []).some(x => x.kind === 'volume_spike')">
+                  <div style="padding:0 12px 12px 56px">
+                    <button class="btn quiet" style="min-height:36px; padding-left:0" @click="toggleAlertChart(a)" :aria-expanded="!!ac[a.id]"
+                            x-text="ac[a.id] ? 'Hide volume chart' : 'Show volume chart'"></button>
+                    <template x-if="ac[a.id]"><div x-init="FinnCharts.mount($el, ac[a.id])"></div></template>
+                  </div>
+                </template>
+              </div>
             </template>
           </div>
         </div>
@@ -873,13 +865,36 @@
       </div>
 
       <div class="section-h"><span class="eyebrow">Portfolio</span><span class="xs t2" x-text="(holdings || []).length + ' holdings'"></span></div>
-      <div class="list">
+      <form class="search" @submit.prevent="addHolding()">
+        <label class="sr" for="addsym">NSE symbol to add</label>
+        <input id="addsym" type="search" x-model="pf.symbol" placeholder="Add a holding, e.g. HAVELLS" autocapitalize="characters" autocomplete="off" enterkeyhint="go">
+        <button class="btn primary" type="submit" :disabled="pf.busy">Add</button>
+      </form>
+      <template x-if="pf.job">
+        <div class="card mt8">
+          <div class="row"><b class="small grow" x-text="pf.job.symbol"></b><span class="badge" :class="pf.job.error ? 'missed' : pf.job.done ? 'delivered' : 'acc'"
+            x-text="pf.job.error ? 'Stopped' : pf.job.done ? 'Ready' : 'Working'"></span></div>
+          <ul class="steps mt8">
+            <template x-for="(s, i) in pf.job.stages" :key="s">
+              <li :class="pfStage(i)"><span class="n"><template x-if="pfStage(i)==='done'"><span>✓</span></template>
+                <template x-if="pfStage(i)==='now'"><span class="spin"></span></template><template x-if="!pfStage(i)"><span x-text="i + 1"></span></template></span><span x-text="s"></span></li>
+            </template>
+          </ul>
+          <template x-for="l in pf.job.log" :key="l"><p class="xs t2 mt4" x-text="l"></p></template>
+          <div class="notice warn mt8" x-show="pf.job.error" x-text="pf.job.error"></div>
+          <a class="btn quiet mt8" style="padding-left:0" x-show="pf.job.done && !pf.job.error" :href="'#holding/' + pf.job.symbol">Open the holding →</a>
+        </div>
+      </template>
+      <div class="list mt12">
         <template x-for="h in (holdings || [])" :key="h.symbol">
-          <a class="li" :href="'#holding/' + h.symbol" style="align-items:center"><b class="small" style="width:96px" x-text="h.symbol"></b><span class="grow xs t2 trunc" x-text="h.name"></span>
-            <span class="badge" :class="h.status" x-text="status(h.status)"></span></a>
+          <div class="row" style="padding-right:4px">
+            <a class="li grow" :href="'#holding/' + h.symbol" style="align-items:center"><b class="small" style="width:96px" x-text="h.symbol"></b><span class="grow xs t2 trunc" x-text="h.name"></span>
+              <span class="badge" :class="h.status" x-text="status(h.status)"></span></a>
+            <button class="ibtn" style="margin:0" @click="removeHolding(h)" :aria-label="'Remove ' + h.symbol + ' from the portfolio'"><svg class="i s"><use href="#i-x"/></svg></button>
+          </div>
         </template>
       </div>
-      <p class="xs t2 mt8">The portfolio is the <span class="num">is_portfolio</span> column of <span class="num">data/companies.csv</span>; theses are edited on each holding.</p>
+      <p class="xs t2 mt8">Removing a holding hides it from Today and alerts; its filings, cards and reports are kept, and adding it again restores them.</p>
 
       <div class="section-h"><span class="eyebrow">Data refresh</span></div>
       <div class="card">

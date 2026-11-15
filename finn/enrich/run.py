@@ -131,9 +131,8 @@ def reextract_results(filing_ids: list[int] | None = None, use_llm: bool = True)
         q = q.where(Filing.id.in_(filing_ids)) if filing_ids else q.where(Co.is_portfolio.is_(True), Enrichment.bucket != "routine")
         rows = s.execute(q.order_by(Co.nse_symbol, Filing.filed_at.desc())).all()
         for f, e, c in rows:
-            s.expunge(f), s.expunge(c)
-            e_payload = dict(e.payload or {})
-            out.append((f, c, e_payload))
+            out.append((f, c, dict(e.payload or {})))
+        s.expunge_all()          # detach once: a company with several results cards appears in several rows
     report = []
     for f, c, old in out:
         try:

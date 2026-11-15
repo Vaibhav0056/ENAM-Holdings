@@ -56,13 +56,14 @@ def to_filing(row: dict, company_id: int) -> dict | None:
     }
 
 
-def fetch_all(b, code: str, days: int) -> list[dict]:
-    """Pages until ROWCNT rows are collected (one page held 43 TCS rows for 90 days in the probe)."""
+def fetch_all(b, code: str, days: int, category: str = "-1") -> list[dict]:
+    """Pages until ROWCNT rows are collected (one page held 43 TCS rows for 90 days in the probe). BSE answers
+    400 for a date range much over a year, so callers keep `days` <= 365."""
     end = datetime.now()
-    start = end - timedelta(days=days)
+    start = end - timedelta(days=min(days, 365))
     out, page = [], 1
     while True:
-        res = _retry(lambda: b.announcements(page_no=page, scripcode=code, from_date=start, to_date=end))
+        res = _retry(lambda: b.announcements(page_no=page, scripcode=code, from_date=start, to_date=end, category=category))
         rows = res.get("Table", []) or []
         out.extend(rows)
         total = (res.get("Table1") or [{}])[0].get("ROWCNT", len(out))
@@ -119,7 +120,7 @@ def _record_refusal(r, *_, **__):
         log.warning("BSE refused: %s", last_refusal)
 
 
-def fetch(companies, days: int) -> tuple[list[dict], list]:
+def fetch(companies, days: int, category: str = "-1") -> tuple[list[dict], list]:
     """Announcements for each company as filing rows. Returns (rows, companies that failed). Exponential backoff on
     403/429 (2 s, 4 s); after 3 companies in a row are refused, stops asking BSE this run and hands the rest on."""
     from bse import BSE
@@ -135,7 +136,7 @@ def fetch(companies, days: int) -> tuple[list[dict], list]:
                 continue
             for attempt in range(3):
                 try:
-                    raw = fetch_all(b, c.bse_code, days)
+                    raw = fetch_all(b, c.bse_code, days, category)
                     rows += [r for r in (to_filing(x, c.id) for x in raw) if r]
                     refused_run = 0
                     break

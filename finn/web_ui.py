@@ -162,9 +162,83 @@ def deep_dive(symbol: str, recipe: str, force: bool = False):
     if recipe not in deep.RUNNERS:
         raise HTTPException(404, f"unknown deep dive; try one of {', '.join(deep.RECIPES)}")
     try:
-        return deep.run(symbol, recipe, force=force)
+        out = deep.run(symbol, recipe, force=force)
     except deep.NeedsResearch as e:
         raise HTTPException(409, str(e))
+    from . import charts
+    return {**out, "charts": charts.deep_charts(out)}
+
+
+# ---------- portfolio editing ----------
+
+@router.post("/api/v2/portfolio")
+async def portfolio_add(request: Request):
+    """Add a holding: validated against NSE's equity list and Yahoo Finance, then onboarded in the background."""
+    from . import portfolio
+    body = await request.json()
+    job = portfolio.add(body.get("symbol") or "")
+    if job.get("done") and job.get("error") and job["stage"] == portfolio.STAGES[0]:
+        raise HTTPException(400, job["error"])
+    return job
+
+
+@router.get("/api/v2/portfolio/jobs/{symbol}")
+def portfolio_job(symbol: str):
+    from . import portfolio
+    job = portfolio.JOBS.get(symbol.upper())
+    if not job:
+        raise HTTPException(404, "no onboarding job for that symbol")
+    return job
+
+
+@router.delete("/api/v2/portfolio/{symbol}")
+def portfolio_remove(symbol: str):
+    from . import portfolio
+    try:
+        return portfolio.remove(symbol)
+    except portfolio.InvalidTicker as e:
+        raise HTTPException(404, str(e))
+
+
+# ---------- charts (specs computed in Python from verified data; static/charts.js draws them) ----------
+
+@router.get("/api/v2/charts/holding/{symbol}")
+def charts_holding(symbol: str):
+    from . import charts
+    out = charts.holding_bundle(symbol)
+    if not out:
+        raise HTTPException(404, "not a company FINN tracks")
+    return out
+
+
+@router.get("/api/v2/charts/research/{symbol}")
+def charts_research(symbol: str):
+    from . import charts
+    from .research.engine import cached_report
+    rep = cached_report(symbol)
+    if not rep:
+        raise HTTPException(404, "no research report yet")
+    return charts.research_bundle(rep)
+
+
+@router.get("/api/v2/charts/alert/{alert_id}")
+def charts_alert(alert_id: int):
+    from . import charts
+    from .models import Alert, AlertRule, Company as Co
+
+    def q(s):
+        a = s.get(Alert, alert_id)
+        if not a:
+            return None
+        r, c = s.get(AlertRule, a.rule_id), s.get(Co, a.company_id)
+        return a.triggered_on, r.kind, (r.params or {}).get("multiple", 3.0), c.id, c.nse_symbol
+    row = read_session_run(q)
+    if not row:
+        raise HTTPException(404, "no such alert")
+    on, kind, mult, cid, sym = row
+    if kind != "volume_spike":
+        return {"volume": None}
+    return {"volume": charts.volume_chart(cid, sym, on, float(mult))}
 
 
 @router.get("/api/v2/deep")

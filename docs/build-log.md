@@ -415,3 +415,63 @@ Lighthouse 12.8.2, mobile, headless Chrome 157, local server. Feed `/digest`: p5
 - EBITDA on these cards is derived (PBT + finance costs + depreciation − other income) and marked with *.
 
 Tests: 221 passed (both bases and continuation pages, OCR spaces and decimal commas, unit headers, unit inference only from an exact match, BSE-summary card, labels without spaces, basis explanations, confirmations not warnings).
+
+
+## Final fix pass, step 4b: charts
+
+**Why.** Numbers in FINN were lists and tables; trends (eight quarters of margins, a year of price with the filings
+that moved it, promise hit-rates) were invisible.
+
+**Built.**
+- `finn/charts.py` computes every chart as a spec in Python from verified database data only: series (gaps stay
+  gaps), units, a one-line title stating the finding (computed from the same numbers), a source per point (document,
+  page, quote), a text summary for screen readers, and the rows for "View as table". The browser computes nothing.
+- `static/charts.js` draws any spec as inline SVG: bars, line, step, waterfall, stacked bars, sparkline, heat grid,
+  threshold band, price with event markers. 1.5 px lines, muted grid, direct labels (a label row with each series'
+  latest value, no legend box), bars from zero, colour only for meaning (accent; green/red for up/down steps and
+  delivered/missed; amber for partial). `FinnCharts.mount(el, spec)` renders the whole card: title, SVG, a tap
+  readout with the point's value and source (opens the evidence sheet at that page), "View as table", the note.
+- Charts placed: Holding (one-year price with results / management / governance markers; results for the last 8
+  quarters with EBITDA margin; EBITDA-to-PAT margin bridge; thesis KPIs against their threshold), Research (promises
+  by quarter said, stacked by verdict; guidance drift step chart), deep dives (new "Results history" tile; cash
+  quality OCF vs PAT with conversion; balance sheet net debt; hedge-meter; worry-map heat grid), Alerts (20-day
+  volume with the rule's threshold line on volume alerts), Gallery (every chart, live data for POLYCAB).
+- Data for them: a year of results filings (`python -m finn.ingest --backfill-results`, one BSE call per company:
+  BSE answers 400 for a range over a year) and a year of daily prices. 70 results filings added and extracted
+  (1,065 s; 55 OK on the first pass), 7,761 price rows. Quarter coverage after re-extraction: median 6 of the 8 quarters per holding; DMART, PERSISTENT and SUNPHARMA have all 8; 17 of 20 holdings have a margin bridge. Re-extracting all 73 results cards (old and new) gave 56 verified, 9 Verify, 8 without figures; each holding's latest card is verified except TATAPOWER, which this pass read from its own PDF (consolidated, quotes verified) instead of showing BSE's summary: BSE's standalone figure is unexplained there, so it carries Verify (corrects step 4's 20 of 20 to 19 of 20). DIXON moved the other way: now read from its own PDF instead of BSE's summary. A junk 'other basis' reading (₹2.00 cr) is never quoted: the other statement must be 5-150% of the shown revenue.
+- Results payloads now keep every line read for the quarter (`lines`), which the margin bridge needs.
+- When a thesis has no numeric KPI, the band chart uses management's own most recent **company-wide** EBITDA-margin
+  target from the promise ledger, labelled as such with its quote and page ("Not your thesis"). Segment targets and
+  operating-margin targets (a different measure) are never used: POLYCAB gets "EBITDA margin vs management's 12–14%
+  target (said Q4 FY26)"; TCS gets none.
+
+**Bugs caught while building it.** The bridge title named a subtotal ("pbt margin") as the biggest step; steps were
+rounded before stacking, so they missed the PBT subtotal by 0.1 points (now 2 decimals in the data, 1 in labels); a
+revenue-only reading of the other basis crashed the mismatch note (2 backfilled filings failed on it); the browser's
+default `<figure>` margin inset every chart; waterfall labels collided at 360 px.
+
+**Performance.** Rendering, steady state in Node: 0.8 ms for an 8-quarter bars chart, 3.6 ms for a 250-day price
+chart (budget 50 ms; a test fails above it). The holding chart bundle went from 2.1 s to 0.37 s warm (quarter history
+computed once, independent queries in parallel).
+
+Tests: test_charts.py (gaps kept, finding computed, bridge adds up and names a real step, hit-rate and drift, deep
+dives, company-wide-only guidance band, every kind rendered in Node without NaN and under 50 ms).
+
+## Final fix pass, step 5: portfolio editing
+
+**Built.** Settings → Portfolio: add a holding by NSE symbol, remove one with ×.
+- Validation: NSE's official equity list (`EQUITY_L.csv`: name, ISIN) and Yahoo Finance price history; the BSE code
+  comes from BSE's securities list matched by ISIN (groups A and B). The `bse` library's `lookup()` crashes on BSE's
+  current response, so it is not used. No BSE listing is fine: the source chain fetches filings from NSE.
+- Onboarding runs in the background with visible stages: checking the ticker → filings (90 days) and prices (a year)
+  → reading the new filings (the pipeline) → the research report (waited for, up to 5 minutes) → a thesis draft from
+  management's own claims (the draft reads the report's verified statements, so research comes first). Progress at
+  `GET /api/v2/portfolio/jobs/{symbol}`; a failed stage leaves the company added and the next scheduled run fills in.
+- Removal sets `status = removed` and drops it from the portfolio: it disappears from Today, Holdings, alerts and the
+  ingest run; every filing, card, report and alert is kept, and adding it again restores it (undo in the toast).
+- Fixed on the way: `seed.py` re-applied `is_portfolio` from `data/companies.csv` on every start (and `start.sh`
+  re-seeds on every deploy), which would have undone any change made in the app. The CSV is now the initial
+  portfolio only.
+
+Tests: test_portfolio.py (invalid tickers rejected with a reason, add + onboarding started, remove keeps history,
+re-add restores, re-seeding never undoes a Settings change, ingest skips removed companies).

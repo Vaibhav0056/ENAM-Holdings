@@ -340,6 +340,25 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 .tab[aria-current="page"] { color: var(--accent-ink); }
 .tab .count { position: absolute; top: 4px; left: calc(50% + 6px); }
 
+/* charts (static/charts.js) */
+.chartbox { padding: var(--cpad); margin: 0; }
+.chartbox .ct-title { font-weight: 600; line-height: 19px; }
+.fchart { width: 100%; height: auto; display: block; overflow: visible; }
+.fchart text { font-family: var(--mono); font-size: 9.5px; fill: var(--text-2); }
+.fchart .lbl { fill: var(--text); font-weight: 500; }
+.fchart .grid { stroke: var(--border); stroke-width: 1; }
+.fchart .line { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.fchart .dot { fill: var(--accent); } .fchart .dot.bad { fill: var(--down); }
+.fchart .th { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 4 3; }
+.fchart .thl { fill: var(--text-2); }
+.fchart .okband { fill: color-mix(in srgb, var(--up) 9%, transparent); }
+.fchart .evline { stroke: var(--border); stroke-width: 1; stroke-dasharray: 1 3; }
+.fchart .evmark { font-weight: 700; font-size: 9px; }
+.fchart .gap { fill: var(--border); }
+.fchart .oninv { fill: var(--on-accent); font-weight: 600; }
+.fchart .watchtxt { fill: var(--watch); }
+.fchart [data-i], .fchart .ev { cursor: pointer; }
+
 /* gallery */
 .gal-h { margin: 32px 0 8px; padding-top: 16px; border-top: 1px dashed var(--border); }
 
